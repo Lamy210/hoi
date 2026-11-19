@@ -17,7 +17,8 @@ interface FC {
 
 export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource): MapRenderer {
   let readyResolve: (() => void) | null = null;
-  const ready = new Promise<void>((res) => (readyResolve = res));
+  let readyReject: ((error: unknown) => void) | null = null;
+  const ready = new Promise<void>((res, rej) => { readyResolve = res; readyReject = rej; });
   let featuresLod1: FCFeature[] = [];
   let featuresLod2: FCFeature[] = [];
   let currentLod: 1 | 2 = 2;
@@ -36,6 +37,8 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
     center: [(ds.viewBbox[0] + ds.viewBbox[2]) / 2, (ds.viewBbox[1] + ds.viewBbox[3]) / 2],
     zoom: 3,
     interactive: true,
+    dragRotate: false,
+    pitchWithRotate: false,
     attributionControl: false,
   });
   map.fitBounds(
@@ -48,10 +51,9 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
   async function init(): Promise<void> {
-    const { loadGeometry, loadDecoration } = await import('../engineClient');
-    const lod1fc = (await loadGeometry(1)) as unknown as FC;
-    const lod2fc = (await loadGeometry(2)) as unknown as FC;
-    const decor = (await loadDecoration()) as unknown as FC;
+    const lod1fc = (await ds.loadGeometry(1)) as unknown as FC;
+    const lod2fc = (await ds.loadGeometry(2)) as unknown as FC;
+    const decor = (await ds.loadDecoration()) as unknown as FC;
     featuresLod1 = lod1fc.features;
     featuresLod2 = lod2fc.features;
 
@@ -92,7 +94,7 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
         currentLod = want;
         (map.getSource('prov') as maplibregl.GeoJSONSource).setData({
           type: 'FeatureCollection',
-          features: want === 1 ? featuresLod1 : featuresLod2,
+          features: currentFC().features,
         } as any);
       }
     };
@@ -134,7 +136,7 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
   }
 
   map.on('load', () => {
-    void init();
+    void init().catch(error => readyReject?.(error));
   });
 
   return {
@@ -159,7 +161,9 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
       }
     },
     pickAt(clientX: number, clientY: number): number | null {
-      const feats = map.queryRenderedFeatures([clientX, clientY], { layers: ['prov-fill'] });
+      if (!map.getLayer('prov-fill')) return null;
+      const rect = map.getCanvas().getBoundingClientRect();
+      const feats = map.queryRenderedFeatures([clientX - rect.left, clientY - rect.top], { layers: ['prov-fill'] });
       const f = feats[0];
       return f ? Number(f.properties?.pidIdx) : null;
     },
@@ -169,6 +173,8 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
         (map.getSource('prov') as maplibregl.GeoJSONSource).setData(currentFC() as any);
       }
     },
+    zoomBy(factor: number) { map.zoomTo(map.getZoom() + Math.log2(factor), { duration: 0 }); },
+    resetView() { map.fitBounds([[ds.viewBbox[0], ds.viewBbox[1]], [ds.viewBbox[2], ds.viewBbox[3]]], { padding: 24, duration: 0, bearing: 0, pitch: 0 }); },
     resize() {
       map.resize();
     },
