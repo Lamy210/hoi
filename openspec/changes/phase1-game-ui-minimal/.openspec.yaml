@@ -1,0 +1,9 @@
+schema: spec-driven
+created: 2026-11-14
+goal: メインゲーム画面（地図中心・時間UI・国家概要・警告フィード・セーブ画面）とja/en多言語化・ショートカットを実装し、Phase 1を遊べる状態にする
+affected_areas:
+  - game-ui
+x-phase: "1"
+x-order: 7
+x-depends-on:
+  - phase1-save-system-mvp

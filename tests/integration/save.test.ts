@@ -1,0 +1,77 @@
+// セーブ/ロード統合テスト（INV-8: 往復一致＋継続一致）
+import { describe, it, expect } from 'vitest';
+import { createTestEngine, loadTestPack } from '../helpers';
+import { deserializeWorld } from '../../src/engine/save/serialize';
+import { hashWorld } from '../../src/engine/core/hash';
+
+describe('セーブ/ロード', () => {
+  it('スナップショットの直列化は決定論的（同状態→同バイト列）', async () => {
+    const engine = await createTestEngine(1, 11, 'JPN');
+    for (let t = 0; t < 100; t++) engine.stepTick();
+    const a = engine.serialize();
+    const b = engine.serialize();
+    expect(Buffer.from(a).equals(Buffer.from(b))).toBe(true);
+  });
+
+  it('往復復元で状態ハッシュ一致・継続tickも一致（INV-8）', async () => {
+    const pack = await loadTestPack();
+    const engine = await createTestEngine(1, 12, 'JPN');
+    for (let t = 0; t < 300; t++) engine.stepTick();
+    const buf = engine.serialize();
+
+    const r = deserializeWorld(buf, pack);
+    expect(r.violations).toEqual([]);
+    expect(r.world).not.toBeNull();
+    expect(hashWorld(r.world!)).toBe(hashWorld(engine.world));
+
+    // 復元後も同一tick数進めると同一ハッシュ
+    for (let t = 0; t < 60; t++) {
+      engine.stepTick();
+      r.world!.runtime.commandsSinceLastTick = [];
+      // 復元側はコマンドなしで進行（AIのみ）
+      const restored = r.world!;
+      // stepTick相当を手動実行（Engineファサードではなく世界直操作）
+      const { applyCommands } = await import('../../src/engine/core/command');
+      applyCommands(restored, restored.runtime.commandsSinceLastTick);
+      restored.runtime.commandsSinceLastTick = [];
+      restored.tick++;
+      const { runDailySystems, runWeeklySystems, runMonthlySystems } = await import('../../src/engine/core/scheduler');
+      runDailySystems(restored);
+      runWeeklySystems(restored);
+      runMonthlySystems(restored);
+    }
+    expect(hashWorld(r.world!)).toBe(hashWorld(engine.world));
+  });
+
+  it('改ざんセーブは拒否される（不正セーブ処理）', async () => {
+    const engine = await createTestEngine(1, 13, 'JPN');
+    for (let t = 0; t < 50; t++) engine.stepTick();
+    const buf = engine.serialize();
+    const pack = await loadTestPack();
+    // ビット列を1ビット改ざん（storesペイロード中央・数値領域を狙う。
+    // 末尾はマップキー文字列で既定値フォールバックにより状態整合が保たれる領域があるため）
+    const corrupt = new Uint8Array(buf);
+    const mid = Math.floor(corrupt.length / 2);
+    corrupt[mid] ^= 0xff;
+    const r = deserializeWorld(corrupt, pack);
+    // decodeまたはintegrityのいずれかで拒否されること
+    expect(r.world).toBeNull();
+    expect(r.violations.length).toBeGreaterThan(0);
+  });
+
+  it('不明バージョンのセーブは拒否される', async () => {
+    const engine = await createTestEngine(1, 14, 'JPN');
+    for (let t = 0; t < 10; t++) engine.stepTick();
+    const buf = engine.serialize();
+    // ヘッダのvを書き換え（msgpack先頭付近の整数を探して1→9）
+    const pack = await loadTestPack();
+    const { decode } = await import('@msgpack/msgpack');
+    const blob = decode(buf) as Record<string, any>;
+    blob.header.v = 999;
+    const { encode } = await import('@msgpack/msgpack');
+    const bad = encode(blob);
+    const r = deserializeWorld(new Uint8Array(bad), pack);
+    expect(r.world).toBeNull();
+    expect(r.violations.some((v) => v.includes('version'))).toBe(true);
+  });
+});

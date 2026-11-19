@@ -1,0 +1,9 @@
+schema: spec-driven
+created: 2026-11-14
+goal: 決定論的なシミュレーション基盤（固定Tick・コマンドキュー・PCG32・スケジューラ・ハッシュアンカー）を実装し、全後続Changeの土台を作る
+affected_areas:
+  - game-core
+  - simulation-clock
+x-phase: "1"
+x-order: 1
+x-depends-on: []

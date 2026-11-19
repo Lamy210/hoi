@@ -1,0 +1,11 @@
+schema: spec-driven
+created: 2026-11-14
+goal: 師団の作成・移動・宣戦・簡易戦闘・占領と簡易補給（到達性＋減衰）を実装し、Phase 1の軍事コアを完成させる
+affected_areas:
+  - military-system
+  - combat-system
+  - logistics-system
+x-phase: "1"
+x-order: 4
+x-depends-on:
+  - phase1-country-scenario

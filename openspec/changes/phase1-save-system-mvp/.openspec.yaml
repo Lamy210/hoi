@@ -1,0 +1,9 @@
+schema: spec-driven
+created: 2026-11-14
+goal: セーブ/ロード（msgpackスナップショット・IndexedDB・バージョン検証・自動セーブ・エクスポート）を実装する
+affected_areas:
+  - save-system
+x-phase: "1"
+x-order: 6
+x-depends-on:
+  - phase1-country-ai-mvp

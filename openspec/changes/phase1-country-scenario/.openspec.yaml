@@ -1,0 +1,10 @@
+schema: spec-driven
+created: 2026-11-14
+goal: シナリオパックのロードフロー（検証→初期状態構築）と国家システムの最小実装（定義読込・国庫・政体・国家選択データ提供）を作る
+affected_areas:
+  - country-system
+  - scenario-system
+x-phase: "1"
+x-order: 3
+x-depends-on:
+  - phase1-world-map-provinces

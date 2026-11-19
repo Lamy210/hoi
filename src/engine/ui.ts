@@ -1,0 +1,336 @@
+// UIスナップショット — Worker→UIの公開状態（差分レンダリングの源）。
+// エンジン状態そのものではなく、UIが必要な値の投影。
+import type { WorldState } from './core/state';
+import { formatDate, civilFromDays } from './clock/date';
+import { activeWarBetween, effectiveSupply } from './core/state';
+import { refreshWeather, seasonOfMonth } from './systems/weather';
+import { computeScores } from './systems/score';
+import { techDefs } from './systems/research';
+import { contributionOf } from './diplomacy/peace';
+import { warScoreFor } from './military/war';
+import type { Alert } from './core/state';
+
+export interface UiCountry {
+  id: string;
+  nameEn: string;
+  nameJa: string;
+  color: string;
+  capital: number;
+  population: number;
+  manpowerPool: number;
+  infEquipmentStock: number;
+  artEquipmentStock: number;
+  productionShare: number;
+  milFactories: number;
+  alive: boolean;
+  divisions: number;
+  atWar: number[]; // 交戦中の国家
+  treasury: number;
+  taxRate: number;
+  budgetEdu: number;
+  gdp: number;
+  livingStandard: number;
+  literacy: number;
+  unemployment: number;
+  supportRate: number;
+  stability: number;
+  pp: number;
+  laws: { conscription: number; economy: number };
+  lawPending: { slot: string; target: number; startTick: number; enactDays: number } | null;
+  research: { active: { id: string; progress: number; days: number }[]; done: string[] };
+  construction: { id: number; prov: number; type: string; costPaid: number; cost: number; daysProgress: number; daysTotal: number; paused: boolean }[];
+  foodStock: number;
+  consumerStock: number;
+  scores: { military: number; economy: number; diplomacy: number; technology: number; living: number };
+  scoreHistory: { tick: number; military: number; economy: number; diplomacy: number; technology: number; living: number }[];
+}
+
+export interface UiTechDef {
+  id: string;
+  cat: string;
+  req: string[];
+  days: number;
+}
+
+export interface UiFront {
+  id: number;
+  owner: number;
+  enemy: number;
+  stance: string;
+  provinces: number[];
+  targets: number[];
+  cap: number;
+  assigned: number;
+}
+
+export interface UiCommander {
+  id: number;
+  country: number;
+  nameJa: string;
+  nameEn: string;
+  skill: number;
+  trait: number;
+  assignedUnit: number;
+  exp: number;
+}
+
+export interface UiUnit {
+  id: number;
+  owner: number;
+  loc: number;
+  moving: boolean;
+  target: number; // 移動先（移動中のみ有効）
+  org: number;
+  strength: number; // manpower/maxManpower
+  infEquipment: number;
+  maxInfEquipment: number;
+  artEquipment: number;
+  maxArtEquipment: number;
+  supply: number;
+  frontId: number;
+  commanderId: number;
+  encircled: boolean;
+  inBattle: boolean;
+}
+
+export interface UiWar {
+  id: number;
+  aggressor: number;
+  defender: number;
+  cb: boolean;
+  status: string;
+  days: number;
+  scoreAggressor: number;
+  scoreDefender: number;
+  contribAggressor: number;
+  contribDefender: number;
+  offerDemands: number[]; // peaceOffered時の要求州
+  offeredBy: number; // peaceOffered時の提案者
+}
+
+export interface UiTreaty {
+  id: number;
+  type: string;
+  a: number;
+  b: number;
+  startTick: number;
+  expiryTick: number;
+  status: string;
+  proposer: number;
+}
+
+export interface UiSnapshot {
+  tick: number;
+  dateStr: string;
+  playerCountry: number;
+  difficulty: number;
+  owner: number[];
+  controller: number[];
+  supplyEff: number[];
+  weather: number[]; // 0=晴 1=雨 2=雪 3=嵐
+  season: string;
+  countries: UiCountry[];
+  units: UiUnit[];
+  wars: UiWar[];
+  fronts: UiFront[];
+  commanders: UiCommander[];
+  techs: UiTechDef[];
+  claims: { country: number; province: number }[];
+  treaties: UiTreaty[]; // phase4-diplomacy-treaties（proposed含む全条約）
+  relations: { a: number; b: number; v: number }[]; // phase4-diplomacy-treaties（UI表示用）
+  alerts: Alert[]; // sinceAlertIdより新しいもの
+  lastAlertId: number;
+}
+
+export interface UiMeta {
+  packId: string;
+  packNameEn: string;
+  packNameJa: string;
+  provCount: number;
+  provIds: string[];
+  provNameEn: string[];
+  provNameJa: string[];
+  provLabelX: number[];
+  provLabelY: number[];
+  provPop: number[];
+  provTerrain: string[];
+  provInfra: number[];
+  provAreaKm2: number[];
+  viewBbox: [number, number, number, number];
+  epochY: number;
+  sources: { name: string; attribution: string; license: string }[];
+}
+
+export function buildUiMeta(w: WorldState, pack: import('./scenario/types').Pack): UiMeta {
+  return {
+    packId: pack.manifest.id,
+    packNameEn: pack.manifest.nameEn,
+    packNameJa: pack.manifest.nameJa,
+    provCount: w.prov.count,
+    provIds: w.prov.id.slice(),
+    provNameEn: w.prov.nameEn.slice(),
+    provNameJa: w.prov.nameJa.slice(),
+    provLabelX: w.prov.labelX.slice(),
+    provLabelY: w.prov.labelY.slice(),
+    provPop: w.prov.population.slice(),
+    provTerrain: w.prov.terrain.map((t) => ['plains', 'hills', 'mountains', 'urban', 'forest', 'desert'][t]),
+    provInfra: w.prov.infra.slice(),
+    provAreaKm2: w.prov.areaKm2.slice(),
+    viewBbox: pack.viewBbox,
+    epochY: 2026,
+    sources: pack.sources.sources.map((s) => ({ name: s.name, attribution: s.attribution, license: s.license })),
+  };
+}
+
+export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot {
+  const techs = techDefs();
+  const countries: UiCountry[] = [];
+  for (let c = 0; c < w.countries.count; c++) {
+    const atWar: number[] = [];
+    for (let e = 0; e < w.countries.count; e++) {
+      if (e !== c && activeWarBetween(w, c, e)) atWar.push(e);
+    }
+    countries.push({
+      id: w.countries.id[c],
+      nameEn: w.countries.nameEn[c],
+      nameJa: w.countries.nameJa[c],
+      color: w.countries.color[c],
+      capital: w.countries.capital[c],
+      population: w.countries.population[c],
+      manpowerPool: w.countries.manpowerPool[c],
+      infEquipmentStock: w.countries.infEquipmentStock[c],
+      artEquipmentStock: w.countries.artEquipmentStock[c],
+      productionShare: Math.round((w.productionShare[c] ?? 0.2) * 1000) / 1000,
+      milFactories: w.countries.milFactories[c],
+      alive: w.countries.alive[c],
+      divisions: w.units.filter((u) => u.owner === c && !u.destroyed).length,
+      atWar,
+      treasury: Math.round(w.treasury[c]),
+      taxRate: w.taxRate[c],
+      budgetEdu: w.budgetEdu[c],
+      gdp: w.gdp[c],
+      livingStandard: Math.round(w.livingStandard[c] * 1000) / 1000,
+      literacy: Math.round(w.literacy[c] * 1000) / 1000,
+      unemployment: Math.round(w.unemployment[c] * 1000) / 1000,
+      supportRate: Math.round(w.supportRate[c] * 1000) / 1000,
+      stability: Math.round(w.stability[c] * 1000) / 1000,
+      pp: Math.round(w.pp[c]),
+      laws: { conscription: w.laws[c].conscription, economy: w.laws[c].economy },
+      lawPending: w.lawQueue[c]
+        ? { slot: w.lawQueue[c]!.slot, target: w.lawQueue[c]!.target, startTick: w.lawQueue[c]!.startTick, enactDays: w.lawQueue[c]!.enactDays }
+        : null,
+      research: {
+        active: w.research[c].active.map((a) => {
+          const def = techs.find((t) => t.id === a.id);
+          return { id: a.id, progress: Math.round(a.progress), days: def?.days ?? 1 };
+        }),
+        done: w.research[c].done.slice(),
+      },
+      construction: w.constructionQueue
+        .filter((pr) => pr.country === c)
+        .map((pr) => ({
+          id: pr.id,
+          prov: pr.prov,
+          type: pr.type,
+          costPaid: Math.round(pr.costPaid),
+          cost: pr.cost,
+          daysProgress: Math.round(pr.daysProgress),
+          daysTotal: pr.daysTotal,
+          paused: pr.paused,
+        })),
+      foodStock: Math.round(w.foodStock[c]),
+      consumerStock: Math.round(w.consumerStock[c]),
+      scores: computeScores(w, c),
+      scoreHistory: (w.scoreHistory[c] ?? []).slice(-120).map((e) => ({ ...e })),
+    });
+  }
+  const units: UiUnit[] = w.units
+    .filter((u) => !u.destroyed)
+    .map((u) => ({
+      id: u.id,
+      owner: u.owner,
+      loc: u.loc,
+      moving: u.path.length > 0,
+      target: u.path.length > 0 ? u.path[u.path.length - 1] : -1,
+      org: Math.round(u.org * 10) / 10,
+      strength: u.maxManpower > 0 ? Math.round((u.manpower / u.maxManpower) * 1000) / 1000 : 0,
+      infEquipment: Math.round(u.infEquipment),
+      maxInfEquipment: u.maxInfEquipment,
+      artEquipment: Math.round(u.artEquipment),
+      maxArtEquipment: u.maxArtEquipment,
+      supply: Math.round(effectiveSupply(w, u) * 1000) / 1000,
+      frontId: u.frontId,
+      commanderId: u.commanderId,
+      encircled: u.encircled,
+      inBattle: w.runtime.activeBattles.has(u.loc),
+    }));
+  const fronts: UiFront[] = w.fronts.map((f) => ({
+    id: f.id,
+    owner: f.owner,
+    enemy: f.enemy,
+    stance: f.stance,
+    provinces: f.provinces.slice(),
+    targets: f.targets.slice(),
+    cap: f.cap,
+    assigned: w.units.filter((u) => !u.destroyed && u.frontId === f.id).length,
+  }));
+  const commanders: UiCommander[] = w.commanders.map((c) => ({
+    id: c.id,
+    country: c.country,
+    nameJa: c.nameJa,
+    nameEn: c.nameEn,
+    skill: c.skill,
+    trait: c.trait,
+    assignedUnit: c.assignedUnit,
+    exp: Math.round(c.exp * 1000) / 1000,
+  }));
+  const wars: UiWar[] = w.wars
+    .filter((war) => war.status !== 'ended')
+    .map((war) => ({
+      id: war.id,
+      aggressor: war.aggressor,
+      defender: war.defender,
+      cb: war.cb,
+      status: war.status,
+      days: w.tick - war.startTick,
+      scoreAggressor: warScoreFor(w, war, war.aggressor),
+      scoreDefender: warScoreFor(w, war, war.defender),
+      contribAggressor: Math.round(contributionOf(war, war.aggressor) * 100) / 100,
+      contribDefender: Math.round(contributionOf(war, war.defender) * 100) / 100,
+      offerDemands: (war.offerDemands ?? []).slice(),
+      offeredBy: war.offeredBy,
+    }));
+  const treaties: UiTreaty[] = w.treaties.map((t) => ({
+    id: t.id,
+    type: t.type,
+    a: t.a,
+    b: t.b,
+    startTick: t.startTick,
+    expiryTick: t.expiryTick,
+    status: t.status,
+    proposer: t.proposer,
+  }));
+  const alerts = w.runtime.alerts.filter((a) => a.id > sinceAlertId);
+  return {
+    tick: w.tick,
+    dateStr: formatDate(w.epochDays + w.tick),
+    playerCountry: w.playerCountry,
+    difficulty: w.difficulty,
+    owner: w.prov.owner.slice(),
+    controller: w.prov.controller.slice(),
+    supplyEff: w.runtime.supplyEff.map((e) => Math.round(e * 1000) / 1000),
+    weather: (refreshWeather(w), w.runtime.weatherByProv.slice()),
+    season: seasonOfMonth(civilFromDays(w.epochDays + w.tick).m),
+    countries,
+    units,
+    wars,
+    fronts,
+    commanders,
+    techs: techs.map((t) => ({ id: t.id, cat: t.cat, req: t.req.slice(), days: t.days })),
+    claims: w.claims.slice(),
+    treaties,
+    relations: w.relations.map((r) => ({ a: r.a, b: r.b, v: Math.round(r.v) })),
+    alerts,
+    lastAlertId: w.nextAlertId - 1,
+  };
+}

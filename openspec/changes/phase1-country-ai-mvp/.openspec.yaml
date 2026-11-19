@@ -1,0 +1,9 @@
+schema: spec-driven
+created: 2026-11-14
+goal: 他国の週次自律思考（戦略スタンス・経済簡易・軍事戦線・外交反応）と判断ログ・分散スケジュールを実装する
+affected_areas:
+  - ai-system
+x-phase: "1"
+x-order: 5
+x-depends-on:
+  - phase1-military-combat-mvp

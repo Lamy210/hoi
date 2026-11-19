@@ -1,0 +1,10 @@
+schema: spec-driven
+created: 2026-11-14
+goal: プロヴィンス地図（パイプライン生成ジオメトリの読込・MapLibre描画・選択/ホバー・LOD）とprovince-systemのSoA実装を作る
+affected_areas:
+  - world-map
+  - province-system
+x-phase: "1"
+x-order: 2
+x-depends-on:
+  - phase1-simulation-clock

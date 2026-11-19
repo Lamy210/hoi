@@ -1,0 +1,30 @@
+schema: spec-driven
+
+context: |
+  ブラウザ型グランドストラテジーゲーム「Orbis（仮称）」の仕様駆動開発プロジェクト。
+  - 単一コードベース: TypeScript strict。エンジン(@orbis/engine)はUI非依存・決定論的シミュレーション。
+  - すべての成果物・仕様・タスク記述は日本語で書く（コード識別子・ファイル名は英語）。
+  - 決定論の規律: Math.random・Math.sin等の超越関数はシミュレーション内で禁止。PCG32（シード派生ストリーム）を使用する。
+  - AI と UI は状態を直接書き換えない。すべてコマンド経由（docs/06 不変条件 INV-3）。
+  - 性能の数値は実測に基づいて確定する。未計測の性能を保証する記述をしない（docs/13）。
+  - baseline spec（openspec/specs/）は「設計合意済みの目標仕様」、Change の delta は「そのChangeで実装する機能レベル要件」。要件名が重複しないよう分担する（docs/17 D-002）。
+  - 同梱データは docs/12 の採用表に従う。UN Comtrade・SIPRI の生データ同梱は禁止。
+  - 開発文書は docs/ にあり、仕様と矛盾した場合は openspec を優先して docs を修正する。
+
+rules:
+  proposal:
+    - 簡潔に書く。Why / What Changes / Capabilities / Impact を必ず含め、対象Phaseを明記する
+  tasks:
+    - 各タスク行に 目的/対象ファイル/作業内容/テスト/期待値/完了条件 を含める
+    - タスクは2時間以内で完了できるチャンクに分割する
+  specs:
+    - Requirement本文は500字以内。ScenarioはWHEN/THENで必ず1つ以上
+    - 本文は日本語で記述する
+
+operations:
+  apply:
+    guidance:
+      - openspec validate --strict を適用前に実行し、失敗するChangeは進めない
+  archive:
+    guidance:
+      - アーカイブ前にbaseline specとの要件名重複を確認する

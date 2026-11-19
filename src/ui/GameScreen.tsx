@@ -1,0 +1,305 @@
+// メインゲーム画面 — 地図中心レイアウト（game-ui仕様: docs/11 §2）
+import { useEffect, useRef, useState } from 'react';
+import { useApp } from './App';
+import { appStore } from './store';
+import { t } from './i18n';
+import { engineClient, loadGeometry, loadDecoration } from './engineClient';
+import { startPacer, stopPacer } from './pacer';
+import type { MapDataSource, MapRenderer } from './maprender/types';
+import { colorsForMode, diffIndices } from './maprender/types';
+import { createCanvasRenderer } from './maprender/canvasAdapter';
+import { createMaplibreRenderer } from './maprender/maplibreAdapter';
+import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel } from './panels';
+
+const TERRAIN_NAMES = ['plains', 'hills', 'mountains', 'urban', 'forest', 'desert'];
+
+function hasWebGL(): boolean {
+  try {
+    const c = document.createElement('canvas');
+    return !!(c.getContext('webgl2') || c.getContext('webgl'));
+  } catch {
+    return false;
+  }
+}
+
+export function GameScreen() {
+  const st = useApp();
+  const mapRef = useRef<HTMLDivElement>(null);
+  const rendererRef = useRef<(MapRenderer & { setMode?: (m: 'political' | 'terrain' | 'supply', colors: string[]) => void }) | null>(null);
+  const dsRef = useRef<MapDataSource | null>(null);
+  const terrainArrRef = useRef<number[]>([]);
+  const prevArrRef = useRef<{ owner: number[]; controller: number[] } | null>(null);
+  const [hoverProv, setHoverProv] = useState<number | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [search, setSearch] = useState<string | null>(null);
+  const lang = st.lang;
+  const meta = st.meta;
+  const snap = st.snap;
+
+  // レンダラ初期化（metaが到着した後に1回。スナップショットは到着待ち）
+  useEffect(() => {
+    if (!st.meta) return;
+    let disposed = false;
+    let renderer: MapRenderer & { setMode?: (m: 'political' | 'terrain' | 'supply', colors: string[]) => void } | null = null;
+    (async () => {
+      let s = appStore.get().snap;
+      for (let i = 0; !s && i < 200 && !disposed; i++) {
+        await new Promise((res) => setTimeout(res, 50));
+        s = appStore.get().snap;
+      }
+      const m = st.meta;
+      if (!m || !s || !mapRef.current) return;
+      terrainArrRef.current = m.provTerrain.map((x) => Math.max(0, TERRAIN_NAMES.indexOf(x)));
+      const ds: MapDataSource = {
+        loadGeometry: (lod) => loadGeometry(lod),
+        loadDecoration: () => loadDecoration(),
+        provIds: m.provIds,
+        owner: s.owner,
+        controller: s.controller,
+        countryColors: s.countries.map((c) => c.color),
+        viewBbox: m.viewBbox,
+        provLabelX: m.provLabelX,
+        provLabelY: m.provLabelY,
+        provNameJa: m.provNameJa,
+        provNameEn: m.provNameEn,
+        supplyEff: s.supplyEff,
+      };
+      dsRef.current = ds;
+      prevArrRef.current = { owner: s.owner, controller: s.controller };
+      // D-015: 既定はCanvas2D（決定論的表示・全環境で視覚検証可能）。
+      // MapLibre GL JSは ?renderer=maplibre 指定時のオプション実装（WebGL環境）。
+      const forceMaplibre = new URLSearchParams(location.search).get('renderer') === 'maplibre';
+      if (forceMaplibre && hasWebGL()) {
+        try {
+          renderer = createMaplibreRenderer(mapRef.current, ds);
+          await renderer.whenReady();
+        } catch (err) {
+          renderer?.dispose();
+          renderer = createCanvasRenderer(mapRef.current, ds, terrainArrRef.current);
+        }
+      } else {
+        renderer = createCanvasRenderer(mapRef.current, ds, terrainArrRef.current);
+      }
+      rendererRef.current = renderer;
+      await renderer.whenReady();
+      if (disposed) {
+        renderer.dispose();
+        return;
+      }
+      applyMode(appStore.get().mapMode, new Set());
+    })();
+    return () => {
+      disposed = true;
+      renderer?.dispose();
+      rendererRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.meta]);
+
+  // ペーサー起動
+  useEffect(() => {
+    startPacer();
+    return () => stopPacer();
+  }, []);
+
+  function applyMode(mode: 'political' | 'terrain' | 'supply', dirty: Set<number>): void {
+    const ds = dsRef.current;
+    const r = rendererRef.current;
+    if (!ds || !r) return;
+    const { colors } = colorsForMode(mode, ds);
+    if (mode === 'terrain' && r.setMode) {
+      r.setMode('terrain', colors);
+    } else if (dirty.size === 0 || mode === 'terrain') {
+      r.rebuildAll(colors);
+    } else {
+      r.setColors(colors, dirty);
+    }
+  }
+
+  // スナップショット差分 → 差分再描画（world-map仕様）
+  useEffect(() => {
+    const r = rendererRef.current;
+    const s = appStore.get().snap;
+    const ds = dsRef.current;
+    if (!r || !s || !ds) return;
+    ds.owner = s.owner;
+    ds.controller = s.controller;
+    ds.supplyEff = s.supplyEff;
+    const prev = prevArrRef.current;
+    if (prev) {
+      const dirty = new Set<number>([...diffIndices(prev.owner, s.owner), ...diffIndices(prev.controller, s.controller)]);
+      if (st.mapMode !== 'terrain') applyMode(st.mapMode, dirty);
+    }
+    prevArrRef.current = { owner: s.owner, controller: s.controller };
+    (r as any).setFronts?.(s.fronts.map((f) => ({ provinces: f.provinces, owner: f.owner, stance: f.stance })));
+    r.setSelected(st.selection.prov);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.snap?.tick, st.snap]);
+
+  // モード切替 → 全再構築
+  useEffect(() => {
+    applyMode(st.mapMode, new Set());
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.mapMode]);
+
+  // 選択ハイライト
+  useEffect(() => {
+    rendererRef.current?.setSelected(st.selection.prov);
+  }, [st.selection.prov]);
+
+  // 重要アラートで自動一時停止（設定で無効化はMVPでは未対応・常時有効）
+  const lastAlertLenRef = useRef(0);
+  useEffect(() => {
+    const log = st.alertLog;
+    if (log.length > lastAlertLenRef.current) {
+      const newest = log[log.length - 1];
+      if (newest && newest.priority >= 8) {
+        appStore.set({ speed: 0 });
+      }
+    }
+    lastAlertLenRef.current = log.length;
+  }, [st.alertLog]);
+
+  if (!meta || !snap) {
+    return <div className="screen"><div className="muted">{t(lang, 'misc.loading')}</div></div>;
+  }
+
+  const player = snap.countries[snap.playerCountry];
+  const selProv = st.selection.prov;
+  const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
+
+  function handleMapClick(e: React.MouseEvent): void {
+    const r = rendererRef.current;
+    const snapNow = appStore.get().snap;
+    if (!r || !snapNow) return;
+    const prov = r.pickAt(e.clientX, e.clientY);
+    if (prov === null) return;
+    const unit = st.selection.unitId !== null ? snapNow.units.find((u) => u.id === st.selection.unitId) : null;
+    if (unit && unit.owner === snapNow.playerCountry && unit.loc !== prov && !unit.moving && !unit.encircled) {
+      // 選択中師団の移動命令（合法性はエンジンが検証・却下時は警告表示）
+      engineClient.command('moveUnits', { units: [unit.id], target: prov });
+      appStore.set({ selection: { prov, unitId: unit.id, country: null } });
+      return;
+    }
+    appStore.set({ selection: { prov, unitId: null, country: null }, trace: null });
+  }
+
+  function handleMapMove(e: React.MouseEvent): void {
+    const r = rendererRef.current;
+    if (!r) return;
+    setHoverPos({ x: e.clientX, y: e.clientY });
+    const prov = r.pickAt(e.clientX, e.clientY);
+    setHoverProv(prov);
+  }
+
+  function setSpeed(v: number): void {
+    appStore.set({ speed: v });
+  }
+
+  const speedButtons: { label: string; v: number }[] = [
+    { label: '⏸', v: 0 },
+    { label: '×1', v: 1 },
+    { label: '×2', v: 2 },
+    { label: '×4', v: 4 },
+    { label: '×8', v: 8 },
+  ];
+
+  const atWarNow = player.atWar.length > 0;
+
+  return (
+    <div className="game">
+      <div className="topbar">
+        <span className="color-dot" style={{ background: player.color }} />
+        <span className="stat"><b>{lang === 'ja' ? player.nameJa : player.nameEn}</b></span>
+        <span className="date" data-testid="date">{snap.dateStr}</span>
+        {speedButtons.map((b) => (
+          <button
+            key={b.v}
+            className={'speed-btn' + (st.speed === b.v ? ' active' : '')}
+            data-testid={'speed-' + b.v}
+            onClick={() => setSpeed(b.v)}
+          >
+            {b.label}
+          </button>
+        ))}
+        {st.perfWarn && <span className="muted">{t(lang, 'misc.tickPerfWarn')}</span>}
+        <span style={{ flex: 1 }} />
+        <span className="stat">{t(lang, 'game.manpower')}: <b data-testid="manpower">{Math.floor(player.manpowerPool).toLocaleString()}</b></span>
+        <span className="stat">{t(lang, 'game.equipment')}: <b data-testid="equipment">{Math.floor(player.infEquipmentStock).toLocaleString()}</b></span>
+        <span className="stat">{t(lang, 'game.divisions')}: <b>{player.divisions}</b></span>
+        <span className="stat" style={{ color: atWarNow ? '#e08b84' : undefined }}>
+          {atWarNow ? t(lang, 'game.atWar') : t(lang, 'game.peace')}
+        </span>
+        <button data-testid="btn-wars" onClick={() => appStore.set({ panel: st.panel === 'wars' ? null : 'wars' })}>{t(lang, 'panel.wars')}</button>
+        <button data-testid="btn-diplomacy" onClick={() => appStore.set({ panel: st.panel === 'diplomacy' ? null : 'diplomacy' })}>{t(lang, 'panel.diplomacy')}</button>
+        <button data-testid="btn-fronts-top" onClick={() => appStore.set({ panel: 'fronts' })}>{t(lang, 'panel.fronts')}</button>
+        <button data-testid="btn-budget" onClick={() => appStore.set({ panel: st.panel === 'budget' ? null : 'budget' })}>{t(lang, 'panel.budget')}</button>
+        <button data-testid="btn-save" onClick={() => appStore.set({ panel: 'saveLoad' })}>{t(lang, 'common.save')}/{t(lang, 'common.load')}</button>
+        {st.devMode && <button data-testid="btn-ai" onClick={() => appStore.set({ panel: 'aiLog', aiLogCountry: (snap.playerCountry + 1) % snap.countries.length })}>{t(lang, 'panel.aiLog')}</button>}
+        <button onClick={() => appStore.set({ panel: 'settings' })}>⚙</button>
+      </div>
+      <div className="main-area">
+        <div
+          className="map-container"
+          ref={mapRef}
+          data-testid="map"
+          onClick={handleMapClick}
+          onMouseMove={handleMapMove}
+          onMouseLeave={() => setHoverProv(null)}
+        />
+        {hoverProv !== null && hoverPos && (
+          <div
+            style={{
+              position: 'fixed', left: hoverPos.x + 12, top: hoverPos.y + 12,
+              background: 'rgba(16,18,26,0.92)', border: '1px solid #454d61',
+              borderRadius: 4, padding: '4px 8px', fontSize: 12, pointerEvents: 'none', zIndex: 30,
+            }}
+          >
+            <b>{(lang === 'ja' ? meta.provNameJa[hoverProv] : meta.provNameEn[hoverProv])}</b>
+            {' — '}
+            {lang === 'ja' ? snap.countries[snap.controller[hoverProv]]?.nameJa : snap.countries[snap.controller[hoverProv]]?.nameEn}
+          </div>
+        )}
+        <AlertFeed />
+        <div className="right-panel">
+          <ContextPanel />
+        </div>
+        {search !== null && (
+          <div className="search-results">
+            {meta.provIds.map((id, i) => ({ id, i }))
+              .filter(({ id, i }) => (meta.provNameJa[i] + meta.provNameEn[i] + id).toLowerCase().includes(search.toLowerCase()))
+              .slice(0, 20)
+              .map(({ id, i }) => (
+                <div key={id} className="search-item" onClick={() => { appStore.set({ selection: { prov: i, unitId: null, country: null } }); setSearch(null); }}>
+                  {meta.provNameJa[i]}（{id}）
+                </div>
+              ))}
+          </div>
+        )}
+        {st.statusMessage && (
+          <div className="status-toast" onClick={() => appStore.set({ statusMessage: null })}>{st.statusMessage}</div>
+        )}
+      </div>
+      <div className="bottombar">
+        {(['political', 'terrain', 'supply'] as const).map((m) => (
+          <button key={m} className={'mode-btn' + (st.mapMode === m ? ' active' : '')} data-testid={'mode-' + m} onClick={() => appStore.set({ mapMode: m })}>
+            {t(lang, 'map.mode.' + m)}
+          </button>
+        ))}
+        <span style={{ flex: 1 }} />
+        {st.mapMode === 'supply' && <span className="muted">{t(lang, 'map.supplyLegend')}</span>}
+        <button onClick={() => setSearch('')}>🔍 {t(lang, 'misc.provSearch')}</button>
+        {search !== null && (
+          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} onBlur={() => setTimeout(() => setSearch(null), 200)} placeholder="Tokyo / 東京" />
+        )}
+      </div>
+      {st.panel === 'saveLoad' && <SaveLoadModal />}
+      {st.panel === 'settings' && <SettingsModal />}
+      {st.panel === 'aiLog' && <AiInspectorModal />}
+      {st.panel === 'fronts' && <FrontsPanel />}
+      {st.panel === 'budget' && <BudgetPanel />}
+      {st.panel === 'diplomacy' && <DiplomacyPanel />}
+      {selProv === null && selUnit === null && null}
+    </div>
+  );
+}
