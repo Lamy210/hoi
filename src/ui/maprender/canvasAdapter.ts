@@ -46,6 +46,8 @@ export function createCanvasRenderer(
     for (const feature of [...features, ...(featuresLod2 ?? [])]) feature.path2d = transform(feature.projected);
     decorPaths = decorProjected.map(transform);
     canvas.dataset.zoom = String(camera.scale / baseScale);
+    canvas.dataset.cameraX = String(camera.offsetX);
+    canvas.dataset.cameraY = String(camera.offsetY);
     canvas.dataset.lod = camera.scale / baseScale < 1.4 ? '2' : '1';
   }
 
