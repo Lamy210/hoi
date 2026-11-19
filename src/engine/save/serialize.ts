@@ -28,6 +28,17 @@ export interface SaveHeader {
 interface SaveBlob {
   header: SaveHeader;
   stores: Record<string, unknown>;
+  payloadChecksum?: number;
+}
+
+/** CRC-32 of the deterministic MessagePack payload; corruption detection, not authentication. */
+export function savePayloadChecksum(header: SaveHeader, stores: Record<string, unknown>): number {
+  let crc = 0xffffffff;
+  for (const byte of encode({ header, stores })) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit++) crc = (crc >>> 1) ^ ((crc & 1) ? 0xedb88320 : 0);
+  }
+  return (crc ^ 0xffffffff) >>> 0;
 }
 
 function packStores(w: WorldState): Record<string, unknown> {
@@ -115,7 +126,8 @@ export function serializeWorld(w: WorldState, pack: Pack): Uint8Array {
     savedAtTick: w.tick,
     integrity: hashWorld(w),
   };
-  const blob: SaveBlob = { header, stores: packStores(w) };
+  const stores = packStores(w);
+  const blob: SaveBlob = { header, stores, payloadChecksum: savePayloadChecksum(header, stores) };
   return encode(blob);
 }
 
@@ -164,6 +176,19 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (violations.length > 0) return { world: null, violations };
 
   if (!isRecord(blob.stores)) return { world: null, violations: ['stores missing or invalid'] };
+  if (h.v === 5) {
+    if (!Number.isInteger(blob.payloadChecksum) || blob.payloadChecksum !== savePayloadChecksum(h, blob.stores)) {
+      return { world: null, violations: ['save payload checksum mismatch'] };
+    }
+    // v5は本エンジンの決定論的なMessagePack表現を唯一の書式とする。
+    // 重複キーや代替バイト表現などデコード時に失われる差異も拒否する。
+    const canonical = encode({ header: h, stores: blob.stores, payloadChecksum: blob.payloadChecksum });
+    if (canonical.length !== buf.length || canonical.some((v, i) => v !== buf[i])) {
+      return { world: null, violations: ['noncanonical save payload'] };
+    }
+  } else if (blob.payloadChecksum !== undefined) {
+    return { world: null, violations: ['v4 contains v5 checksum'] };
+  }
   const s = blob.stores as Record<string, any>;
   if (!isRecord(s.prov) || !isRecord(s.countries) || !isRecord(s.counters)) {
     return { world: null, violations: ['required store missing or invalid'] };
