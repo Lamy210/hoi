@@ -1,7 +1,7 @@
 // セーブ/ロード統合テスト（INV-8: 往復一致＋継続一致）
 import { describe, it, expect } from 'vitest';
 import { createTestEngine, loadTestPack } from '../helpers';
-import { deserializeWorld } from '../../src/engine/save/serialize';
+import { deserializeWorld, savePayloadChecksum } from '../../src/engine/save/serialize';
 import { hashWorld } from '../../src/engine/core/hash';
 
 describe('セーブ/ロード', () => {
@@ -48,13 +48,12 @@ describe('セーブ/ロード', () => {
     for (let t = 0; t < 50; t++) engine.stepTick();
     const buf = engine.serialize();
     const pack = await loadTestPack();
-    // ビット列を1ビット改ざん（storesペイロード中央・数値領域を狙う。
-    // 末尾はマップキー文字列で既定値フォールバックにより状態整合が保たれる領域があるため）
+    // v5の全ペイロード検証は、状態ハッシュ対象外の保存フィールドも保護する。
     const corrupt = new Uint8Array(buf);
     const mid = Math.floor(corrupt.length / 2);
     corrupt[mid] ^= 0xff;
     const r = deserializeWorld(corrupt, pack);
-    // decodeまたはintegrityのいずれかで拒否されること
+    // decode、payload checksum、canonical表現、状態検証のいずれかで拒否する。
     expect(r.world).toBeNull();
     expect(r.violations.length).toBeGreaterThan(0);
   });
@@ -104,6 +103,8 @@ describe('セーブ/ロード', () => {
     const badSavedAt = makeBlob();
     badSavedAt.header.savedAtTick++;
     for (const value of [null, [], 0, {}, missingStores, missingProv, nullUnit, badOwner, badController, badUnitStock, badPlayer, badTick, badSavedAt]) {
+      // チェックサムを再計算しても構造・参照検証で拒否することを確認する。
+      if (value?.header && value?.stores) value.payloadChecksum = savePayloadChecksum(value.header, value.stores);
       const bytes = encode(value);
       const result = deserializeWorld(bytes, engine.pack);
       expect(result.world).toBeNull();
