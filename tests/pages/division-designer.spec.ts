@@ -9,7 +9,7 @@ test('自由編成の試算をWorkerから取得し、ゲーム状態を変え�
   await page.getByTestId('country-JPN').click();
   await page.getByTestId('btn-start').click();
   await page.getByTestId('btn-recruit').click();
-  const before = await page.getByTestId('template-cost').innerText();
+  const before = await page.getByTestId('template-cost').textContent();
   await page.getByTestId('open-division-designer').click();
   const d = page.getByTestId('division-designer');
   await expect(d.getByTestId('designer-stat-game.manpower')).toHaveText('10000');
@@ -21,7 +21,7 @@ test('自由編成の試算をWorkerから取得し、ゲーム状態を変え�
   await expect(d.getByTestId('designer-stat-mil.trainingDays')).toHaveText('44');
   await expect(d.getByTestId('designer-stat-designer.attack')).toHaveText('34.50');
   await expect(page.getByTestId('date')).toHaveText('2026-01-01');
-  await expect(page.getByTestId('template-cost')).toHaveText(before);
+  await expect(page.getByTestId('template-cost')).toHaveText(before ?? '');
   await expect(page.locator('[data-testid^="training-"]')).toHaveCount(0);
   await d.getByTestId('designer-reset').click();
   await expect(d.getByTestId('designer-stat-game.manpower')).toHaveText('10000');
