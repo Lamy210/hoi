@@ -75,43 +75,78 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
   const impl = opts.fetchImpl ?? defaultFetch;
   const violations: string[] = [];
   const base = baseUrl.endsWith('/') ? baseUrl : baseUrl + '/';
-  const manifest = await fetchJson<PackManifest>(base + 'manifest.json', impl);
-  const provinces = await fetchJson<PackProvince[]>(base + 'provinces.json', impl);
-  const countries = await fetchJson<PackCountry[]>(base + 'countries.json', impl);
-  const edges = await fetchJson<PackEdge[]>(base + 'adjacency.json', impl);
-  const meta = await fetchJson<{ viewBbox: [number, number, number, number]; relations: Record<string, number> }>(
-    base + 'meta.json',
-    impl,
-  );
-  const sources = await fetchJson<PackSources>(base + 'SOURCES.json', impl);
-  // events.json は任意（phase2-events-basic）
-  let events: EventDef[] = [];
-  try {
-    events = await fetchJson<EventDef[]>(base + 'events.json', impl);
-  } catch {
-    events = [];
-  }
-  // techs.json は任意（phase3-research-tree）
-  let techs: TechDef[] = [];
-  try {
-    techs = await fetchJson<TechDef[]>(base + 'techs.json', impl);
-  } catch {
-    techs = [];
-  }
-
-  // checksum検証（crypto.subtleが利用できる環境のみ）
-  const verify = opts.verifyChecksums !== false;
-  if (verify && cryptoAvailable) {
+  const verify = opts.verifyChecksums !== false && cryptoAvailable;
+  const required = ['manifest.json', 'provinces.json', 'countries.json', 'adjacency.json',
+    'meta.json', 'SOURCES.json', 'geometry-lod1.json', 'geometry-lod2.json', 'decoration.json'];
+  const optional = ['events.json', 'techs.json'];
+  let sums: PackChecksums = {};
+  const payloads = new Map<string, string>();
+  if (verify) {
     try {
-      const sums = await fetchJson<PackChecksums>(base + 'checksums.json', impl);
-      for (const [file, expect] of Object.entries(sums)) {
-        const res = await impl(base + file);
-        const text = await res.text();
-        const actual = await sha256Hex(text);
-        if (actual !== expect) violations.push('checksum mismatch: ' + file);
+      sums = await fetchJson<PackChecksums>(base + 'checksums.json', impl);
+      if (!sums || typeof sums !== 'object' || Array.isArray(sums)) {
+        throw new Error('invalid checksums manifest');
+      }
+      for (const file of required) {
+        if (!Object.hasOwn(sums, file)) violations.push('missing checksum: ' + file);
+      }
+      for (const [file, expected] of Object.entries(sums)) {
+        if (![...required, ...optional].includes(file) || !/^[0-9a-f]{64}$/.test(expected)) {
+          violations.push('invalid checksum entry: ' + file);
+          continue;
+        }
+        try {
+          const res = await impl(base + file);
+          if (!res.ok) throw new Error('HTTP ' + (res.status ?? '?'));
+          const text = await res.text();
+          const actual = await sha256Hex(text);
+          if (actual !== expected) violations.push('checksum mismatch: ' + file);
+          else payloads.set(file, text);
+        } catch (err) {
+          violations.push('checksum verification failed: ' + file + ': ' + String(err));
+        }
       }
     } catch (err) {
       violations.push('checksum verification failed: ' + String(err));
+    }
+    if (violations.length) throw new PackValidationError(violations);
+  }
+
+  // 検証済みの同じテキストをパースし、二重取得による内容差異を防ぐ。
+  async function read<T>(file: string): Promise<T> {
+    if (!verify) return fetchJson<T>(base + file, impl);
+    const text = payloads.get(file);
+    if (text === undefined) throw new PackValidationError(['missing verified payload: ' + file]);
+    try {
+      return JSON.parse(text) as T;
+    } catch {
+      throw new PackValidationError(['invalid JSON: ' + file]);
+    }
+  }
+  async function readOptional<T>(file: string): Promise<T[]> {
+    if (verify) return Object.hasOwn(sums, file) ? read<T[]>(file) : [];
+    // 非検証モードの既存互換性を維持する。
+    try { return await read<T[]>(file); } catch { return []; }
+  }
+  const manifest = await read<PackManifest>('manifest.json');
+  const provinces = await read<PackProvince[]>('provinces.json');
+  const countries = await read<PackCountry[]>('countries.json');
+  const edges = await read<PackEdge[]>('adjacency.json');
+  const meta = await read<{ viewBbox: [number, number, number, number]; relations: Record<string, number> }>('meta.json');
+  const sources = await read<PackSources>('SOURCES.json');
+  const events = await readOptional<EventDef>('events.json');
+  const techs = await readOptional<TechDef>('techs.json');
+
+  if (verify) {
+    // 両レンダラは配列インデックスで州を参照するため、順序も同一でなければならない。
+    for (const file of ['geometry-lod1.json', 'geometry-lod2.json']) {
+      const geometry = await read<{ type: string; features: { properties?: { pid?: string }; geometry?: { type?: string } }[] }>(file);
+      if (geometry?.type !== 'FeatureCollection' || !Array.isArray(geometry.features) ||
+          geometry.features.length !== provinces.length ||
+          geometry.features.some((f, i) => f?.properties?.pid !== provinces[i].id ||
+            !['Polygon', 'MultiPolygon'].includes(f?.geometry?.type ?? ''))) {
+        violations.push('geometry province order or type mismatch: ' + file);
+      }
     }
   }
 
@@ -188,6 +223,7 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
     const t = ev.trigger;
     if (!t || !['date', 'warStart', 'provinceOccupied', 'stockBelow', 'commandDone'].includes(t.type)) {
       violations.push('event ' + ev.id + ': unknown trigger type');
+      continue;
     }
     for (const c of t.countries ?? []) {
       if (!countryIds.has(c)) violations.push('event ' + ev.id + ': unknown country ' + c);
