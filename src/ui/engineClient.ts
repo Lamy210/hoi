@@ -149,6 +149,7 @@ export class EngineClient {
   /** Workerを起動してゲームを初期化する */
   async startGame(pack: Pack, opts: GameOptions): Promise<void> {
     this.dispose();
+    appStore.set({ pendingCommands: 0 });
     this.worker = new EngineWorker();
     this.worker.onmessage = (ev: MessageEvent) => this.handle(ev.data as Record<string, any>);
     this.worker.onerror = (err) => {
@@ -189,6 +190,7 @@ export class EngineClient {
         break;
       }
       case 'loaded': {
+        if (m.ok) appStore.set({ pendingCommands: 0, selection: { prov: null, unitId: null, country: null }, alertLog: [], lastAlertId: 0 });
         this.pendingLoad?.(m);
         this.pendingLoad = null;
         break;
