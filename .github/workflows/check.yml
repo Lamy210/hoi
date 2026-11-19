@@ -33,6 +33,7 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm run test:pages
       - run: npx openspec validate release-github-pages --strict
+      - run: npx openspec validate scenario-pack-integrity --strict
       - name: Upload verified production build
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5

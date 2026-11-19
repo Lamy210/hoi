@@ -1,7 +1,7 @@
 // エンジンクライアント — Worker境界のRPCラッパ＋シナリオカタログ＋パック読込。
 // http(s): fetch＋checksum検証 / file://: 静的インポート（検証スキップ・UIに注記）。
 import EngineWorker from '../engine/worker?worker&inline';
-import { loadPack, defaultFetch, cryptoAvailable } from '../engine/scenario/loader';
+import { loadPack, defaultFetch, cryptoAvailable, loadVerifiedPackAsset } from '../engine/scenario/loader';
 import type { Pack } from '../engine/scenario/types';
 import type { UiMeta, UiSnapshot } from '../engine/ui';
 import type { TraceRequest, TraceResult } from '../engine/engine';
@@ -123,7 +123,7 @@ export async function loadGeometry(lod: 1 | 2): Promise<GeoJSON.FeatureCollectio
       : await import('../../public/packs/modern-eastasia/geometry-lod2.json');
     return mod.default as unknown as GeoJSON.FeatureCollection;
   }
-  return fetchJsonStatic<GeoJSON.FeatureCollection>(PACK_BASE + 'geometry-lod' + lod + '.json');
+  return loadVerifiedPackAsset<GeoJSON.FeatureCollection>((await getPack()).pack, 'geometry-lod' + lod + '.json');
 }
 
 export async function loadDecoration(): Promise<GeoJSON.FeatureCollection> {
@@ -131,7 +131,7 @@ export async function loadDecoration(): Promise<GeoJSON.FeatureCollection> {
     const mod = await import('../../public/packs/modern-eastasia/decoration.json');
     return mod.default as unknown as GeoJSON.FeatureCollection;
   }
-  return fetchJsonStatic<GeoJSON.FeatureCollection>(PACK_BASE + 'decoration.json');
+  return loadVerifiedPackAsset<GeoJSON.FeatureCollection>((await getPack()).pack, 'decoration.json');
 }
 
 type MsgHandler = (msg: Record<string, any>) => void;
