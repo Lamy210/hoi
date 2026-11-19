@@ -80,6 +80,9 @@ describe('セーブ/ロード', () => {
     const { decode, encode } = await import('@msgpack/msgpack');
     const valid = engine.serialize();
     const originalHash = hashWorld(engine.world);
+    const originalPlayer = engine.world.playerCountry;
+    const originalTick = engine.world.tick;
+    const originalUnits = engine.world.units;
     const makeBlob = () => decode(valid) as Record<string, any>;
     const missingStores = makeBlob();
     delete missingStores.stores;
@@ -89,6 +92,10 @@ describe('セーブ/ロード', () => {
     nullUnit.stores.units = [null];
     const badOwner = makeBlob();
     badOwner.stores.prov.owner[0] = null;
+    const badController = makeBlob();
+    badController.stores.prov.controller[0] = 0.5;
+    const badUnitStock = makeBlob();
+    badUnitStock.stores.units[0].manpower = NaN;
     const badPlayer = makeBlob();
     badPlayer.header.playerCountry = engine.pack.countries.length;
     badPlayer.stores.playerCountry = badPlayer.header.playerCountry;
@@ -96,7 +103,7 @@ describe('セーブ/ロード', () => {
     badTick.stores.tick++;
     const badSavedAt = makeBlob();
     badSavedAt.header.savedAtTick++;
-    for (const value of [null, [], 0, {}, missingStores, missingProv, nullUnit, badOwner, badPlayer, badTick, badSavedAt]) {
+    for (const value of [null, [], 0, {}, missingStores, missingProv, nullUnit, badOwner, badController, badUnitStock, badPlayer, badTick, badSavedAt]) {
       const bytes = encode(value);
       const result = deserializeWorld(bytes, engine.pack);
       expect(result.world).toBeNull();
@@ -105,6 +112,9 @@ describe('セーブ/ロード', () => {
       expect(loaded.ok).toBe(false);
       expect(loaded.violations.length).toBeGreaterThan(0);
       expect(hashWorld(engine.world)).toBe(originalHash);
+      expect(engine.world.playerCountry).toBe(originalPlayer);
+      expect(engine.world.tick).toBe(originalTick);
+      expect(engine.world.units).toBe(originalUnits);
     }
     expect(engine.loadFrom(valid)).toEqual({ ok: true, violations: [] });
     expect(hashWorld(engine.world)).toBe(originalHash);
