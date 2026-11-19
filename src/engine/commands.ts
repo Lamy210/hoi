@@ -7,6 +7,8 @@ import { applyRelationDelta, endWar, startWar, warScoreFor } from './military/wa
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './scenario/unitCosts';
 import { autoAssignCommander } from './military/commanders';
 import { autoFrontProvinces, frontOf } from './military/fronts';
+import { divisionTemplate, MAX_TRAINING } from './military/templates';
+import { refundTraining } from './systems/training';
 import { MAX_ART_SHARE } from './systems/production';
 import { LAW_PP_COST } from './systems/politics';
 import { techDefs, MAX_ACTIVE_RESEARCH } from './systems/research';
@@ -107,6 +109,41 @@ export function registerAllCommands(): void {
         actor: country, province: prov,
       });
       void issuer;
+    },
+  });
+
+  registerCommand('startTraining', {
+    validate(w, p, issuer) {
+      const c = actorCountry(w, issuer), prov = p.province as number;
+      const t = divisionTemplate(p.templateId);
+      if (c === null || !w.countries.alive[c]) return 'countryDead';
+      if (!t) return 'badParams';
+      if (!Number.isInteger(prov) || prov < 0 || prov >= w.prov.count) return 'badProvince';
+      if (w.prov.controller[prov] !== c) return 'notControlledByYou';
+      if (w.trainingQueue.filter(o => o.country === c).length >= MAX_TRAINING) return 'trainingFull';
+      if (w.countries.manpowerPool[c] < t.manpower) return 'insufficientManpower';
+      if (w.countries.infEquipmentStock[c] < t.infantry) return 'insufficientEquipment';
+      if (w.countries.artEquipmentStock[c] < t.artillery) return 'insufficientArtillery';
+      return null;
+    },
+    apply(w, p, issuer) {
+      const c = actorCountry(w, issuer)!;
+      const t = divisionTemplate(p.templateId)!;
+      w.countries.manpowerPool[c] -= t.manpower;
+      w.countries.infEquipmentStock[c] -= t.infantry;
+      w.countries.artEquipmentStock[c] -= t.artillery;
+      w.trainingQueue.push({ id: w.nextUnitId++, country: c, province: p.province as number, templateId: t.id, readyTick: w.tick + t.days });
+    },
+  });
+  registerCommand('cancelTraining', {
+    validate(w, p, issuer) {
+      const c = actorCountry(w, issuer);
+      return w.trainingQueue.some(o => o.id === p.id && o.country === c) ? null : 'badParams';
+    },
+    apply(w, p) {
+      const index = w.trainingQueue.findIndex(o => o.id === p.id);
+      refundTraining(w, w.trainingQueue[index]);
+      w.trainingQueue.splice(index, 1);
     },
   });
 
