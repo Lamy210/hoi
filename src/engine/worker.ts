@@ -2,6 +2,7 @@
 // 上り: コマンド（検証はエンジン内）。下り: 差分スナップショット。トレースはオンデマンド。
 import { createEngine, type Engine, type TraceRequest } from './engine';
 import { civilFromDays } from './clock/date';
+import { previewTemplate } from './military/templateStats';
 import type { Pack } from './scenario/types';
 
 let engine: Engine | null = null;
@@ -78,6 +79,11 @@ self.onmessage = async (ev: MessageEvent) => {
         } else {
           reply({ type: 'loaded', ok: false, violations: r.violations });
         }
+        break;
+      }
+      case 'previewTemplate': {
+        if (!engine) throw new Error('Engine not initialized');
+        reply({ type: 'templatePreview', result: previewTemplate(msg.composition) });
         break;
       }
       case 'trace': {
