@@ -11,9 +11,9 @@ const post = (msg: unknown, transfer?: Transferable[]): void => {
   (self as unknown as Worker).postMessage(msg, transfer ?? []);
 };
 
-async function postSnapshot(sinceAlertId: number): Promise<void> {
+async function postSnapshot(sinceAlertId: number, appliedPlayerCommands = 0): Promise<void> {
   if (!engine) return;
-  post({ type: 'snapshot', snap: engine.getUiSnapshot(sinceAlertId) });
+  post({ type: 'snapshot', snap: engine.getUiSnapshot(sinceAlertId), appliedPlayerCommands });
 }
 
 self.onmessage = async (ev: MessageEvent) => {
@@ -36,6 +36,7 @@ self.onmessage = async (ev: MessageEvent) => {
       case 'step': {
         if (!engine) return;
         const n: number = msg.ticks ?? 1;
+        const appliedPlayerCommands = n > 0 ? engine.world.runtime.commandsSinceLastTick.filter(c => c.issuer === 'player').length : 0;
         for (let i = 0; i < n; i++) engine.stepTick();
         // 月初で自動セーブ（save-system仕様）
         const day = civilFromDays(engine.world.epochDays + engine.world.tick).d;
@@ -43,7 +44,7 @@ self.onmessage = async (ev: MessageEvent) => {
           const buf = engine.serialize();
           post({ type: 'autosave', buf, tick: engine.world.tick }, [buf.buffer as ArrayBuffer]);
         }
-        await postSnapshot(msg.sinceAlertId ?? 0);
+        await postSnapshot(msg.sinceAlertId ?? 0, appliedPlayerCommands);
         break;
       }
       case 'snapshot': {

@@ -8,8 +8,9 @@ import { startPacer, stopPacer } from './pacer';
 import type { MapDataSource, MapRenderer } from './maprender/types';
 import { colorsForMode, diffIndices } from './maprender/types';
 import { createCanvasRenderer } from './maprender/canvasAdapter';
+import { TERRAIN_COLORS, terrainOf } from './maprender/terrainColors';
 import { createMaplibreRenderer } from './maprender/maplibreAdapter';
-import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel } from './panels';
+import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel, PendingOrders } from './panels';
 
 const TERRAIN_NAMES = ['plains', 'hills', 'mountains', 'urban', 'forest', 'desert'];
 
@@ -31,6 +32,8 @@ export function GameScreen() {
   const prevArrRef = useRef<{ owner: number[]; controller: number[] } | null>(null);
   const [hoverProv, setHoverProv] = useState<number | null>(null);
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [mapReady, setMapReady] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
   const lang = st.lang;
   const meta = st.meta;
@@ -39,6 +42,8 @@ export function GameScreen() {
   // レンダラ初期化（metaが到着した後に1回。スナップショットは到着待ち）
   useEffect(() => {
     if (!st.meta) return;
+    setMapReady(false);
+    setMapError(null);
     let disposed = false;
     let renderer: MapRenderer & { setMode?: (m: 'political' | 'terrain' | 'supply', colors: string[]) => void } | null = null;
     (async () => {
@@ -48,7 +53,7 @@ export function GameScreen() {
         s = appStore.get().snap;
       }
       const m = st.meta;
-      if (!m || !s || !mapRef.current) return;
+      if (disposed || !m || !s || !mapRef.current) return;
       terrainArrRef.current = m.provTerrain.map((x) => Math.max(0, TERRAIN_NAMES.indexOf(x)));
       const ds: MapDataSource = {
         loadGeometry: (lod) => loadGeometry(lod),
@@ -87,7 +92,8 @@ export function GameScreen() {
         return;
       }
       applyMode(appStore.get().mapMode, new Set());
-    })();
+      setMapReady(true);
+    })().catch((err: unknown) => { if (!disposed) setMapError(String(err)); });
     return () => {
       disposed = true;
       renderer?.dispose();
@@ -106,9 +112,9 @@ export function GameScreen() {
     const ds = dsRef.current;
     const r = rendererRef.current;
     if (!ds || !r) return;
-    const { colors } = colorsForMode(mode, ds);
-    if (mode === 'terrain' && r.setMode) {
-      r.setMode('terrain', colors);
+    const colors = mode === 'terrain' ? terrainArrRef.current.map(i => TERRAIN_COLORS[terrainOf(i)]) : colorsForMode(mode, ds).colors;
+    if (r.setMode) {
+      r.setMode(mode, colors);
     } else if (dirty.size === 0 || mode === 'terrain') {
       r.rebuildAll(colors);
     } else {
@@ -223,6 +229,7 @@ export function GameScreen() {
           </button>
         ))}
         {st.perfWarn && <span className="muted">{t(lang, 'misc.tickPerfWarn')}</span>}
+        <button data-testid="btn-step-day" onClick={() => engineClient.step(1, appStore.get().lastAlertId)} disabled={st.speed !== 0}>{t(lang, 'game.stepDay')}</button>
         <span style={{ flex: 1 }} />
         <span className="stat">{t(lang, 'game.manpower')}: <b data-testid="manpower">{Math.floor(player.manpowerPool).toLocaleString()}</b></span>
         <span className="stat">{t(lang, 'game.equipment')}: <b data-testid="equipment">{Math.floor(player.infEquipmentStock).toLocaleString()}</b></span>
@@ -233,11 +240,13 @@ export function GameScreen() {
         <button data-testid="btn-wars" onClick={() => appStore.set({ panel: st.panel === 'wars' ? null : 'wars' })}>{t(lang, 'panel.wars')}</button>
         <button data-testid="btn-diplomacy" onClick={() => appStore.set({ panel: st.panel === 'diplomacy' ? null : 'diplomacy' })}>{t(lang, 'panel.diplomacy')}</button>
         <button data-testid="btn-fronts-top" onClick={() => appStore.set({ panel: 'fronts' })}>{t(lang, 'panel.fronts')}</button>
+        <button data-testid="btn-research" onClick={() => appStore.set({ panel: 'research' })}>{t(lang, 'research.title')}</button>
         <button data-testid="btn-budget" onClick={() => appStore.set({ panel: st.panel === 'budget' ? null : 'budget' })}>{t(lang, 'panel.budget')}</button>
         <button data-testid="btn-save" onClick={() => appStore.set({ panel: 'saveLoad' })}>{t(lang, 'common.save')}/{t(lang, 'common.load')}</button>
         {st.devMode && <button data-testid="btn-ai" onClick={() => appStore.set({ panel: 'aiLog', aiLogCountry: (snap.playerCountry + 1) % snap.countries.length })}>{t(lang, 'panel.aiLog')}</button>}
         <button onClick={() => appStore.set({ panel: 'settings' })}>⚙</button>
       </div>
+      {st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && <PendingOrders />}
       <div className="main-area">
         <div
           className="map-container"
@@ -247,6 +256,12 @@ export function GameScreen() {
           onMouseMove={handleMapMove}
           onMouseLeave={() => setHoverProv(null)}
         />
+        <div className="map-tools" aria-label={t(lang, 'map.controls')}>
+          <button aria-label={t(lang, 'map.zoomIn')} data-testid="map-zoom-in" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(1.25)}>＋</button>
+          <button aria-label={t(lang, 'map.zoomOut')} data-testid="map-zoom-out" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(0.8)}>－</button>
+          <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
+        </div>
+        {mapError && <div className="status-toast" role="alert">{mapError}</div>}
         {hoverProv !== null && hoverPos && (
           <div
             style={{
@@ -297,8 +312,8 @@ export function GameScreen() {
       {st.panel === 'settings' && <SettingsModal />}
       {st.panel === 'aiLog' && <AiInspectorModal />}
       {st.panel === 'fronts' && <FrontsPanel />}
-      {st.panel === 'budget' && <BudgetPanel />}
-      {st.panel === 'diplomacy' && <DiplomacyPanel />}
+      {(st.panel === 'budget' || st.panel === 'research') && <BudgetPanel key={st.panel} initialTab={st.panel} />}
+      {(st.panel === 'diplomacy' || st.panel === 'wars') && <DiplomacyPanel key={st.panel} initialTab={st.panel === 'wars' ? 'peace' : 'relations'} />}
       {selProv === null && selUnit === null && null}
     </div>
   );

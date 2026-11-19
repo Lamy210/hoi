@@ -10,6 +10,8 @@ export interface MapRenderer {
   pickAt(clientX: number, clientY: number): number | null;
   /** 状態ハッシュから決定論的に全配色を再構築（モード切替時） */
   rebuildAll(colors: string[]): void;
+  zoomBy(factor: number): void;
+  resetView(): void;
   resize(): void;
   dispose(): void;
 }

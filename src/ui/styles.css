@@ -89,3 +89,9 @@ input, select {
 }
 .ai-log-entry { border-bottom: 1px solid #2e3547; padding: 6px 0; font-size: 12px; }
 .sourcelist li { font-size: 12px; color: #a5a49c; margin-bottom: 4px; }
+
+.map-tools { position: absolute; top: 12px; left: 12px; z-index: 20; display: flex; gap: 6px; }
+.pending-orders { padding: 5px 10px; background: #39321e; color: #f2d982; font-size: 13px; }
+.modal { min-width: min(560px, 94vw); max-width: min(720px, 94vw); }
+.left-feed { width: min(340px, 42%); }
+@media (max-width: 700px) { .right-panel { width: 38%; min-width: 140px; padding: 6px; } .topbar { gap: 4px; } }

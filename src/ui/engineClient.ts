@@ -149,6 +149,7 @@ export class EngineClient {
   /** Workerを起動してゲームを初期化する */
   async startGame(pack: Pack, opts: GameOptions): Promise<void> {
     this.dispose();
+    appStore.set({ pendingCommands: 0 });
     this.worker = new EngineWorker();
     this.worker.onmessage = (ev: MessageEvent) => this.handle(ev.data as Record<string, any>);
     this.worker.onerror = (err) => {
@@ -174,7 +175,7 @@ export class EngineClient {
         const st = appStore.get();
         const alertLog = [...st.alertLog, ...(snap.alerts ?? [])];
         if (alertLog.length > 100) alertLog.splice(0, alertLog.length - 100);
-        appStore.set({ snap, alertLog, lastAlertId: snap.lastAlertId });
+        appStore.set({ snap, alertLog, lastAlertId: snap.lastAlertId, pendingCommands: Math.max(0, st.pendingCommands - (m.appliedPlayerCommands ?? 0)) });
         this.onSnapshotHook?.();
         break;
       }
@@ -189,6 +190,7 @@ export class EngineClient {
         break;
       }
       case 'loaded': {
+        if (m.ok) appStore.set({ pendingCommands: 0, selection: { prov: null, unitId: null, country: null }, alertLog: [], lastAlertId: 0 });
         this.pendingLoad?.(m);
         this.pendingLoad = null;
         break;
@@ -211,7 +213,9 @@ export class EngineClient {
   }
 
   command(cmdType: string, p: Record<string, unknown>): void {
+    if (!this.worker) return;
     this.send({ type: 'command', seq: this.seq++, cmdType, p });
+    appStore.set({ pendingCommands: appStore.get().pendingCommands + 1 });
   }
 
   step(ticks = 1, sinceAlertId: number): void {

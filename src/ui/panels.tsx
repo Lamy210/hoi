@@ -297,12 +297,12 @@ export function SaveLoadModal() {
   );
 }
 
-export function BudgetPanel() {
+export function BudgetPanel({ initialTab = 'budget' }: { initialTab?: 'budget' | 'research' }) {
   const st = useApp();
   const lang = st.lang;
   const snap = st.snap!;
   const player = snap.countries[snap.playerCountry];
-  const [tab, setTab] = useState<'budget' | 'laws' | 'research' | 'construction' | 'score'>('budget');
+  const [tab, setTab] = useState<'budget' | 'laws' | 'research' | 'construction' | 'score'>(initialTab);
   const tabs: { key: typeof tab; label: string }[] = [
     { key: 'budget', label: t(lang, 'budget.tab') },
     { key: 'laws', label: t(lang, 'laws.title') },
@@ -312,13 +312,14 @@ export function BudgetPanel() {
   ];
   return (
     <div className="modal-backdrop" onClick={() => appStore.set({ panel: null })}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="budget-modal" style={{ minWidth: 560 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="budget-modal">
         <h3>{t(lang, 'panel.budget')}</h3>
         <div className="row" style={{ gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
           {tabs.map((x) => (
             <button key={x.key} className={tab === x.key ? 'primary' : ''} onClick={() => setTab(x.key)}>{x.label}</button>
           ))}
         </div>
+        <PendingOrders />
         {tab === 'budget' && (
           <div data-testid="budget-tab">
             <div className="kv"><span className="k">{t(lang, 'budget.treasury')}</span><span data-testid="treasury">{fmtNumber(lang, player.treasury)}</span></div>
@@ -386,7 +387,7 @@ export function BudgetPanel() {
                     {isDone ? '✔' : isActive ? Math.round((player.research.active.find((a) => a.id === tech.id)!.progress / tech.days) * 100) + '%' : (
                       <button
                         data-testid={'research-' + tech.id}
-                        disabled={!prereqOk}
+                        disabled={!prereqOk || player.research.active.length >= 2}
                         onClick={() => engineClient.command('startResearch', { techId: tech.id })}
                       >
                         {t(lang, 'research.start')}
@@ -572,13 +573,13 @@ export function AiInspectorModal() {
 
 const TREATY_PROPOSALS = ['nonaggression', 'trade', 'alliance', 'access'] as const;
 
-export function DiplomacyPanel() {
+export function DiplomacyPanel({ initialTab = 'relations' }: { initialTab?: 'relations' | 'peace' }) {
   const st = useApp();
   const lang = st.lang;
   const snap = st.snap!;
   const meta = st.meta!;
   const player = snap.playerCountry;
-  const [tab, setTab] = useState<'relations' | 'treaties' | 'peace'>('relations');
+  const [tab, setTab] = useState<'relations' | 'treaties' | 'peace'>(initialTab);
   const [demands, setDemands] = useState<Record<number, number[]>>({});
   const tabs: { key: typeof tab; label: string }[] = [
     { key: 'relations', label: t(lang, 'dip.tab.relations') },
@@ -602,7 +603,7 @@ export function DiplomacyPanel() {
 
   return (
     <div className="modal-backdrop" onClick={() => appStore.set({ panel: null })}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="diplomacy-modal" style={{ minWidth: 560 }}>
+      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="diplomacy-modal">
         <h3>{t(lang, 'panel.diplomacy')}</h3>
         <div className="row" style={{ gap: 6, marginBottom: 10 }}>
           {tabs.map((x) => (
@@ -610,6 +611,7 @@ export function DiplomacyPanel() {
           ))}
         </div>
 
+        <PendingOrders />
         {tab === 'relations' && (
           <div data-testid="dip-relations">
             {snap.countries.map((c, i) => {
@@ -753,4 +755,13 @@ function relValueOf(snap: import('../engine/ui').UiSnapshot, a: number, b: numbe
   const hi = Math.max(a, b);
   const r = snap.relations.find((x) => x.a === lo && x.b === hi);
   return r ? String(r.v) : '0';
+}
+
+export function PendingOrders() {
+  const st = useApp();
+  if (!st.pendingCommands) return null;
+  return <div className="row pending-orders" data-testid="pending-orders" role="status">
+    <span>{t(st.lang, 'game.pendingOrders', { count: st.pendingCommands })}</span>
+    {st.speed === 0 && <button data-testid="apply-pending" onClick={() => engineClient.step(1, appStore.get().lastAlertId)}>{t(st.lang, 'game.stepDay')}</button>}
+  </div>;
 }
