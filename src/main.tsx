@@ -13,7 +13,8 @@ const root = createRoot(document.getElementById('root')!);
 root.render(<Root />);
 
 // E2E/dev hooks（?e2e=1 のみ有効。外部には公開しない決定論的ステップ実行）
-if (typeof location !== 'undefined' && new URLSearchParams(location.search).get('e2e') === '1') {
+if ((import.meta.env.DEV || import.meta.env.MODE === 'e2e') &&
+    typeof location !== 'undefined' && new URLSearchParams(location.search).get('e2e') === '1') {
   (window as unknown as Record<string, unknown>).__orbis = {
     appStore,
     engineClient,
