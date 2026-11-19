@@ -9,7 +9,7 @@ import type { MapDataSource, MapRenderer } from './maprender/types';
 import { colorsForMode, diffIndices } from './maprender/types';
 import { createCanvasRenderer } from './maprender/canvasAdapter';
 import { createMaplibreRenderer } from './maprender/maplibreAdapter';
-import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel } from './panels';
+import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel, PendingOrders } from './panels';
 
 const TERRAIN_NAMES = ['plains', 'hills', 'mountains', 'urban', 'forest', 'desert'];
 
@@ -243,6 +243,7 @@ export function GameScreen() {
         {st.devMode && <button data-testid="btn-ai" onClick={() => appStore.set({ panel: 'aiLog', aiLogCountry: (snap.playerCountry + 1) % snap.countries.length })}>{t(lang, 'panel.aiLog')}</button>}
         <button onClick={() => appStore.set({ panel: 'settings' })}>⚙</button>
       </div>
+      <PendingOrders />
       <div className="main-area">
         <div
           className="map-container"
@@ -253,8 +254,8 @@ export function GameScreen() {
           onMouseLeave={() => setHoverProv(null)}
         />
         <div className="map-tools" aria-label={t(lang, 'map.controls')}>
-          <button data-testid="map-zoom-in" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(1.25)}>＋</button>
-          <button data-testid="map-zoom-out" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(0.8)}>－</button>
+          <button aria-label={t(lang, 'map.zoomIn')} data-testid="map-zoom-in" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(1.25)}>＋</button>
+          <button aria-label={t(lang, 'map.zoomOut')} data-testid="map-zoom-out" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(0.8)}>－</button>
           <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
         </div>
         {mapError && <div className="status-toast" role="alert">{mapError}</div>}
@@ -309,7 +310,7 @@ export function GameScreen() {
       {st.panel === 'aiLog' && <AiInspectorModal />}
       {st.panel === 'fronts' && <FrontsPanel />}
       {(st.panel === 'budget' || st.panel === 'research') && <BudgetPanel key={st.panel} initialTab={st.panel} />}
-      {st.panel === 'diplomacy' && <DiplomacyPanel />}
+      {(st.panel === 'diplomacy' || st.panel === 'wars') && <DiplomacyPanel key={st.panel} initialTab={st.panel === 'wars' ? 'peace' : 'relations'} />}
       {selProv === null && selUnit === null && null}
     </div>
   );
