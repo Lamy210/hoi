@@ -111,6 +111,7 @@ export interface TechDef {
 }
 
 export interface Pack {
+  verifiedChecksums?: PackChecksums; // 検証時の固定マニフェスト（描画アセットの再取得にも使用）
   techs: TechDef[];
   events: EventDef[];
   baseUrl: string;
