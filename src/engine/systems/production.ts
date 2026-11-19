@@ -17,6 +17,16 @@ export function aiEquipmentBonus(w: WorldState, country: number): number {
   return 0;
 }
 
+export function dailyEquipmentOutput(w: WorldState, c: number): { infantry: number; artillery: number } {
+  if (!w.countries.alive[c]) return { infantry: 0, artillery: 0 };
+  const share = w.productionShare[c] ?? 0.2;
+  const bonus = aiEquipmentBonus(w, c);
+  const lawTech = lawOutputFactor(w, c) * (1 + techMods(w, c, 'factoryOutput'));
+  const factories = w.countries.milFactories[c];
+  return { infantry: factories * (1 - share) * EQUIPMENT_PER_FACTORY_DAY * (1 + bonus) * lawTech,
+    artillery: factories * share * ART_PER_FACTORY_DAY * (1 + bonus) * lawTech };
+}
+
 export function registerProductionSystem(): void {
   registerSystem({
     name: 'production',
@@ -24,12 +34,9 @@ export function registerProductionSystem(): void {
     fn: (w) => {
       for (let c = 0; c < w.countries.count; c++) {
         if (!w.countries.alive[c]) continue;
-        const bonus = aiEquipmentBonus(w, c);
-        const share = w.productionShare[c] ?? 0.2;
-        // 経済法×技術効果（phase3: 一元参照・D-039/D-044）
-        const lawTech = lawOutputFactor(w, c) * (1 + techMods(w, c, 'factoryOutput'));
-        w.countries.infEquipmentStock[c] += w.countries.milFactories[c] * (1 - share) * EQUIPMENT_PER_FACTORY_DAY * (1 + bonus) * lawTech;
-        w.countries.artEquipmentStock[c] += w.countries.milFactories[c] * share * ART_PER_FACTORY_DAY * (1 + bonus) * lawTech;
+        const output = dailyEquipmentOutput(w, c);
+        w.countries.infEquipmentStock[c] += output.infantry;
+        w.countries.artEquipmentStock[c] += output.artillery;
         w.countries.manpowerPool[c] += (w.countries.population[c] * MANPOWER_RATE_MONTHLY) / w.daysPerMonth;
       }
     },

@@ -25,6 +25,7 @@ function hashUnit(h: number, u: Unit): number {
   h = mixInt(h, u.commanderId);
   h = mixBool(h, u.encircled);
   h = mixBool(h, u.destroyed);
+  if (u.templateId !== undefined) h = mixStr(h, u.templateId);
   return h;
 }
 
@@ -167,6 +168,10 @@ export function hashWorld(w: WorldState): number {
   h = mixInt(h, w.nextConstructionId);
   h = mixInt(h, w.nextTreatyId);
   for (const u of w.units) h = hashUnit(h, u);
+  for (const o of w.trainingQueue) {
+    h = mixInt(h, o.id); h = mixInt(h, o.country); h = mixInt(h, o.province);
+    h = mixStr(h, o.templateId); h = mixInt(h, o.readyTick);
+  }
 
   for (const a of w.anchors) {
     h = mixInt(h, a.tick);

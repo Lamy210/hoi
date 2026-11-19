@@ -9,6 +9,7 @@ export const TERRAIN = ['plains', 'hills', 'mountains', 'urban', 'forest', 'dese
 export type TerrainId = (typeof TERRAIN)[number];
 
 export interface Unit {
+  templateId?: import('../military/templates').DivisionTemplateId;
   id: number;
   owner: number; // 国家インデックス
   loc: number; // 現在のプロヴィンス（移動完了済み）
@@ -238,6 +239,7 @@ export interface WorldState {
   treaties: Treaty[]; // phase4-diplomacy-treaties
   wars: War[];
   units: Unit[];
+  trainingQueue: import('../military/templates').TrainingOrder[];
   fronts: Front[];
   commanders: Commander[];
   productionShare: number[]; // 国ごとの火砲配分率 0..0.5

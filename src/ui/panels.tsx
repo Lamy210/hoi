@@ -1,4 +1,5 @@
 // パネル群 — 警告フィード／コンテキストパネル／セーブ・ロード／設定／AI判断ログ／外交（phase4）
+import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from '../engine/military/templates';
 import { useEffect, useState } from 'react';
 import { useApp } from './App';
 import { appStore, fmtNumber } from './store';
@@ -86,7 +87,7 @@ export function ContextPanel() {
           <div className="row" style={{ marginTop: 6 }}>
             <button data-testid="btn-fronts" onClick={() => appStore.set({ panel: 'fronts' })}>{t(lang, 'panel.fronts')}（{snap.fronts.filter((f) => f.owner === snap.playerCountry).length}）</button>
           </div>
-          <div className="muted" style={{ marginTop: 6 }}>{t(lang, 'prod.template')}</div>
+          <div className="row" style={{ marginTop: 6 }}><button onClick={() => appStore.set({ panel: 'production' })}>{t(lang, 'prod.title')}</button><button onClick={() => appStore.set({ panel: 'recruit' })}>{t(lang, 'mil.recruit')}</button></div>
           <div className="muted" style={{ marginTop: 6 }}>{t(lang, 'panel.selectUnit')}</div>
         </div>
         <TraceBox />
@@ -106,7 +107,6 @@ export function ContextPanel() {
     const war = foreignOwner ? snap.wars.find((w) => (w.aggressor === snap.playerCountry && w.defender === snap.owner[prov]) || (w.defender === snap.playerCountry && w.aggressor === snap.owner[prov])) : null;
     const hasCb = snap.claims.some((cl) => cl.country === snap.playerCountry && snap.owner[cl.province] === snap.owner[prov]);
     const supply = snap.supplyEff[prov];
-    const canCreate = isPlayerControlled && player.manpowerPool >= 10000 && player.infEquipmentStock >= 1000 && player.artEquipmentStock >= 200;
     return (
       <div className="panel-section" data-testid="province-panel">
         <h4>{lang === 'ja' ? meta.provNameJa[prov] : meta.provNameEn[prov]}（{meta.provIds[prov]}）</h4>
@@ -135,10 +135,9 @@ export function ContextPanel() {
             <button
               className="primary"
               data-testid="btn-create-unit"
-              disabled={!canCreate}
-              onClick={() => engineClient.command('createUnit', { country: snap.playerCountry, province: prov })}
+              onClick={() => appStore.set({ panel: 'recruit' })}
             >
-              {t(lang, 'panel.createDivision')}
+              {t(lang, 'mil.recruit')}
             </button>
           </div>
         )}
@@ -184,7 +183,7 @@ export function ContextPanel() {
     const targetName = u.moving && u.target >= 0 ? (lang === 'ja' ? meta.provNameJa[u.target] : meta.provNameEn[u.target]) : null;
     return (
       <div className="panel-section" data-testid="unit-panel">
-        <h4>{t(lang, 'panel.unit')} #{u.id}</h4>
+        <h4>{t(lang, 'panel.unit')} #{u.id} — {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}</h4>
         <div className="kv"><span className="k">{t(lang, 'panel.org')}</span><span data-testid="unit-org">{Math.round(u.org)} / 100</span></div>
         <div className="kv"><span className="k">{t(lang, 'panel.strength')}</span><span>{Math.round(u.strength * 100)}%</span></div>
         <div className="kv"><span className="k">{t(lang, 'game.equipment')}</span><span>{u.infEquipment}/{u.maxInfEquipment} + {u.artEquipment}/{u.maxArtEquipment}</span></div>
@@ -784,5 +783,76 @@ export function PendingOrders() {
   return <div className="row pending-orders" data-testid="pending-orders" role="status">
     <span>{t(st.lang, 'game.pendingOrders', { count: st.pendingCommands })}</span>
     {st.speed === 0 && <button data-testid="apply-pending" onClick={() => engineClient.step(1, appStore.get().lastAlertId)}>{t(st.lang, 'game.stepDay')}</button>}
+  </div>;
+}
+
+export function RecruitmentPanel() {
+  const st = useApp(), snap = st.snap!, meta = st.meta!, lang = st.lang;
+  const player = snap.countries[snap.playerCountry];
+  const [templateId, setTemplateId] = useState<DivisionTemplateId>('standard-v1');
+  const [province, setProvince] = useState(st.selection.prov !== null && snap.controller[st.selection.prov] === snap.playerCountry ? st.selection.prov : player.capital);
+  const template = divisionTemplate(templateId)!;
+  const owned = meta.provIds.map((_, i) => i).filter(i => snap.controller[i] === snap.playerCountry);
+  const valid = owned.includes(province);
+  const nameOf = (p: number) => lang === 'ja' ? meta.provNameJa[p] : meta.provNameEn[p];
+  const missing = player.manpowerPool < template.manpower ? 'reason.insufficientManpower' :
+    player.infEquipmentStock < template.infantry ? 'reason.insufficientEquipment' :
+    player.artEquipmentStock < template.artillery ? 'reason.insufficientArtillery' :
+    player.training.length >= MAX_TRAINING ? 'reason.trainingFull' : null;
+  return <div className="modal-backdrop" onClick={() => appStore.set({ panel: null })}>
+    <div className="modal" data-testid="recruit-modal" onClick={e => e.stopPropagation()}>
+      <h3>{t(lang, 'mil.recruit')}</h3>
+      <PendingOrders />
+      <div className="row"><label>{t(lang, 'mil.template')} <select data-testid="division-template" value={templateId} onChange={e => setTemplateId(e.target.value as DivisionTemplateId)}>
+        {DIVISION_TEMPLATES.map(d => <option key={d.id} value={d.id}>{lang === 'ja' ? d.nameJa : d.nameEn}</option>)}
+      </select></label><label>{t(lang, 'mil.deployProvince')} <select data-testid="deploy-province" value={province} onChange={e => setProvince(Number(e.target.value))}>
+        {owned.map(p => <option key={p} value={p}>{nameOf(p)}</option>)}
+      </select></label></div>
+      <div className="panel-section" data-testid="template-cost">
+        <div className="kv"><span>{t(lang, 'game.manpower')}</span><span>{fmtNumber(lang, template.manpower)} / {fmtNumber(lang, Math.floor(player.manpowerPool))}</span></div>
+        <div className="kv"><span>{t(lang, 'prod.infStock')}</span><span>{fmtNumber(lang, template.infantry)} / {fmtNumber(lang, Math.floor(player.infEquipmentStock))}</span></div>
+        <div className="kv"><span>{t(lang, 'prod.artStock')}</span><span>{fmtNumber(lang, template.artillery)} / {fmtNumber(lang, Math.floor(player.artEquipmentStock))}</span></div>
+        <div className="kv"><span>{t(lang, 'mil.trainingDays')}</span><span>{template.days}</span></div>
+      </div>
+      <button className="primary" data-testid="start-training" disabled={!valid || !!missing || st.pendingCommands > 0} onClick={() => engineClient.command('startTraining', { templateId, province })}>{t(lang, 'mil.startTraining')}</button>
+      {missing && <span className="muted"> {t(lang, missing)}</span>}
+      <h4>{t(lang, 'mil.queue')} ({player.training.length}/{MAX_TRAINING})</h4>
+      {player.training.map(o => {
+        const d = divisionTemplate(o.templateId)!;
+        const remaining = Math.max(0, o.readyTick - snap.tick);
+        return <div className="panel-section" key={o.id} data-testid={'training-' + o.id}>
+          <div className="kv"><span>{lang === 'ja' ? d.nameJa : d.nameEn} #{o.id} — {nameOf(o.province)}</span><span>{remaining}/{d.days}</span></div>
+          <progress max={d.days} value={d.days - remaining} style={{ width: '100%' }} />
+          <button data-testid={'cancel-training-' + o.id} disabled={st.pendingCommands > 0} onClick={() => engineClient.command('cancelTraining', { id: o.id })}>{t(lang, 'mil.cancel')}</button>
+        </div>;
+      })}
+      <h4>{t(lang, 'mil.deployed')} ({player.divisions})</h4>
+      <div style={{ maxHeight: 180, overflowY: 'auto' }}>
+        {snap.units.filter(u => u.owner === snap.playerCountry).map(u => <button key={u.id} onClick={() => appStore.set({ panel: null, selection: { prov: u.loc, unitId: u.id, country: null } })}>#{u.id} {nameOf(u.loc)}</button>)}
+      </div>
+      <button onClick={() => appStore.set({ panel: null })}>{t(lang, 'common.close')}</button>
+    </div>
+  </div>;
+}
+
+export function ProductionPanel() {
+  const st = useApp(), lang = st.lang, p = st.snap!.countries[st.snap!.playerCountry];
+  const [share, setShare] = useState(p.productionShare);
+  useEffect(() => { setShare(p.productionShare); }, [p.productionShare]);
+  return <div className="modal-backdrop" onClick={() => appStore.set({ panel: null })}>
+    <div className="modal" data-testid="production-modal" onClick={e => e.stopPropagation()}>
+      <h3>{t(lang, 'prod.title')}</h3>
+      <PendingOrders />
+      <div className="kv"><span>{t(lang, 'country.factories')}</span><b>{p.milFactories}</b></div>
+      {([['prod.infStock', p.infEquipmentStock, p.dailyEquipment.infantry, 1 - p.productionShare], ['prod.artStock', p.artEquipmentStock, p.dailyEquipment.artillery, p.productionShare]] as const).map(([key, stock, output, ratio]) => <div key={key} className="panel-section" data-testid={'line-' + key}>
+        <h4>{t(lang, key)}</h4><div className="kv"><span>{t(lang, 'prod.allocation')}</span><b>{(ratio * 100).toFixed(0)}%</b></div>
+        <progress max={1} value={ratio} style={{ width: '100%' }} />
+        <div className="kv"><span>{t(lang, 'prod.dailyOutput')}</span><b>{output.toFixed(2)}</b></div>
+        <div className="kv"><span>{t(lang, 'prod.stockpile')}</span><b>{fmtNumber(lang, Math.floor(stock))}</b></div>
+      </div>)}
+      <label>{t(lang, 'prod.share')} {Math.round(share * 100)}% <input data-testid="production-art-share" type="range" min={0} max={0.5} step={0.05} value={share} onChange={e => setShare(Number(e.target.value))} /></label>
+      <button data-testid="apply-production" disabled={st.pendingCommands > 0 || Math.abs(share - p.productionShare) < 0.0001} onClick={() => engineClient.command('setProductionShare', { share })}>{t(lang, 'prod.apply')}</button>
+      <div className="row"><button onClick={() => appStore.set({ panel: 'recruit' })}>{t(lang, 'mil.recruit')}</button><button onClick={() => appStore.set({ panel: null })}>{t(lang, 'common.close')}</button></div>
+    </div>
   </div>;
 }

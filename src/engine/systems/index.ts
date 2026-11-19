@@ -1,6 +1,7 @@
 // システムの登録順（tick内実行順の単一の真実源・docs/06 §5）
 import { registerLogisticsSystems } from './logistics';
 import { registerCombatSystems } from './combat';
+import { registerTrainingSystem } from './training';
 import { registerProductionSystem } from './production';
 import { registerAISystem } from '../ai/ai';
 import { registerFrontSystem } from './fronts';
@@ -23,6 +24,7 @@ export function registerAllSystems(): void {
   registerLogisticsSystems();
   registerCombatSystems();
   registerProductionSystem();
+  registerTrainingSystem();
   // 日次+週内分散: 戦線AI（プレイヤー戦線とAI戦線に同一ロジック）
   registerFrontSystem();
   // phase3: 経済・人口・政治・研究・建設・スコア

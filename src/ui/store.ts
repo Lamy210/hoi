@@ -4,7 +4,7 @@ import type { Lang } from './i18n';
 
 export type Screen = 'title' | 'scenario' | 'country' | 'game';
 export type MapMode = 'political' | 'terrain' | 'supply';
-export type PanelId = 'overview' | 'wars' | 'aiLog' | 'saveLoad' | 'settings' | 'fronts' | 'budget' | 'research' | 'diplomacy' | null;
+export type PanelId = 'overview' | 'wars' | 'aiLog' | 'saveLoad' | 'settings' | 'fronts' | 'budget' | 'research' | 'recruit' | 'production' | 'diplomacy' | null;
 
 export interface Selection {
   prov: number | null;

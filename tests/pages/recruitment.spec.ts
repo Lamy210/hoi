@@ -1,0 +1,32 @@
+import { expect, test } from '@playwright/test';
+
+test('生産変更と師団訓練を通常UIから実行できる', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await page.getByTestId('btn-production').click();
+  const prod = page.getByTestId('production-modal');
+  await expect(prod.getByTestId('line-prod.infStock')).toBeVisible();
+  await prod.getByTestId('production-art-share').focus();
+  await page.keyboard.press('End');
+  await prod.getByTestId('apply-production').click();
+  await prod.getByTestId('apply-pending').click();
+  await expect(prod.getByTestId('line-prod.artStock')).toContainText('50%');
+  await page.keyboard.press('Escape');
+  await page.getByTestId('btn-recruit').click();
+  const recruit = page.getByTestId('recruit-modal');
+  await recruit.getByTestId('division-template').selectOption('light-v1');
+  await recruit.getByTestId('start-training').click();
+  await recruit.getByTestId('apply-pending').click();
+  const order = recruit.locator('[data-testid^="training-"]');
+  await expect(order).toHaveCount(1);
+  await expect(order).toContainText('軽歩兵師団');
+  await order.locator('[data-testid^="cancel-training-"]').click();
+  await recruit.getByTestId('apply-pending').click();
+  await expect(order).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
