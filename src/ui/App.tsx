@@ -1,8 +1,9 @@
 // アプリルータ＋タイトル/シナリオ/国家選択画面
-import { useSyncExternalStore, useState } from 'react';
+import { useEffect, useSyncExternalStore, useState } from 'react';
 import { appStore, type AppState } from './store';
 import { t } from './i18n';
 import { GameScreen } from './GameScreen';
+import { SettingsModal } from './panels';
 import { listScenarios, getPack, engineClient, type ScenarioInfo } from './engineClient';
 import type { Pack } from '../engine/scenario/types';
 import './styles.css';
@@ -36,11 +37,12 @@ function TitleScreen() {
         >
           {t(st.lang, 'title.newGame')}
         </button>
-        <button onClick={() => appStore.set({ panel: 'settings', screen: 'title' })}>
+        <button data-testid="btn-title-settings" onClick={() => appStore.set({ panel: 'settings', screen: 'title' })}>
           {t(st.lang, 'common.settings')}
         </button>
       </div>
-      {note && <div className="muted">{note}</div>}
+      {note && <div className="muted" role="alert">{note}</div>}
+      {st.panel === 'settings' && <SettingsModal />}
     </div>
   );
 }
@@ -49,11 +51,15 @@ function ScenarioScreen() {
   const st = useApp();
   const [info, setInfo] = useState<ScenarioInfo | null>(null);
   const [error, setError] = useState<string | null>(null);
-  if (!info && !error) {
-    listScenarios()
-      .then((arr) => setInfo(arr[0]))
-      .catch((err) => setError(String(err)));
-  }
+  useEffect(() => {
+    let active = true;
+    void listScenarios().then((arr) => {
+      if (!active) return;
+      if (!arr[0]) setError('No available scenario');
+      else setInfo(arr[0]);
+    }).catch((err) => { if (active) setError(String(err)); });
+    return () => { active = false; };
+  }, []);
   const lang = st.lang;
   return (
     <div className="screen">
@@ -98,11 +104,13 @@ function CountryScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [difficulty, setDifficulty] = useState<0 | 1 | 2>(1);
   const [seed, setSeed] = useState<number>(() => 20261114);
-  if (!pack && !error) {
-    getPack()
-      .then((r) => setPack(r.pack))
-      .catch((err) => setError(String(err)));
-  }
+  const [starting, setStarting] = useState(false);
+  useEffect(() => {
+    let active = true;
+    void getPack().then((r) => { if (active) setPack(r.pack); })
+      .catch((err) => { if (active) setError(String(err)); });
+    return () => { active = false; };
+  }, []);
   return (
     <div className="screen">
       <div className="screen-title">{t(lang, 'country.select')}</div>
@@ -147,17 +155,25 @@ function CountryScreen() {
               <button
                 className="primary"
                 data-testid="btn-start"
-                disabled={!selected}
+                disabled={!selected || starting || !Number.isSafeInteger(seed)}
                 onClick={async () => {
-                  if (!selected) return;
-                  const { pack: p } = await getPack();
-                  await engineClient.startGame(p, { seed, playerCountryId: selected, difficulty });
-                  appStore.set({ screen: 'game', gameOpts: { seed, playerCountryId: selected, difficulty } });
+                  if (!selected || starting || !Number.isSafeInteger(seed)) return;
+                  setStarting(true);
+                  setError(null);
+                  try {
+                    const { pack: p } = await getPack();
+                    await engineClient.startGame(p, { seed, playerCountryId: selected, difficulty });
+                    appStore.set({ screen: 'game', panel: null, gameOpts: { seed, playerCountryId: selected, difficulty } });
+                  } catch (err) {
+                    engineClient.dispose();
+                    setError(String(err));
+                    setStarting(false);
+                  }
                 }}
               >
                 {t(lang, 'common.start')}
               </button>
-              <button onClick={() => appStore.set({ screen: 'scenario' })}>{t(lang, 'common.back')}</button>
+              <button disabled={starting} onClick={() => appStore.set({ screen: 'scenario' })}>{t(lang, 'common.back')}</button>
             </div>
           </div>
         </>
