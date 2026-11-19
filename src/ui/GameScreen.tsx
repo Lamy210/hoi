@@ -8,6 +8,7 @@ import { startPacer, stopPacer } from './pacer';
 import type { MapDataSource, MapRenderer } from './maprender/types';
 import { colorsForMode, diffIndices } from './maprender/types';
 import { createCanvasRenderer } from './maprender/canvasAdapter';
+import { TERRAIN_COLORS, terrainOf } from './maprender/terrainColors';
 import { createMaplibreRenderer } from './maprender/maplibreAdapter';
 import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel, PendingOrders } from './panels';
 
@@ -41,6 +42,8 @@ export function GameScreen() {
   // レンダラ初期化（metaが到着した後に1回。スナップショットは到着待ち）
   useEffect(() => {
     if (!st.meta) return;
+    setMapReady(false);
+    setMapError(null);
     let disposed = false;
     let renderer: MapRenderer & { setMode?: (m: 'political' | 'terrain' | 'supply', colors: string[]) => void } | null = null;
     (async () => {
@@ -109,7 +112,7 @@ export function GameScreen() {
     const ds = dsRef.current;
     const r = rendererRef.current;
     if (!ds || !r) return;
-    const { colors } = colorsForMode(mode, ds);
+    const colors = mode === 'terrain' ? terrainArrRef.current.map(i => TERRAIN_COLORS[terrainOf(i)]) : colorsForMode(mode, ds).colors;
     if (r.setMode) {
       r.setMode(mode, colors);
     } else if (dirty.size === 0 || mode === 'terrain') {
@@ -243,7 +246,7 @@ export function GameScreen() {
         {st.devMode && <button data-testid="btn-ai" onClick={() => appStore.set({ panel: 'aiLog', aiLogCountry: (snap.playerCountry + 1) % snap.countries.length })}>{t(lang, 'panel.aiLog')}</button>}
         <button onClick={() => appStore.set({ panel: 'settings' })}>⚙</button>
       </div>
-      <PendingOrders />
+      {st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && <PendingOrders />}
       <div className="main-area">
         <div
           className="map-container"
