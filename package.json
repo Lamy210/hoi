@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test",
+    "test:e2e": "vite build --mode e2e && playwright test",
+    "test:pages": "playwright test --config playwright.pages.config.ts",
     "bench": "tsx tools/bench.ts",
     "pipeline": "node tools/pipeline/build-scenario.mjs"
   },
