@@ -1,0 +1,30 @@
+import { expect, test } from '@playwright/test';
+
+test('自由編成の試算をWorkerから取得し、ゲーム状態を変えない', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await page.getByTestId('btn-recruit').click();
+  const before = await page.getByTestId('template-cost').innerText();
+  await page.getByTestId('open-division-designer').click();
+  const d = page.getByTestId('division-designer');
+  await expect(d.getByTestId('designer-stat-game.manpower')).toHaveText('10000');
+  for (let i = 0; i < 4; i++) await d.getByTestId('remove-infantry-v1').click();
+  for (let i = 0; i < 2; i++) await d.getByTestId('add-artillery-heavy-v1').click();
+  await d.getByTestId('support-engineer-v1').check();
+  await expect(d.getByTestId('designer-stat-game.manpower')).toHaveText('8200');
+  await expect(d.getByTestId('designer-stat-prod.artStock')).toHaveText('200');
+  await expect(d.getByTestId('designer-stat-mil.trainingDays')).toHaveText('44');
+  await expect(d.getByTestId('designer-stat-designer.attack')).toHaveText('34.50');
+  await expect(page.getByTestId('date')).toHaveText('2026-01-01');
+  await expect(page.getByTestId('template-cost')).toHaveText(before);
+  await expect(page.locator('[data-testid^="training-"]')).toHaveCount(0);
+  await d.getByTestId('designer-reset').click();
+  await expect(d.getByTestId('designer-stat-game.manpower')).toHaveText('10000');
+  await expect(d.getByTestId('support-engineer-v1')).not.toBeChecked();
+  expect(errors).toEqual([]);
+});
