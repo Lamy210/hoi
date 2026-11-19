@@ -3,6 +3,7 @@ import { createTestEngine } from '../helpers';
 import { applyCommands } from '../../src/engine/core/command';
 import { tickTraining } from '../../src/engine/systems/training';
 import { hashWorld } from '../../src/engine/core/hash';
+import { savePayloadChecksum } from '../../src/engine/save/serialize';
 import { decode, encode } from '@msgpack/msgpack';
 
 describe('師団募集・配備', () => {
@@ -47,10 +48,12 @@ describe('師団募集・配備', () => {
     const old = decode(e.serialize()) as any;
     old.header.v = 4;
     delete old.stores.trainingQueue;
+    delete old.payloadChecksum;
     expect(e.loadFrom(encode(old)).ok).toBe(true);
     expect(e.world.trainingQueue).toEqual([]);
     const bad = decode(e.serialize()) as any;
     bad.stores.trainingQueue = [{id:1,country:0,province:0,templateId:'unknown',readyTick:40}];
-    expect(e.loadFrom(encode(bad)).ok).toBe(false);
+    bad.payloadChecksum = savePayloadChecksum(bad.header, bad.stores);
+    expect(e.loadFrom(encode(bad)).violations).toContain('invalid training order');
   });
 });
