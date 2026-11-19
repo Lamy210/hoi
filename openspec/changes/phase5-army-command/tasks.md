@@ -1,0 +1,9 @@
+# Tasks（未実装）
+- [ ] 1.1 目的: 指揮階層。対象: core/state.ts, military/armies.ts（新規）。作業: ID、所属、上限、逆引き。テスト: A01/A02。期待値: 重複所属なし。完了条件: unit合格。
+- [ ] 1.2 目的: 編入・指揮官。対象: commands.ts, military/commanders.ts。作業: 原子的検証・役職排他。テスト: A03/A04。期待値: 部分変更なし。完了条件: integration合格。
+- [ ] 2.1 目的: 一括移動・停止。対象: commands.ts, movement.ts。作業: 経路世代、append、hold。テスト: A05/A06。期待値: 進捗維持。完了条件: integration合格。
+- [ ] 2.2 目的: 作戦。対象: systems/fronts.ts, military/fronts.ts。作業: 版・割当・和平・自動停止。テスト: A07/A08。期待値: 古い命令拒否。完了条件: integration合格。
+- [ ] 3.1 目的: 地図選択。対象: ui/GameScreen.tsx, maprender。作業: 多選択、矩形、DPR/タッチ。テスト: A09。期待値: 選択/パン排他。完了条件: E2E合格。
+- [ ] 3.2 目的: 軍団・作戦UI。対象: panels.tsx, engine/ui.ts, i18n.ts。作業: バー/矢印/実行停止。テスト: A10/A11。期待値: 通常操作。完了条件: E2E合格。
+- [ ] 4.1 目的: 保存。対象: save/serialize.ts, core/hash.ts。作業: 旧Front移行・命令状態保存。テスト: A12。期待値: 往復一致。完了条件: 実fixture合格。
+- [ ] 4.2 目的: 性能と公開。対象: docs/13, CI。作業: A13長期・性能・strict。テスト: 全回帰。期待値: 参照切れなし。完了条件: 最新HEADと公開確認。
