@@ -31,4 +31,4 @@ Operation{id,owner,armyId?,kind:frontline|offensive|fallback|garrison|rally,stat
 地図クリックで選択、Shift/Ctrl/Cmdで追加/解除、ドラッグ矩形（選択モード）と地図パンを区別、右クリック/タップ用明示ボタンで移動。軍団バー、全選択、編入/解除、作戦へ割当、地図上の色/矢印、実行/一時停止、停止/自動復帰。タッチは長押しに依存せず複数選択トグル。右クリック・編集・ドラッグの競合禁止、Escapeでモード解除。Canvas/MapLibre共通ID、ズーム/高DPIで選択一致。視認性は色だけに依存しない。
 
 ## 保存・性能
-5B後のschema番号はdocs/20へ割当（暫定v9を避け順序で予約、実装時確定）。旧frontIdを作戦へ変換し旧unit/commander IDを維持。旧移動中のsegProgressを保持。新しいmanualHold、waypoints、operationRevision、階層・命令をハッシュ/保存。部隊消滅時参照解除、国消滅で作戦停止。UI選択は保存不要。部隊index・経路キャッシュは支配/通行権/海峡変化で失効。1024師団選択表示の描画負荷も測定するが1コマンド上限256を維持。
+想定順のschemaはv7（docs/20の予約表、実装時確定）。旧frontIdを作戦へ変換し旧unit/commander IDを維持。旧移動中のsegProgressを保持。新しいmanualHold、waypoints、operationRevision、階層・命令をハッシュ/保存。部隊消滅時参照解除、国消滅で作戦停止。UI選択は保存不要。部隊index・経路キャッシュは支配/通行権/海峡変化で失効。1024師団選択表示の描画負荷も測定するが1コマンド上限256を維持。
