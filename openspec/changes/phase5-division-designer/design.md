@@ -52,3 +52,6 @@ draft → queued → training → ready → deployed。draftはUIローカル、
 テンプレート名はtrim後1〜64 Unicode code points、制御文字禁止。IDは正のsafe integer、国ごと128現行テンプレート/256版、IDカウンタは単調増加、削除時再利用禁止。組み込み3版は同じ上限に含むが直接削除不可、複製は可能。大隊順はUI配置順を保持し集計は固定ID順。同国異名テンプレートは許可。revisionは楽観ロック。未知カタログID・未解禁ID拒否。
 enqueueTrainingのorderIdはnextUnitIdを予約し重複不可、cancel後も再利用しない。queuedは設備不足でも登録可能、日次割当はpriority降順/orderId昇順、資源全量が揃う注文だけ予約。不足注文は理由を表示し、後続の実行可能注文を阻害しない。5Bは補充優先、6Aは設定可能。training開始時tick+durationを記録、readyTick到達でreadyへ。自動配備は同日のready遷移後に合法州なら実行。支配喪失でreadyを維持、再指定可、中止なら生存国へ返却。消滅国の予約は消滅台帳に記録し削除。
 再編: 財・人力それぞれ旧上限M、旧保有H、新上限Nについて retain=min(H,N)、refund=max(0,H-N)、buy=max(0,N-M)、新保有=retain+buy（N以下）。旧不足は新編成の範囲で保持、追加枠だけ購入。全buyが揃わなければ拒否。返却と購入は同一財で相殺可能だが他財へ変換不可。組織率はmin(旧org,新org上限)×0.5、経験は維持。指揮官/位置/ID維持。差分は原子的、通常補充は翌日から。旧兵員/装備の小数を捨てない。
+
+## 先行実装スライス: 編成プレビュー
+5Bの先行スライスでは builtin-v1 の仮カタログ、純粋集計関数 templateStats.ts と Worker read-only RPC (previewTemplate → templatePreview) を追加する。UIの入力は battalionIds/supportIds のみ。結果は ok/catalogVersion/stats または ok=false/reason。UIは直近の入力に対応する応答のみ表示。試算操作はtick、命令キュー、備蓄、部隊、セーブに影響しない。既存の固定3編成の募集とv5を維持する。カタログのパック駆動化、版付き保存、独自編成の募集、戦闘/兵站への統合は未実装であり、tasks 0.1/1.1/1.2/4.2等を完了扱いにしない。初期カタログは支援2種のみ、最大5種は将来拡張上限。D01/D02および入力検証をunitで、D16のうち非破壊プレビューを通常UIで検証する。
