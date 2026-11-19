@@ -1,4 +1,5 @@
 // パネル群 — 警告フィード／コンテキストパネル／セーブ・ロード／設定／AI判断ログ／外交（phase4）
+import { DivisionDesignerPreview } from './DivisionDesignerPreview';
 import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from '../engine/military/templates';
 import { useEffect, useState } from 'react';
 import { useApp } from './App';
@@ -816,6 +817,7 @@ export function RecruitmentPanel() {
       </div>
       <button className="primary" data-testid="start-training" disabled={!valid || !!missing || st.pendingCommands > 0} onClick={() => engineClient.command('startTraining', { templateId, province })}>{t(lang, 'mil.startTraining')}</button>
       {missing && <span className="muted"> {t(lang, missing)}</span>}
+      <DivisionDesignerPreview lang={lang} />
       <h4>{t(lang, 'mil.queue')} ({player.training.length}/{MAX_TRAINING})</h4>
       {player.training.map(o => {
         const d = divisionTemplate(o.templateId)!;
