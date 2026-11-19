@@ -11,7 +11,7 @@
 
 ## Capabilities
 - Added: naval-system
-- Modified: production-system, economy-system, research-system, save-system, ai-system, game-ui
+- Modified: production-system, save-system, game-ui
 
 ## Impact
 海軍は独立状態、装備/労働/貨幣は共通台帳。海軍数値はゲーム調整値、実艦性能や現実の軍事運用は再現しない。航空支援は後続Phase8D。
