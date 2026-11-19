@@ -70,11 +70,11 @@ self.onmessage = async (ev: MessageEvent) => {
       }
       case 'load': {
         if (!engine || !pack) return;
+        if (engine.world.runtime.commandsSinceLastTick.some(c => c.issuer === 'player')) throw new Error('Apply pending orders before loading');
         const r = engine.loadFrom(msg.buf);
         if (r.ok) {
           playerSeq = resumePlayerSequence(engine);
-          reply({ type: 'loaded', ok: true, meta: engine.getUiMeta() });
-          await postSnapshot(0);
+          reply({ type: 'loaded', ok: true, meta: engine.getUiMeta(), snap: engine.getUiSnapshot(0) });
         } else {
           reply({ type: 'loaded', ok: false, violations: r.violations });
         }
