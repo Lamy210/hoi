@@ -245,7 +245,8 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
 
   if (violations.length > 0) throw new PackValidationError(violations);
 
-  return { baseUrl: base, manifest, provinces, countries, edges, relations: meta.relations, viewBbox: meta.viewBbox, sources, events, techs };
+  return { baseUrl: base, manifest, provinces, countries, edges, relations: meta.relations, viewBbox: meta.viewBbox, sources, events, techs,
+    ...(verify ? { verifiedChecksums: sums } : {}) };
 }
 
 /** パック内容の簡易フィンガープリント（schemaHash用） */
@@ -255,4 +256,20 @@ export function packFingerprint(pack: Pack): string {
   h = fnv1a32(h + String(pack.provinces.length) + String(pack.countries.length) + String(pack.edges.length));
   for (const p of pack.provinces) h = fnv1a32(h + p.id + p.owner + p.terrain + String(p.infra) + String(p.population));
   return (h >>> 0).toString(16);
+}
+
+/** 初期ロード時に固定したチェックサムに対して、実際に描画するテキストを検証する。 */
+export async function loadVerifiedPackAsset<T>(pack: Pack, file: string, impl: FetchImpl = defaultFetch): Promise<T> {
+  if (!['geometry-lod1.json', 'geometry-lod2.json', 'decoration.json'].includes(file)) {
+    throw new PackValidationError(['unsupported map asset: ' + file]);
+  }
+  if (!pack.verifiedChecksums) return fetchJson<T>(pack.baseUrl + file, impl);
+  const expected = pack.verifiedChecksums[file];
+  const res = await impl(pack.baseUrl + file);
+  if (!res.ok) throw new PackValidationError(['map asset HTTP error: ' + file]);
+  const text = await res.text();
+  if (!expected || await sha256Hex(text) !== expected) {
+    throw new PackValidationError(['checksum mismatch: ' + file]);
+  }
+  return JSON.parse(text) as T;
 }
