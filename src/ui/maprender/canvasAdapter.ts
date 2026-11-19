@@ -3,10 +3,12 @@
 // ホバー/選択はポイント-in-ポリゴン（Path2D）で解決する。
 import type { MapDataSource, MapRenderer } from './types';
 import { TERRAIN_COLORS, terrainOf } from './terrainColors';
+import { mercatorY, fitMercator, zoomCamera } from './camera';
 
 interface FeatureRec {
   provIdx: number;
   path2d: Path2D;
+  projected: Path2D;
   bbox: [number, number, number, number];
 }
 
@@ -29,27 +31,32 @@ export function createCanvasRenderer(
   let mode: 'political' | 'terrain' | 'supply' = 'political';
   let selected: number | null = null;
   let fronts: { provinces: number[]; owner: number; stance: string }[] = [];
-  let readyResolve: (() => void) | null = null;
-  const ready = new Promise<void>((res) => (readyResolve = res));
+  let disposed = false;
+  let baseScale = 1;
+  let readyForInput = false;
 
-  // ビュー変換（経度緯度→ピクセル）。メルカトルではなくシンプルな線形投影（MVP・決定論的）
-  let scale = 1;
-  let offsetX = 0;
-  let offsetY = 0;
-  const [bx0, by0, bx1, by1] = ds.viewBbox;
+  // 北が上のWeb Mercator。投影座標のPath2Dを保持し、カメラ変更時だけ変換する。
+  let camera = { scale: 1, offsetX: 0, offsetY: 0 };
+  let decorProjected: Path2D[] = [];
+  let decorPaths: Path2D[] = [];
+
+  function rebuildPaths(): void {
+    const matrix = new DOMMatrix([camera.scale, 0, 0, -camera.scale, camera.offsetX, camera.offsetY]);
+    const transform = (source: Path2D) => { const path = new Path2D(); path.addPath(source, matrix); return path; };
+    for (const feature of [...features, ...(featuresLod2 ?? [])]) feature.path2d = transform(feature.projected);
+    decorPaths = decorProjected.map(transform);
+    canvas.dataset.zoom = String(camera.scale / baseScale);
+    canvas.dataset.lod = camera.scale / baseScale < 1.4 ? '2' : '1';
+  }
 
   function fitBounds(): void {
-    const w = container.clientWidth || 800;
-    const h = container.clientHeight || 600;
-    const sx = w / (bx1 - bx0);
-    const sy = h / (by1 - by0);
-    scale = Math.min(sx, sy);
-    offsetX = w / 2 - ((bx0 + bx1) / 2) * scale;
-    offsetY = h / 2 - ((by0 + by1) / 2) * scale;
+    camera = fitMercator(ds.viewBbox, container.clientWidth || 800, container.clientHeight || 600);
+    baseScale = camera.scale;
+    rebuildPaths();
   }
 
   function toPixel(lng: number, lat: number): [number, number] {
-    return [lng * scale + offsetX, lat * scale + offsetY];
+    return [lng * camera.scale + camera.offsetX, -mercatorY(lat) * camera.scale + camera.offsetY];
   }
 
   function buildPath(geom: any): { path: Path2D; bbox: [number, number, number, number] } {
@@ -66,10 +73,10 @@ export function createCanvasRenderer(
           if (lat < minY) minY = lat;
           if (lat > maxY) maxY = lat;
         }
-        const [x0, y0] = toPixel(ring[0][0], ring[0][1]);
+        const [x0, y0] = [ring[0][0], mercatorY(ring[0][1])];
         path.moveTo(x0, y0);
         for (let i = 1; i < ring.length; i++) {
-          const [x, y] = toPixel(ring[i][0], ring[i][1]);
+          const [x, y] = [ring[i][0], mercatorY(ring[i][1])];
           path.lineTo(x, y);
         }
         path.closePath();
@@ -78,41 +85,40 @@ export function createCanvasRenderer(
     return { path, bbox: [minX, minY, maxX, maxY] };
   }
 
-  let decorPaths: Path2D[] = [];
-
   async function init(): Promise<void> {
-    const { loadGeometry, loadDecoration } = await import('../engineClient');
     fitBounds();
     // LOD2（簡略）を先に描画可能にし、LOD1を後から差し替え
-    const lod2fc = (await loadGeometry(2)) as any;
+    const lod2fc = (await ds.loadGeometry(2)) as any;
     featuresLod2 = lod2fc.features.map((f: any, i: number) => {
       const built = buildPath(f.geometry);
-      return { provIdx: i, path2d: built.path, bbox: built.bbox };
+      return { provIdx: i, path2d: new Path2D(), projected: built.path, bbox: built.bbox };
     });
-    const decor = (await loadDecoration()) as any;
-    decorPaths = decor.features.map((f: any) => buildPath(f.geometry).path);
-    const lod1fc = (await loadGeometry(1)) as any;
+    const decor = (await ds.loadDecoration()) as any;
+    decorProjected = decor.features.map((f: any) => buildPath(f.geometry).path);
+    const lod1fc = (await ds.loadGeometry(1)) as any;
     features = lod1fc.features.map((f: any, i: number) => {
       const built = buildPath(f.geometry);
-      return { provIdx: i, path2d: built.path, bbox: built.bbox };
+      return { provIdx: i, path2d: new Path2D(), projected: built.path, bbox: built.bbox };
     });
-    readyResolve?.();
+    if (disposed) return;
+    readyForInput = true;
+    rebuildPaths();
     draw();
   }
 
   function currentFeatures(): FeatureRec[] {
     // LOD切替: ズーム倍率が小さい（広域）ときは簡略ジオメトリ
-    const w = container.clientWidth || 800;
-    const zoomFrac = scale / (w / (bx1 - bx0));
+    const zoomFrac = camera.scale / baseScale;
     return zoomFrac < 1.4 && featuresLod2 ? featuresLod2 : features;
   }
 
   function draw(): void {
+    if (disposed) return;
     const dpr = window.devicePixelRatio || 1;
     const w = container.clientWidth || 800;
     const h = container.clientHeight || 600;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
+    if (canvas.width !== Math.round(w * dpr)) canvas.width = Math.round(w * dpr);
+    if (canvas.height !== Math.round(h * dpr)) canvas.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     // 海
     ctx.fillStyle = '#2c3444';
@@ -147,7 +153,7 @@ export function createCanvasRenderer(
         const [minX, minY, maxX, maxY] = f.bbox;
         const [px0, py0] = toPixel(minX, maxY);
         const [px1, py1] = toPixel(maxX, minY);
-        const step = Math.max(6, scale * 0.5);
+        const step = Math.max(6, camera.scale * 0.5);
         for (let x = px0 - (py1 - py0); x < px1; x += step) {
           ctx.beginPath();
           ctx.moveTo(x, py1);
@@ -158,7 +164,7 @@ export function createCanvasRenderer(
       }
     }
     // ラベル（広域では都市ラベルは省略、州名は表示）
-    if (scale * 5 > 12) {
+    if (camera.scale * 5 > 12) {
       ctx.fillStyle = 'rgba(240,238,232,0.9)';
       ctx.strokeStyle = 'rgba(0,0,0,0.6)';
       ctx.lineWidth = 2;
@@ -233,45 +239,73 @@ export function createCanvasRenderer(
     return null;
   }
 
-  // パン・ズーム
-  let dragging = false;
-  let lastX = 0;
-  let lastY = 0;
-  canvas.addEventListener('mousedown', (e) => {
-    dragging = true;
+  // パン・ズーム。ポインタを捕捉し、ドラッグ完了を州クリックとして扱わない。
+  let pointer: number | null = null;
+  let startX = 0, startY = 0, lastX = 0, lastY = 0;
+  let dragged = false;
+  let suppressClick = false;
+  canvas.style.touchAction = 'none';
+  canvas.addEventListener('pointerdown', (e) => {
+    if (!readyForInput || e.button !== 0 || pointer !== null) return;
+    pointer = e.pointerId;
+    startX = lastX = e.clientX;
+    startY = lastY = e.clientY;
+    dragged = false;
+    suppressClick = false;
+    canvas.setPointerCapture(e.pointerId);
+  });
+  canvas.addEventListener('pointermove', (e) => {
+    if (pointer !== e.pointerId) return;
+    if (!dragged && Math.hypot(e.clientX - startX, e.clientY - startY) < 4) return;
+    dragged = true;
+    canvas.style.cursor = 'grabbing';
+    camera.offsetX += e.clientX - lastX;
+    camera.offsetY += e.clientY - lastY;
     lastX = e.clientX;
     lastY = e.clientY;
+    rebuildPaths();
+    draw();
   });
-  window.addEventListener('mouseup', () => (dragging = false));
-  canvas.addEventListener('mousemove', (e) => {
-    if (dragging) {
-      offsetX += e.clientX - lastX;
-      offsetY += e.clientY - lastY;
-      lastX = e.clientX;
-      lastY = e.clientY;
-      draw();
-    }
+  const endDrag = (e: PointerEvent) => {
+    if (pointer !== e.pointerId) return;
+    pointer = null;
+    suppressClick = dragged;
+    canvas.style.cursor = 'pointer';
+  };
+  canvas.addEventListener('pointerup', endDrag);
+  canvas.addEventListener('pointercancel', endDrag);
+  canvas.addEventListener('lostpointercapture', endDrag);
+  canvas.addEventListener('click', (e) => {
+    if (suppressClick) { e.stopPropagation(); suppressClick = false; }
   });
+  function zoom(factor: number, x = container.clientWidth / 2, y = container.clientHeight / 2): void {
+    if (!readyForInput) return;
+    camera = zoomCamera(camera, baseScale, factor, x, y);
+    rebuildPaths();
+    draw();
+  }
   canvas.addEventListener('wheel', (e) => {
     e.preventDefault();
+    if (!e.deltaY) return;
     const rect = canvas.getBoundingClientRect();
-    const mx = e.clientX - rect.left;
-    const my = e.clientY - rect.top;
-    const factor = e.deltaY < 0 ? 1.25 : 0.8;
-    const lng = (mx - offsetX) / scale;
-    const lat = (my - offsetY) / scale;
-    scale *= factor;
-    offsetX = mx - lng * scale;
-    offsetY = my - lat * scale;
+    zoom(e.deltaY < 0 ? 1.25 : 0.8, e.clientX - rect.left, e.clientY - rect.top);
+  }, { passive: false });
+  let lastWidth = container.clientWidth, lastHeight = container.clientHeight;
+  const resize = () => {
+    const w = container.clientWidth, h = container.clientHeight;
+    if (w === lastWidth && h === lastHeight) return;
+    if (readyForInput) {
+      camera.offsetX += (w - lastWidth) / 2;
+      camera.offsetY += (h - lastHeight) / 2;
+      rebuildPaths();
+    }
+    lastWidth = w; lastHeight = h;
     draw();
-  });
-  const resizeObserver = new ResizeObserver(() => {
-    fitBounds();
-    draw();
-  });
+  };
+  const resizeObserver = new ResizeObserver(resize);
   resizeObserver.observe(container);
 
-  void init();
+  const ready = init();
 
   const renderer = {
     whenReady: () => ready,
@@ -290,17 +324,17 @@ export function createCanvasRenderer(
       colors = next;
       draw();
     },
-    resize() {
-      fitBounds();
-      draw();
-    },
+    zoomBy: (factor: number) => zoom(factor),
+    resetView() { fitBounds(); draw(); },
+    resize,
     dispose() {
+      disposed = true;
       resizeObserver.disconnect();
       canvas.remove();
     },
     setMode(m: 'political' | 'terrain' | 'supply', nextColors: string[]) {
       mode = m;
-      colors = m === 'terrain' ? nextColors : nextColors;
+      colors = nextColors;
       // terrainモードでは州ごとの地形色を使用
       if (m === 'terrain') {
         colors = nextColors.map((_, i) => TERRAIN_COLORS[terrainOf(terrainArr[i])]);
