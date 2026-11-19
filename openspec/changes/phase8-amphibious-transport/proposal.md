@@ -11,7 +11,7 @@
 
 ## Capabilities
 - Added: maritime-transport
-- Modified: military-system, combat-system, logistics-system, economy-system, naval-system, game-ui, save-system, ai-system
+- Modified: combat-system, logistics-system, game-ui, save-system
 
 ## Impact
 陸軍通常移動は海越え禁止のまま。抽象ゲームモデルのみ。実際の上陸作戦・兵站の戦術モデルや実在の戦力評価は対象外。航空戦力は後続。
