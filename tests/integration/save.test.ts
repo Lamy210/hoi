@@ -74,4 +74,40 @@ describe('セーブ/ロード', () => {
     expect(r.world).toBeNull();
     expect(r.violations.some((v) => v.includes('version'))).toBe(true);
   });
+
+  it('デコード可能な不正構造を例外ではなく拒否結果として返す', async () => {
+    const engine = await createTestEngine(1, 15, 'JPN');
+    const { decode, encode } = await import('@msgpack/msgpack');
+    const valid = engine.serialize();
+    const originalHash = hashWorld(engine.world);
+    const makeBlob = () => decode(valid) as Record<string, any>;
+    const missingStores = makeBlob();
+    delete missingStores.stores;
+    const missingProv = makeBlob();
+    delete missingProv.stores.prov;
+    const nullUnit = makeBlob();
+    nullUnit.stores.units = [null];
+    const badOwner = makeBlob();
+    badOwner.stores.prov.owner[0] = null;
+    const badPlayer = makeBlob();
+    badPlayer.header.playerCountry = engine.pack.countries.length;
+    badPlayer.stores.playerCountry = badPlayer.header.playerCountry;
+    const badTick = makeBlob();
+    badTick.stores.tick++;
+    const badSavedAt = makeBlob();
+    badSavedAt.header.savedAtTick++;
+    for (const value of [null, [], 0, {}, missingStores, missingProv, nullUnit, badOwner, badPlayer, badTick, badSavedAt]) {
+      const bytes = encode(value);
+      const result = deserializeWorld(bytes, engine.pack);
+      expect(result.world).toBeNull();
+      expect(result.violations.length).toBeGreaterThan(0);
+      const loaded = engine.loadFrom(bytes);
+      expect(loaded.ok).toBe(false);
+      expect(loaded.violations.length).toBeGreaterThan(0);
+      expect(hashWorld(engine.world)).toBe(originalHash);
+    }
+    expect(engine.loadFrom(valid)).toEqual({ ok: true, violations: [] });
+    expect(hashWorld(engine.world)).toBe(originalHash);
+  });
+
 });
