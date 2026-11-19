@@ -52,7 +52,7 @@ export function unitPowerFactorsPure(
   const sideMod = side === 'attack' ? t.atk : t.def;
   const weather = side === 'attack' ? weatherMod : 1.0; // 天候は攻撃側にのみ適用
   return [
-    { label: 'base', value: 40, formula: 'base=40' },
+    { label: 'base', value: 40 * (u.maxManpower / 10000) * (side === 'attack' ? (divisionTemplate(u.templateId)?.attack ?? 1) : 1), formula: '40×size×templateAttack' },
     { label: 'org', value: orgFrac, formula: 'org/100' },
     { label: 'manpower', value: mpFill, formula: 'manpower/maxManpower' },
     { label: 'equipment', value: eqFill, formula: 'sqrt(infFill×artFill)' },
@@ -163,7 +163,7 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
 
   // 崩壊チェック（戦力枯渇）
   for (const u of [...frontA, ...frontD]) {
-    if (!u.destroyed && (u.manpower < 500 || u.infEquipment < 400 || u.artEquipment < 50)) {
+    if (!u.destroyed && (u.manpower < u.maxManpower * 0.05 || u.infEquipment < u.maxInfEquipment * 0.4 || u.artEquipment < u.maxArtEquipment * 0.25)) {
       u.destroyed = true;
       addAlert(w, { kind: 'unitDestroyed', priority: 4, msgKey: 'alert.unitDestroyed', params: { where: prov.nameJa[provIdx] || prov.nameEn[provIdx] }, actor: u.owner, province: provIdx });
     }
