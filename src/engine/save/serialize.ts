@@ -127,6 +127,21 @@ export function deserializeWorld(
   buf: Uint8Array,
   pack: Pack,
 ): LoadResult {
+  // デコードできても構造が不正な入力がある。検証・復元中の例外も
+  // LoadResult に変換し、部分的に復元した状態を呼び出し元へ公開しない。
+  try {
+    return deserializeWorldInternal(buf, pack);
+  } catch {
+    return { world: null, violations: ['invalid save structure or state'] };
+  }
+}
+
+function isRecord(value: unknown): boolean {
+  return value !== null && typeof value === 'object' &&
+    !Array.isArray(value) && Object.getPrototypeOf(value) === Object.prototype;
+}
+
+function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   const violations: string[] = [];
   let blob: SaveBlob;
   try {
@@ -134,16 +149,26 @@ export function deserializeWorld(
   } catch (err) {
     return { world: null, violations: ['decode failed: ' + String(err)] };
   }
+  if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
-  if (!h || typeof h !== 'object') return { world: null, violations: ['header missing'] };
+  if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
   if (h.v !== SAVE_SCHEMA_VERSION) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
   if (h.difficulty !== 0 && h.difficulty !== 1 && h.difficulty !== 2) violations.push('difficulty out of range: ' + h.difficulty);
+  if (!Number.isSafeInteger(h.tick) || h.tick < 0 || h.savedAtTick !== h.tick) violations.push('invalid header tick');
+  if (!Number.isSafeInteger(h.playerCountry) || h.playerCountry < 0 || h.playerCountry >= pack.countries.length) violations.push('player country out of range');
   if (violations.length > 0) return { world: null, violations };
 
+  if (!isRecord(blob.stores)) return { world: null, violations: ['stores missing or invalid'] };
   const s = blob.stores as Record<string, any>;
+  if (!isRecord(s.prov) || !isRecord(s.countries) || !isRecord(s.counters)) {
+    return { world: null, violations: ['required store missing or invalid'] };
+  }
+  if (s.tick !== h.tick || s.epochDays !== h.epochDays || s.playerCountry !== h.playerCountry || s.difficulty !== h.difficulty) {
+    return { world: null, violations: ['header and stores mismatch'] };
+  }
   // 構造検証（範囲・参照）
   const provCount = pack.provinces.length;
   const ctryCount = pack.countries.length;
@@ -153,13 +178,13 @@ export function deserializeWorld(
   if (!Array.isArray(controller) || controller.length !== provCount) violations.push('controller array size mismatch');
   if (violations.length === 0) {
     for (let i = 0; i < provCount; i++) {
-      if (owner[i] < 0 || owner[i] >= ctryCount) violations.push('owner out of range at ' + i);
-      if (controller[i] < -1 || controller[i] >= ctryCount) violations.push('controller out of range at ' + i);
+      if (!Number.isInteger(owner[i]) || owner[i] < 0 || owner[i] >= ctryCount) violations.push('owner out of range at ' + i);
+      if (!Number.isInteger(controller[i]) || controller[i] < -1 || controller[i] >= ctryCount) violations.push('controller out of range at ' + i);
     }
     for (const u of s.units as any[]) {
-      if (u.owner < 0 || u.owner >= ctryCount) violations.push('unit owner out of range: ' + u.id);
-      if (u.loc < 0 || u.loc >= provCount) violations.push('unit loc out of range: ' + u.id);
-      if (u.manpower < 0 || u.infEquipment < 0 || u.artEquipment < 0) violations.push('negative stock in unit: ' + u.id);
+      if (!Number.isInteger(u.owner) || u.owner < 0 || u.owner >= ctryCount) violations.push('unit owner out of range: ' + u.id);
+      if (!Number.isInteger(u.loc) || u.loc < 0 || u.loc >= provCount) violations.push('unit loc out of range: ' + u.id);
+      if (![u.manpower, u.infEquipment, u.artEquipment].every((n) => Number.isFinite(n) && n >= 0)) violations.push('invalid stock in unit: ' + u.id);
       if (u.frontId !== undefined && u.frontId < -1) violations.push('bad frontId in unit: ' + u.id);
     }
     for (const c of s.countries.manpowerPool) if (c < 0) violations.push('negative manpowerPool');
