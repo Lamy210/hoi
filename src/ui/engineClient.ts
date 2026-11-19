@@ -174,7 +174,7 @@ export class EngineClient {
         const st = appStore.get();
         const alertLog = [...st.alertLog, ...(snap.alerts ?? [])];
         if (alertLog.length > 100) alertLog.splice(0, alertLog.length - 100);
-        appStore.set({ snap, alertLog, lastAlertId: snap.lastAlertId });
+        appStore.set({ snap, alertLog, lastAlertId: snap.lastAlertId, pendingCommands: Math.max(0, st.pendingCommands - (m.appliedPlayerCommands ?? 0)) });
         this.onSnapshotHook?.();
         break;
       }
@@ -211,7 +211,9 @@ export class EngineClient {
   }
 
   command(cmdType: string, p: Record<string, unknown>): void {
+    if (!this.worker) return;
     this.send({ type: 'command', seq: this.seq++, cmdType, p });
+    appStore.set({ pendingCommands: appStore.get().pendingCommands + 1 });
   }
 
   step(ticks = 1, sinceAlertId: number): void {
