@@ -1,0 +1,31 @@
+name: Specification Design
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: specification-design-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          package-manager-cache: false
+      - run: npm install --no-audit --no-fund
+      - run: npx openspec validate phase5-division-designer --strict
+      - run: npx openspec validate phase6-equipment-lines --strict
+      - run: npx openspec validate phase6-industrial-economy --strict
+      - run: npx openspec validate phase5-army-command --strict
+      - run: npx openspec validate phase8-maritime-map --strict
+      - run: npx openspec validate phase8-naval-fleets --strict
+      - run: npx openspec validate phase8-amphibious-transport --strict
