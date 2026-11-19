@@ -35,6 +35,15 @@ export function GameScreen() {
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || target?.closest('input, textarea, select, [contenteditable]') || appStore.get().panel) return;
+      if (e.key.toLowerCase() === 'f') { e.preventDefault(); setSearch(''); }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const lang = st.lang;
   const meta = st.meta;
   const snap = st.snap;
@@ -170,6 +179,13 @@ export function GameScreen() {
     return <div className="screen"><div className="muted">{t(lang, 'misc.loading')}</div></div>;
   }
 
+  const searchResults = search === null ? [] : meta.provIds.map((id, i) => ({ id, i }))
+    .filter(({ id, i }) => (meta.provNameJa[i] + meta.provNameEn[i] + id).toLowerCase().includes(search.trim().toLowerCase())).slice(0, 20);
+  function chooseProvince(prov: number) {
+    appStore.set({ selection: { prov, unitId: null, country: null }, trace: null });
+    rendererRef.current?.focusProvince(prov);
+    setSearch(null);
+  }
   const player = snap.countries[snap.playerCountry];
   const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
@@ -281,14 +297,12 @@ export function GameScreen() {
         </div>
         {search !== null && (
           <div className="search-results">
-            {meta.provIds.map((id, i) => ({ id, i }))
-              .filter(({ id, i }) => (meta.provNameJa[i] + meta.provNameEn[i] + id).toLowerCase().includes(search.toLowerCase()))
-              .slice(0, 20)
-              .map(({ id, i }) => (
-                <div key={id} className="search-item" onClick={() => { appStore.set({ selection: { prov: i, unitId: null, country: null } }); setSearch(null); }}>
-                  {meta.provNameJa[i]}（{id}）
-                </div>
-              ))}
+            {searchResults.map(({ id, i }) => (
+              <button key={id} type="button" data-testid={'search-result-' + id} className="search-item" onClick={() => chooseProvince(i)}>
+                {lang === 'ja' ? meta.provNameJa[i] : meta.provNameEn[i]}（{id}）
+              </button>
+            ))}
+            {searchResults.length === 0 && <div className="muted search-item">{t(lang, 'map.noResults')}</div>}
           </div>
         )}
         {st.statusMessage && (
@@ -303,9 +317,13 @@ export function GameScreen() {
         ))}
         <span style={{ flex: 1 }} />
         {st.mapMode === 'supply' && <span className="muted">{t(lang, 'map.supplyLegend')}</span>}
-        <button onClick={() => setSearch('')}>🔍 {t(lang, 'misc.provSearch')}</button>
+        <button data-testid="btn-province-search" aria-expanded={search !== null} onClick={() => setSearch(search === null ? '' : null)}>🔍 {t(lang, 'misc.provSearch')}</button>
         {search !== null && (
-          <input autoFocus value={search} onChange={(e) => setSearch(e.target.value)} onBlur={() => setTimeout(() => setSearch(null), 200)} placeholder="Tokyo / 東京" />
+          <input autoFocus data-testid="province-search" aria-label={t(lang, 'misc.provSearch')} value={search}
+            onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => {
+              if (e.key === 'Enter' && searchResults[0]) { e.preventDefault(); chooseProvince(searchResults[0].i); }
+              if (e.key === 'Escape') { e.stopPropagation(); setSearch(null); }
+            }} placeholder="Tokyo / 東京" />
         )}
       </div>
       {st.panel === 'saveLoad' && <SaveLoadModal />}

@@ -95,3 +95,6 @@ input, select {
 .modal { min-width: min(560px, 94vw); max-width: min(720px, 94vw); }
 .left-feed { width: min(340px, 42%); }
 @media (max-width: 700px) { .right-panel { width: 38%; min-width: 140px; padding: 6px; } .topbar { gap: 4px; } }
+
+.search-results button.search-item { display: block; width: 100%; text-align: left; border: 0; border-radius: 0; background: transparent; }
+.search-results button.search-item:hover, .search-results button.search-item:focus-visible { background: #2b3140; outline: 1px solid #f2c94c; }

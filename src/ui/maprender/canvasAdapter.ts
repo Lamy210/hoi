@@ -328,6 +328,14 @@ export function createCanvasRenderer(
     },
     zoomBy: (factor: number) => zoom(factor),
     resetView() { fitBounds(); draw(); },
+    focusProvince(prov: number) {
+      if (!readyForInput || !Number.isInteger(prov) || prov < 0 || prov >= ds.provIds.length) return;
+      const scale = Math.max(camera.scale, baseScale * 4);
+      camera = { scale, offsetX: container.clientWidth / 2 - ds.provLabelX[prov] * scale,
+        offsetY: container.clientHeight / 2 + mercatorY(ds.provLabelY[prov]) * scale };
+      rebuildPaths();
+      draw();
+    },
     resize,
     dispose() {
       disposed = true;
