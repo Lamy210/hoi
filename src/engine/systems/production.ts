@@ -20,8 +20,11 @@ export function aiEquipmentBonus(w: WorldState, country: number): number {
 export function dailyEquipmentOutput(w: WorldState, c: number): { infantry: number; artillery: number } {
   if (!w.countries.alive[c]) return { infantry: 0, artillery: 0 };
   const share = w.productionShare[c] ?? 0.2;
-  const factor = w.countries.milFactories[c] * (1 + aiEquipmentBonus(w, c)) * lawOutputFactor(w, c) * (1 + techMods(w, c, 'factoryOutput'));
-  return { infantry: factor * (1 - share) * EQUIPMENT_PER_FACTORY_DAY, artillery: factor * share * ART_PER_FACTORY_DAY };
+  const bonus = aiEquipmentBonus(w, c);
+  const lawTech = lawOutputFactor(w, c) * (1 + techMods(w, c, 'factoryOutput'));
+  const factories = w.countries.milFactories[c];
+  return { infantry: factories * (1 - share) * EQUIPMENT_PER_FACTORY_DAY * (1 + bonus) * lawTech,
+    artillery: factories * share * ART_PER_FACTORY_DAY * (1 + bonus) * lawTech };
 }
 
 export function registerProductionSystem(): void {
