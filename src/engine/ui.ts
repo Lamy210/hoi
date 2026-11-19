@@ -1,5 +1,7 @@
 // UIスナップショット — Worker→UIの公開状態（差分レンダリングの源）。
 // エンジン状態そのものではなく、UIが必要な値の投影。
+import { dailyEquipmentOutput } from './systems/production';
+import type { TrainingOrder, DivisionTemplateId } from './military/templates';
 import type { WorldState } from './core/state';
 import { formatDate, civilFromDays } from './clock/date';
 import { activeWarBetween, effectiveSupply } from './core/state';
@@ -21,6 +23,8 @@ export interface UiCountry {
   infEquipmentStock: number;
   artEquipmentStock: number;
   productionShare: number;
+  dailyEquipment: { infantry: number; artillery: number };
+  training: TrainingOrder[];
   milFactories: number;
   alive: boolean;
   divisions: number;
@@ -75,6 +79,7 @@ export interface UiCommander {
 }
 
 export interface UiUnit {
+  templateId?: DivisionTemplateId;
   id: number;
   owner: number;
   loc: number;
@@ -200,6 +205,8 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       manpowerPool: w.countries.manpowerPool[c],
       infEquipmentStock: w.countries.infEquipmentStock[c],
       artEquipmentStock: w.countries.artEquipmentStock[c],
+      dailyEquipment: dailyEquipmentOutput(w, c),
+      training: w.trainingQueue.filter(o => o.country === c).map(o => ({ ...o })),
       productionShare: Math.round((w.productionShare[c] ?? 0.2) * 1000) / 1000,
       milFactories: w.countries.milFactories[c],
       alive: w.countries.alive[c],
@@ -248,6 +255,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     .filter((u) => !u.destroyed)
     .map((u) => ({
       id: u.id,
+      templateId: u.templateId,
       owner: u.owner,
       loc: u.loc,
       moving: u.path.length > 0,
