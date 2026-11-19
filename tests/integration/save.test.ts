@@ -104,7 +104,9 @@ describe('セーブ/ロード', () => {
     badSavedAt.header.savedAtTick++;
     for (const value of [null, [], 0, {}, missingStores, missingProv, nullUnit, badOwner, badController, badUnitStock, badPlayer, badTick, badSavedAt]) {
       // チェックサムを再計算しても構造・参照検証で拒否することを確認する。
-      if (value?.header && value?.stores) value.payloadChecksum = savePayloadChecksum(value.header, value.stores);
+      if (value !== null && typeof value === 'object' && !Array.isArray(value) && value.header && value.stores) {
+        value.payloadChecksum = savePayloadChecksum(value.header, value.stores);
+      }
       const bytes = encode(value);
       const result = deserializeWorld(bytes, engine.pack);
       expect(result.world).toBeNull();
