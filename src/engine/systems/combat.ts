@@ -1,5 +1,6 @@
 // 戦闘システム — プロヴィンス単位バトル・日次解決・撤退・包囲・占領（combat-system仕様）。
 // 全ての係数はトレース可能（trace.tsのunitCombatTraceで再計算）。決定論ロールはPCG32派生ストリーム。
+import { divisionTemplate } from '../military/templates';
 import { deriveStream } from '../core/rng';
 import { addAlert, atWar, effectiveSupply, type Unit, type WorldState } from '../core/state';
 import { registerSystem } from '../core/scheduler';
