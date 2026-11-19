@@ -1,6 +1,7 @@
 // セーブデータの直列化・検証・復元（save-system仕様）。
 // derivedCache（runtime・adjacency）は保存せず、復元時に再計算する（INV-8）。
 import { encode, decode } from '@msgpack/msgpack';
+import { divisionTemplate, MAX_TRAINING } from '../military/templates';
 import { hashWorld } from '../core/hash';
 import type { WorldState } from '../core/state';
 import { buildAdjacency } from '../map/adjacency';
@@ -8,7 +9,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 4;
+export const SAVE_SCHEMA_VERSION = 5;
 
 export interface SaveHeader {
   v: number;
@@ -57,6 +58,7 @@ function packStores(w: WorldState): Record<string, unknown> {
     treaties: w.treaties,
     wars: w.wars,
     units: w.units,
+    trainingQueue: w.trainingQueue,
     fronts: w.fronts,
     commanders: w.commanders,
     productionShare: w.productionShare,
@@ -152,7 +154,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -169,6 +171,8 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (s.tick !== h.tick || s.epochDays !== h.epochDays || s.playerCountry !== h.playerCountry || s.difficulty !== h.difficulty) {
     return { world: null, violations: ['header and stores mismatch'] };
   }
+  if (h.v === 4 && (s.trainingQueue !== undefined || (Array.isArray(s.units) && s.units.some((u: any) => u?.templateId !== undefined)))) return { world: null, violations: ['v4 contains v5 data'] };
+  if (h.v === 5 && !Array.isArray(s.trainingQueue)) return { world: null, violations: ['training queue missing'] };
   // 構造検証（範囲・参照）
   const provCount = pack.provinces.length;
   const ctryCount = pack.countries.length;
@@ -181,11 +185,26 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
       if (!Number.isInteger(owner[i]) || owner[i] < 0 || owner[i] >= ctryCount) violations.push('owner out of range at ' + i);
       if (!Number.isInteger(controller[i]) || controller[i] < -1 || controller[i] >= ctryCount) violations.push('controller out of range at ' + i);
     }
+    const ids = new Set<number>();
+    const next = s.counters.nextUnitId;
+    if (!Number.isSafeInteger(next) || next < 1) violations.push('invalid nextUnitId');
     for (const u of s.units as any[]) {
+      if (!Number.isSafeInteger(u.id) || u.id < 1 || u.id >= next || ids.has(u.id)) violations.push('invalid unit id');
+      ids.add(u.id);
+      if (u.templateId !== undefined) {
+        const t = divisionTemplate(u.templateId);
+        if (!t || u.maxManpower !== t.manpower || u.maxInfEquipment !== t.infantry || u.maxArtEquipment !== t.artillery) violations.push('invalid unit template');
+      }
       if (!Number.isInteger(u.owner) || u.owner < 0 || u.owner >= ctryCount) violations.push('unit owner out of range: ' + u.id);
       if (!Number.isInteger(u.loc) || u.loc < 0 || u.loc >= provCount) violations.push('unit loc out of range: ' + u.id);
       if (![u.manpower, u.infEquipment, u.artEquipment].every((n) => Number.isFinite(n) && n >= 0)) violations.push('invalid stock in unit: ' + u.id);
       if (u.frontId !== undefined && u.frontId < -1) violations.push('bad frontId in unit: ' + u.id);
+    }
+    const counts = new Array<number>(ctryCount).fill(0);
+    for (const o of s.trainingQueue ?? []) {
+      if (!o || !Number.isSafeInteger(o.id) || o.id < 1 || o.id >= next || ids.has(o.id) || !Number.isInteger(o.country) || o.country < 0 || o.country >= ctryCount || !Number.isInteger(o.province) || o.province < 0 || o.province >= provCount || !divisionTemplate(o.templateId) || !Number.isSafeInteger(o.readyTick) || o.readyTick <= h.tick || o.readyTick > h.tick + 60) { violations.push('invalid training order'); continue; }
+      ids.add(o.id);
+      if (++counts[o.country] > MAX_TRAINING) violations.push('training queue limit');
     }
     for (const c of s.countries.manpowerPool) if (c < 0) violations.push('negative manpowerPool');
     for (const c of s.countries.population ?? []) if (!Number.isFinite(c) || c < 0) violations.push('invalid population');
@@ -274,6 +293,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     treaties: s.treaties ?? [],
     wars: s.wars,
     units: s.units,
+    trainingQueue: s.trainingQueue ?? [],
     fronts: s.fronts ?? [],
     commanders: s.commanders ?? [],
     productionShare: s.productionShare ?? pack.countries.map(() => 0.2),
