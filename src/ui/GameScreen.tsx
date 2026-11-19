@@ -246,7 +246,7 @@ export function GameScreen() {
         {st.devMode && <button data-testid="btn-ai" onClick={() => appStore.set({ panel: 'aiLog', aiLogCountry: (snap.playerCountry + 1) % snap.countries.length })}>{t(lang, 'panel.aiLog')}</button>}
         <button onClick={() => appStore.set({ panel: 'settings' })}>⚙</button>
       </div>
-      {st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && <PendingOrders />}
+      {st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && st.panel !== 'saveLoad' && <PendingOrders />}
       <div className="main-area">
         <div
           className="map-container"

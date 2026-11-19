@@ -234,64 +234,85 @@ export function ContextPanel() {
 export function SaveLoadModal() {
   const st = useApp();
   const lang = st.lang;
-  const [slots, setSlots] = useState<{ slot: string; dateStr: string; tick: number; ts: number; auto: boolean }[]>([]);
+  const [slots, setSlots] = useState<import('./idb').SaveSlotMeta[]>([]);
+  const [slot, setSlot] = useState('slot1');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   useEffect(() => {
-    void (async () => {
-      const all = await listSlots();
-      setSlots(all as any);
-    })();
+    let active = true;
+    void listSlots().then(all => { if (active) setSlots(all); })
+      .catch(err => { if (active) setError(String(err)); });
+    return () => { active = false; };
   }, []);
 
+  async function run(action: () => Promise<void>): Promise<void> {
+    if (busy) return;
+    setBusy(true);
+    setError(null);
+    setNotice(null);
+    try { await action(); }
+    catch (err) { setError(String(err)); }
+    finally { setBusy(false); }
+  }
+
+  async function restore(buf: Uint8Array): Promise<void> {
+    const result = await engineClient.load(buf);
+    if (!result.ok) throw new Error(t(lang, 'save.loadFailed', { violations: result.violations?.join(', ') ?? '' }));
+    appStore.set({ statusMessage: t(lang, 'save.imported'), panel: null });
+  }
+  const blocked = busy || st.pendingCommands > 0;
+
   return (
-    <div className="modal-backdrop" onClick={() => appStore.set({ panel: null })}>
+    <div className="modal-backdrop" onClick={() => { if (!busy) appStore.set({ panel: null }); }}>
       <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="save-modal">
         <h3>{t(lang, 'save.title')}</h3>
+        <PendingOrders />
+        {error && <div role="alert" data-testid="save-error">{error}</div>}
+        {notice && <div role="status" data-testid="save-notice">{notice}</div>}
         <div className="row" style={{ marginBottom: 10 }}>
-          <button className="primary" data-testid="btn-do-save" onClick={async () => {
+          <select aria-label={t(lang, 'save.title')} data-testid="save-slot-select" value={slot} disabled={busy} onChange={e => setSlot(e.target.value)}>
+            {Array.from({ length: MANUAL_SLOTS }, (_, i) => 'slot' + (i + 1)).map(id =>
+              <option key={id} value={id}>{id}{slots.some(s => s.slot === id) ? ' ●' : ''}</option>)}
+          </select>
+          <button className="primary" data-testid="btn-do-save" disabled={blocked} onClick={() => void run(async () => {
             const r = await engineClient.save();
-            await saveSlot('slot1', r.buf, { tick: r.tick, dateStr: r.dateStr, ts: Date.now(), auto: false });
-            const all = await listSlots();
-            setSlots(all as any);
-            appStore.set({ statusMessage: t(lang, 'save.exported') });
-          }}>{t(lang, 'common.save')}（slot1）</button>
-          <button onClick={async () => {
+            await saveSlot(slot, r.buf, { tick: r.tick, dateStr: r.dateStr, ts: Date.now(), auto: false });
+            setSlots(await listSlots());
+            setNotice(t(lang, 'save.savedAt', { date: r.dateStr, tick: r.tick }));
+          })}>{t(lang, 'common.save')}（{slot}）</button>
+          <button disabled={blocked} onClick={() => void run(async () => {
             const r = await engineClient.save();
             exportSaveFile(r.buf, r.dateStr);
-          }}>{t(lang, 'common.export')}</button>
-          <label style={{ cursor: 'pointer' }}>
+          })}>{t(lang, 'common.export')}</button>
+          <label style={{ cursor: blocked ? 'default' : 'pointer' }}>
             {t(lang, 'common.import')}
-            <input type="file" style={{ display: 'none' }} onChange={async (e) => {
-              const f = e.target.files?.[0];
-              if (!f) return;
-              try {
-                const buf = await importSaveFile(f);
-                const r = await engineClient.load(buf);
-                if (r.ok) appStore.set({ statusMessage: t(lang, 'save.imported'), panel: null });
-                else appStore.set({ statusMessage: t(lang, 'save.loadFailed', { violations: r.violations?.join(', ') ?? '' }) });
-              } catch (err) {
-                appStore.set({ statusMessage: String(err) });
-              }
+            <input type="file" data-testid="save-import" disabled={blocked} style={{ display: 'none' }} onChange={(e) => {
+              const file = e.target.files?.[0];
+              e.target.value = '';
+              if (file) void run(async () => restore(await importSaveFile(file)));
             }} />
           </label>
         </div>
-        {slots.map((s) => (
+        {slots.map(s => (
           <div key={s.slot} className="kv" data-testid={'slot-' + s.slot}>
-            <span>{s.auto ? t(lang, 'save.auto') : t(lang, 'save.slot', { slot: 1 })}</span>
+            <span>{s.auto ? t(lang, 'save.auto') : s.slot}</span>
             <span className="muted">{t(lang, 'save.savedAt', { date: s.dateStr, tick: s.tick })}</span>
             <span className="row">
-              <button onClick={async () => {
-                const v = await loadSlot(s.slot);
-                if (!v) return;
-                const r = await engineClient.load(v.buf);
-                if (r.ok) appStore.set({ panel: null });
-                else appStore.set({ statusMessage: t(lang, 'save.loadFailed', { violations: r.violations?.join(', ') ?? '' }) });
-              }}>{t(lang, 'common.load')}</button>
-              <button onClick={async () => { await deleteSlot(s.slot); setSlots((await listSlots()) as any); }}>{t(lang, 'common.delete')}</button>
+              <button data-testid={'load-' + s.slot} disabled={blocked} onClick={() => void run(async () => {
+                const value = await loadSlot(s.slot);
+                if (!value) throw new Error('Save slot not found');
+                await restore(value.buf);
+              })}>{t(lang, 'common.load')}</button>
+              <button disabled={busy} onClick={() => void run(async () => {
+                await deleteSlot(s.slot);
+                setSlots(await listSlots());
+              })}>{t(lang, 'common.delete')}</button>
             </span>
           </div>
         ))}
         <div className="muted" style={{ marginTop: 8 }}>{t(lang, 'save.slot', { slot: MANUAL_SLOTS })}・{t(lang, 'save.auto')}</div>
-        <div style={{ marginTop: 10 }}><button onClick={() => appStore.set({ panel: null })}>{t(lang, 'common.close')}</button></div>
+        <div style={{ marginTop: 10 }}><button disabled={busy} onClick={() => appStore.set({ panel: null })}>{t(lang, 'common.close')}</button></div>
       </div>
     </div>
   );
