@@ -11,7 +11,7 @@
 
 ## Capabilities
 - Added: maritime-map
-- Modified: world-map, province-system, military-system, scenario-system
+- Modified: world-map, military-system, scenario-system
 
 ## Impact
 既存陸域IDを維持。海上補給と艦隊は後続Change。海域未収録の旧パックは陸軍モードを明示して維持。海域ポリゴンはゲーム用区画であり領海や主権の法的表示ではない。
