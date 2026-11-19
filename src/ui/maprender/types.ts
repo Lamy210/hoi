@@ -12,6 +12,7 @@ export interface MapRenderer {
   rebuildAll(colors: string[]): void;
   zoomBy(factor: number): void;
   resetView(): void;
+  focusProvince(prov: number): void;
   resize(): void;
   dispose(): void;
 }
