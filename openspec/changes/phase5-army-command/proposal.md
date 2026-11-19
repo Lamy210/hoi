@@ -10,7 +10,7 @@
 - 指揮官階層、明示命令優先、停止/再開、作戦状況表示。
 
 ## Capabilities
-- Modified: military-system, combat-system, game-ui, ai-system, save-system
+- Modified: military-system, game-ui, ai-system, save-system
 
 ## Impact
 既存Front/Commanderを移行。旧moveUnitsを互換入口に残し、同じ検証を使用。海上輸送は別Change、陸軍だけで海越え不可。
