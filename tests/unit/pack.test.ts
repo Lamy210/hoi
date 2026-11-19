@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { loadTestPack, nodeFetch } from '../helpers';
 import { createHash } from 'node:crypto';
-import { loadPack, packFingerprint, cryptoAvailable, type FetchImpl } from '../../src/engine/scenario/loader';
+import { loadPack, loadVerifiedPackAsset, packFingerprint, cryptoAvailable, type FetchImpl } from '../../src/engine/scenario/loader';
 
 describe('現代東アジアパック', () => {
   it('checksum検証つきでロードできる', async () => {
@@ -132,6 +132,14 @@ describe('検証済みシナリオパックの整合性', () => {
     };
     await expect(loadPack(base, { fetchImpl })).rejects.toMatchObject({
       violations: expect.arrayContaining(['geometry province order or type mismatch: geometry-lod2.json']),
+    });
+  });
+
+  it('初期検証後に差し替わった描画用地図を拒否する', async () => {
+    const pack = await loadTestPack(true);
+    const fetchImpl: FetchImpl = async () => asResponse('{"type":"FeatureCollection","features":[]}');
+    await expect(loadVerifiedPackAsset(pack, 'geometry-lod2.json', fetchImpl)).rejects.toMatchObject({
+      violations: ['checksum mismatch: geometry-lod2.json'],
     });
   });
 
