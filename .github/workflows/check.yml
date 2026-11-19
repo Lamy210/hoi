@@ -18,10 +18,13 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
+          package-manager-cache: false
       # lockfile が追加されたら npm ci に切り替える。
       - run: npm install --no-audit --no-fund
       - run: npm run typecheck
@@ -32,7 +35,7 @@ jobs:
       - run: npx openspec validate release-github-pages --strict
       - name: Upload verified production build
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-        uses: actions/upload-pages-artifact@v4
+        uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
@@ -49,7 +52,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - uses: actions/configure-pages@v5
+      - uses: actions/configure-pages@v6
       - name: Deploy verified build
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
