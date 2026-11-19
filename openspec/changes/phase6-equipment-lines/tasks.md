@@ -7,4 +7,4 @@
 - [ ] 2.2 目的: 市場接続。対象: systems/economy.ts, ai/ai.ts。作業: 旧直書き除去/輸出余剰/AI配分。テスト: 予約輸出不可。期待値: 台帳一致。完了条件: 長期検証。
 - [ ] 3.1 目的: 保存移行。対象: save/serialize.ts, core/hash.ts。作業: 旧比率→整数割当/装備移行。テスト: v4/v5/Phase5B。期待値: 保有・予約不変。完了条件: 旧実ファイル回帰合格。
 - [ ] 3.2 目的: UI。対象: ui/panels.tsx, engine/ui.ts, i18n.ts。作業: ライン・不足・優先度。テスト: 実UI切替/補充。期待値: コマンド反映。完了条件: Playwright合格。
-- [ ] 4.1 目的: リリース。対象: check.yml, docs/13。作業: strict/全回帰/性能。テスト: CI/50年/Pages。期待値: 全合格。完了条件: 実測記録、実URL確認。
+- [ ] 4.1 目的: リリース。対象: check.yml, docs/13。作業: strict/全回帰/acceptance.md E01〜E17の追跡/性能。テスト: CI/50年/Pages。期待値: 全合格。完了条件: 実測記録、実URL確認。
