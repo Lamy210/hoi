@@ -10,7 +10,7 @@ import { colorsForMode, diffIndices } from './maprender/types';
 import { createCanvasRenderer } from './maprender/canvasAdapter';
 import { TERRAIN_COLORS, terrainOf } from './maprender/terrainColors';
 import { createMaplibreRenderer } from './maprender/maplibreAdapter';
-import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel, PendingOrders } from './panels';
+import { AlertFeed, ContextPanel, SaveLoadModal, SettingsModal, AiInspectorModal, FrontsPanel, BudgetPanel, DiplomacyPanel, PendingOrders, RecruitmentPanel, ProductionPanel } from './panels';
 
 const TERRAIN_NAMES = ['plains', 'hills', 'mountains', 'urban', 'forest', 'desert'];
 
@@ -256,13 +256,15 @@ export function GameScreen() {
         <button data-testid="btn-wars" onClick={() => appStore.set({ panel: st.panel === 'wars' ? null : 'wars' })}>{t(lang, 'panel.wars')}</button>
         <button data-testid="btn-diplomacy" onClick={() => appStore.set({ panel: st.panel === 'diplomacy' ? null : 'diplomacy' })}>{t(lang, 'panel.diplomacy')}</button>
         <button data-testid="btn-fronts-top" onClick={() => appStore.set({ panel: 'fronts' })}>{t(lang, 'panel.fronts')}</button>
+        <button data-testid="btn-production" onClick={() => appStore.set({ panel: 'production' })}>{t(lang, 'prod.title')}</button>
+        <button data-testid="btn-recruit" onClick={() => appStore.set({ panel: 'recruit' })}>{t(lang, 'mil.recruit')}</button>
         <button data-testid="btn-research" onClick={() => appStore.set({ panel: 'research' })}>{t(lang, 'research.title')}</button>
         <button data-testid="btn-budget" onClick={() => appStore.set({ panel: st.panel === 'budget' ? null : 'budget' })}>{t(lang, 'panel.budget')}</button>
         <button data-testid="btn-save" onClick={() => appStore.set({ panel: 'saveLoad' })}>{t(lang, 'common.save')}/{t(lang, 'common.load')}</button>
         {st.devMode && <button data-testid="btn-ai" onClick={() => appStore.set({ panel: 'aiLog', aiLogCountry: (snap.playerCountry + 1) % snap.countries.length })}>{t(lang, 'panel.aiLog')}</button>}
         <button onClick={() => appStore.set({ panel: 'settings' })}>⚙</button>
       </div>
-      {st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && st.panel !== 'saveLoad' && <PendingOrders />}
+      {st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && st.panel !== 'saveLoad' && st.panel !== 'recruit' && st.panel !== 'production' && <PendingOrders />}
       <div className="main-area">
         <div
           className="map-container"
@@ -327,6 +329,8 @@ export function GameScreen() {
         )}
       </div>
       {st.panel === 'saveLoad' && <SaveLoadModal />}
+      {st.panel === 'recruit' && <RecruitmentPanel />}
+      {st.panel === 'production' && <ProductionPanel />}
       {st.panel === 'settings' && <SettingsModal />}
       {st.panel === 'aiLog' && <AiInspectorModal />}
       {st.panel === 'fronts' && <FrontsPanel />}
