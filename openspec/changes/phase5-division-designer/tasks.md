@@ -1,4 +1,6 @@
-# Tasks（未実装、依存PR #11の合格後に開始）
+# Tasks（PR #11マージ済み、5B先行スライス着手）
+
+- [ ] 0.2 目的: 非破壊の編成試算を実装。対象: military/templateStats.ts, worker.ts, engineClient.ts, DivisionDesignerPreview.tsx。作業: builtin-v1・純粋集計・RPC・通常UI。テスト: D01/D02・不正構成・試算前後の状態一致。期待値: 既存固定3編成の資源/日数一致、試算のみで日付や備蓄を変えない。完了条件: 最新HEADのCI合格と通常UI確認。pack定義/独自編成保存は後続。
 
 - [ ] 0.1 目的: 横断契約を確定。対象: docs/20、acceptance.md、core/command.ts、worker.ts。作業: issuer/seq採番・旧履歴監査・v6割当・D15ケース追加。テスト: 400件超再送、復元。期待値: 新版命令の二重適用なし。完了条件: regression合格、旧版限界を文書化。
 - [ ] 1.1 目的: 定義スキーマを固定。対象: scenario/types.ts, loader.ts, military/templates.ts。作業: カタログ・版・参照検証。テスト: 未知財/重複/上限。期待値: 不正拒否。完了条件: unit合格。
