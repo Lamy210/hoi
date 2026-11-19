@@ -4,7 +4,7 @@ import type { Lang } from './i18n';
 
 export type Screen = 'title' | 'scenario' | 'country' | 'game';
 export type MapMode = 'political' | 'terrain' | 'supply';
-export type PanelId = 'overview' | 'wars' | 'aiLog' | 'saveLoad' | 'settings' | 'fronts' | 'budget' | 'diplomacy' | null;
+export type PanelId = 'overview' | 'wars' | 'aiLog' | 'saveLoad' | 'settings' | 'fronts' | 'budget' | 'research' | 'diplomacy' | null;
 
 export interface Selection {
   prov: number | null;
@@ -32,6 +32,7 @@ export interface AppState {
   selection: Selection;
   panel: PanelId;
   mapMode: MapMode;
+  pendingCommands: number;
   speed: number; // 0=一時停止, 1,2,4,8
   perfWarn: boolean;
   aiLogCountry: number | null;
@@ -58,6 +59,7 @@ const state: AppState = {
   selection: { prov: null, unitId: null, country: null },
   panel: null,
   mapMode: 'political',
+  pendingCommands: 0,
   speed: 0,
   perfWarn: false,
   aiLogCountry: null,
