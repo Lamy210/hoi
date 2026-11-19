@@ -175,6 +175,10 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
     },
     zoomBy(factor: number) { map.zoomTo(map.getZoom() + Math.log2(factor), { duration: 0 }); },
     resetView() { map.fitBounds([[ds.viewBbox[0], ds.viewBbox[1]], [ds.viewBbox[2], ds.viewBbox[3]]], { padding: 24, duration: 0, bearing: 0, pitch: 0 }); },
+    focusProvince(prov: number) {
+      if (!Number.isInteger(prov) || prov < 0 || prov >= ds.provIds.length) return;
+      map.jumpTo({ center: [ds.provLabelX[prov], ds.provLabelY[prov]], zoom: Math.max(map.getZoom(), 6) });
+    },
     resize() {
       map.resize();
     },
