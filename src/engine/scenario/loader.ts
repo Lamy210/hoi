@@ -91,7 +91,7 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
         if (!Object.hasOwn(sums, file)) violations.push('missing checksum: ' + file);
       }
       for (const [file, expected] of Object.entries(sums)) {
-        if (![...required, ...optional].includes(file) || !/^[0-9a-f]{64}$/.test(expected)) {
+        if (![...required, ...optional].includes(file) || typeof expected !== 'string' || !/^[0-9a-f]{64}$/.test(expected)) {
           violations.push('invalid checksum entry: ' + file);
           continue;
         }
@@ -136,6 +136,10 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
   const sources = await read<PackSources>('SOURCES.json');
   const events = await readOptional<EventDef>('events.json');
   const techs = await readOptional<TechDef>('techs.json');
+
+  if (![provinces, countries, edges, events, techs].every(Array.isArray)) {
+    throw new PackValidationError(['invalid pack array structure']);
+  }
 
   if (verify) {
     // 両レンダラは配列インデックスで州を参照するため、順序も同一でなければならない。
