@@ -6,7 +6,7 @@ import { hashWorld } from '../../src/engine/core/hash';
 import { savePayloadChecksum } from '../../src/engine/save/serialize';
 import { effectiveSupply } from '../../src/engine/core/state';
 import { validateHierarchy } from '../../src/engine/military/armies';
-import { summarizeDivisions } from '../../src/ui/ArmyManagement';
+import { summarizeDivisions } from '../../src/engine/military/armySummary';
 
 async function fixture() {
   const e=await createTestEngine(), w=e.world, own=w.units.filter(u=>u.owner===w.playerCountry);
