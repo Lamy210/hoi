@@ -277,6 +277,8 @@ export interface WorldState {
 
   // ジャーナル（直近N件のリング）
   journal: JournalEntry[];
+  /** Highest processed command sequence per issuer; independent of journal eviction. */
+  commandWatermarks: Record<string, number>;
   journalStart: number; // journalの実インデックス開始（回転管理用）
 
   // 進行中カウンタ
