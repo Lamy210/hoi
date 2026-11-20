@@ -39,5 +39,10 @@ test('自由師団編成を保存し、募集中に編成改訂しても訓練�
   await queue.first().locator('button').click();
   await page.getByTestId('apply-pending').click();
   await expect(queue).toHaveCount(0);
+  await page.getByTestId('saved-template-select').selectOption('1');
+  await page.getByTestId('delete-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(select.locator('option')).toHaveCount(3);
+  await expect(select).toHaveValue('standard-v1');
   expect(errors).toEqual([]);
 });
