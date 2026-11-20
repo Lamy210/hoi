@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -247,6 +247,10 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
   if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&includeCustomTemplates&&includeCustomTraining&&includeReinforcementPriority){
     h=mixStr(h,'army-reinforcement-priority-v12');
     for(const a of w.armies)h=mixInt(h,a.reinforcementPriority??5);
+  }
+  if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&includeCustomTemplates&&includeCustomTraining&&includeReinforcementPriority&&includeQueuedTraining){
+    h=mixStr(h,'queued-training-v13');
+    for(const o of w.trainingQueue){h=mixStr(h,o.status??'legacy');h=mixInt(h,o.priority??5);h=mixBool(h,o.autoDeploy??true);}
   }
   return h >>> 0;
 }

@@ -787,6 +787,8 @@ export function RecruitmentPanel() {
   const player = snap.countries[snap.playerCountry];
   const [templateId, setTemplateId] = useState<string>('standard-v1');
   const [refitId,setRefitId] = useState<number>(st.selection.unitId??-1);
+  const [queuePriority,setQueuePriority]=useState(5);
+  const [autoDeploy,setAutoDeploy]=useState(true);
   const [province, setProvince] = useState(st.selection.prov !== null && snap.controller[st.selection.prov] === snap.playerCountry ? st.selection.prov : player.capital);
   const ownTemplates=snap.customTemplates.filter(t=>t.country===snap.playerCountry).sort((a,b)=>a.templateId-b.templateId||b.revision-a.revision).filter((t,i,all)=>i===0||all[i-1].templateId!==t.templateId);
   const selectedCustom=ownTemplates.find(t=>'custom:'+t.templateId===templateId);
@@ -827,6 +829,18 @@ export function RecruitmentPanel() {
       </div>
       <button className="primary" data-testid="start-training" disabled={!valid || !!missing || st.pendingCommands > 0} onClick={() => selectedCustom ? engineClient.command('startCustomTraining',{templateId:selectedCustom.templateId,revision:selectedCustom.revision,province}):engineClient.command('startTraining', { templateId, province })}>{t(lang, 'mil.startTraining')}</button>
       {missing && <span className="muted"> {t(lang, missing)}</span>}
+      <div className="panel-section" data-testid="queue-training-options">
+        <label>{lang==='ja'?'注文優先度':'Queue priority'} <select data-testid="new-training-priority" value={queuePriority} onChange={e=>setQueuePriority(Number(e.target.value))}>
+          {Array.from({length:10},(_,n)=><option key={n} value={n}>{n}{n===5?' · '+(lang==='ja'?'標準':'Normal'):''}</option>)}
+        </select></label>
+        <label><input type="checkbox" data-testid="new-training-autodeploy" checked={autoDeploy} onChange={e=>setAutoDeploy(e.target.checked)}/>{lang==='ja'?'訓練完了時に自動配備':'Auto-deploy when ready'}</label>
+        <button data-testid="queue-training" disabled={!valid||player.training.length>=MAX_TRAINING||st.pendingCommands>0} onClick={()=>
+          engineClient.command('enqueueTraining',{templateId:selectedCustom?selectedCustom.templateId:templateId,
+            ...(selectedCustom?{revision:selectedCustom.revision}:{}),province,priority:queuePriority,autoDeploy})}>
+          {lang==='ja'?'在庫不足でも訓練待ちに登録':'Queue training (even without stock)'}
+        </button>
+      </div>
+
       <DivisionDesignerPreview lang={lang} templates={snap.customTemplates} playerCountry={snap.playerCountry} pending={st.pendingCommands} />
       <section className="panel-section" data-testid="custom-refit">
         <h4>{lang==='ja'?'既存師団の編成変更':'Refit deployed division'}</h4>
@@ -843,10 +857,22 @@ export function RecruitmentPanel() {
       {player.training.map(o => {
         const custom=o.customTemplateId!==undefined?snap.customTemplates.find(t=>t.country===o.country&&t.templateId===o.customTemplateId&&t.revision===o.customRevision):null;
         const d=custom?{nameJa:custom.name,nameEn:custom.name,days:customTemplateStats(custom).days}:divisionTemplate(o.templateId)!;
-        const remaining = Math.max(0, o.readyTick - snap.tick);
+        const remaining = o.status==='queued' ? d.days : Math.max(0, o.readyTick - snap.tick);
+        const progress=o.status==='queued'?0:o.status==='ready'?d.days:d.days-remaining;
+        const state=o.status==='queued'?(lang==='ja'?'在庫待ち':'Awaiting stock'):o.status==='ready'?(lang==='ja'?'配備待ち':'Ready to deploy'):(lang==='ja'?'訓練中':'Training');
         return <div className="panel-section" key={o.id} data-testid={'training-' + o.id}>
-          <div className="kv"><span>{lang === 'ja' ? d.nameJa : d.nameEn} #{o.id} — {nameOf(o.province)}</span><span>{remaining}/{d.days}</span></div>
-          <progress max={d.days} value={d.days - remaining} style={{ width: '100%' }} />
+          <div className="kv"><span>{lang === 'ja' ? d.nameJa : d.nameEn} #{o.id} — {nameOf(o.province)}</span><span data-testid={'queue-state-'+o.id}>{state} · {remaining}/{d.days}</span></div>
+          <progress max={d.days} value={progress} style={{ width: '100%' }} />
+          {o.status!==undefined&&<div className="row">
+            <label>{lang==='ja'?'優先度':'Priority'} <select data-testid={'queue-priority-'+o.id} disabled={st.pendingCommands>0} value={o.priority??5} onChange={e=>engineClient.command('setTrainingPriority',{orderId:o.id,priority:Number(e.target.value)})}>
+              {Array.from({length:10},(_,n)=><option key={n} value={n}>{n}</option>)}
+            </select></label>
+            <label>{lang==='ja'?'配備州':'Deployment province'} <select data-testid={'queue-province-'+o.id} disabled={st.pendingCommands>0} value={o.province} onChange={e=>engineClient.command('setDeploymentProvince',{orderId:o.id,province:Number(e.target.value)})}>
+              {!owned.includes(o.province)&&<option value={o.province} disabled>{nameOf(o.province)} ({lang==='ja'?'非支配':'Not controlled'})</option>}
+              {owned.map(p=><option key={p} value={p}>{nameOf(p)}</option>)}
+            </select></label>
+            {o.status==='ready'&&<button data-testid={'deploy-training-'+o.id} disabled={st.pendingCommands>0||!owned.includes(o.province)} onClick={()=>engineClient.command('deployTraining',{orderId:o.id})}>{lang==='ja'?'配備':'Deploy'}</button>}
+          </div>}
           <button data-testid={'cancel-training-' + o.id} disabled={st.pendingCommands > 0} onClick={() => engineClient.command('cancelTraining', { id: o.id })}>{t(lang, 'mil.cancel')}</button>
         </div>;
       })}

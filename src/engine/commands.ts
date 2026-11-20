@@ -12,8 +12,8 @@ import { applyRelationDelta, endWar, startWar, warScoreFor } from './military/wa
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './scenario/unitCosts';
 import { autoAssignCommander, releaseCommander } from './military/commanders';
 import { autoFrontProvinces, frontOf } from './military/fronts';
-import { divisionTemplate, MAX_TRAINING } from './military/templates';
-import { refundTraining } from './systems/training';
+import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
+import { refundTraining, deployTrainingOrder } from './systems/training';
 import { MAX_ART_SHARE } from './systems/production';
 import { LAW_PP_COST } from './systems/politics';
 import { techDefs, MAX_ACTIVE_RESEARCH } from './systems/research';
@@ -255,6 +255,70 @@ export function registerAllCommands(): void {
       w.countries.artEquipmentStock[c]-=t.artillery;
       w.trainingQueue.push({id:w.nextUnitId++,country:c,province:p.province as number,
         customTemplateId:p.templateId as number,customRevision:p.revision as number,readyTick:w.tick+t.days});
+    },
+  });
+
+  // The queued workflow is additive: legacy startTraining remains immediate-reservation.
+  registerCommand('enqueueTraining',{
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer),prov=p.province as number;
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(!Number.isInteger(prov)||prov<0||prov>=w.prov.count)return 'badProvince';
+      if(w.prov.controller[prov]!==c)return 'notControlledByYou';
+      if(!Number.isInteger(p.priority)||(p.priority as number)<0||(p.priority as number)>9||
+         typeof p.autoDeploy!=='boolean')return 'badParams';
+      if(w.trainingQueue.filter(o=>o.country===c).length>=MAX_TRAINING||w.nextUnitId>=Number.MAX_SAFE_INTEGER)return 'trainingFull';
+      if(typeof p.templateId==='string'&&p.revision===undefined){
+        return divisionTemplate(p.templateId)?null:'badParams';
+      }
+      if(!Number.isSafeInteger(p.templateId)||!Number.isSafeInteger(p.revision))return 'badParams';
+      const t=trainingSpec(w,{country:c,customTemplateId:p.templateId as number,customRevision:p.revision as number});
+      return t?null:'notYourTemplate';
+    },
+    apply(w,p,issuer){
+      const c=actorCountry(w,issuer)!;
+      const ref=typeof p.templateId==='string'?
+        {templateId:p.templateId as DivisionTemplateId}:
+        {customTemplateId:p.templateId as number,customRevision:p.revision as number};
+      w.trainingQueue.push({id:w.nextUnitId++,country:c,province:p.province as number,
+        ...ref,status:'queued',readyTick:-1,priority:p.priority as number,autoDeploy:p.autoDeploy as boolean});
+    },
+  });
+  registerCommand('setTrainingPriority',{
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||issuer==='frontai')return 'badIssuer';
+      if(!Number.isInteger(p.priority)||(p.priority as number)<0||(p.priority as number)>9)return 'badParams';
+      return w.trainingQueue.some(o=>o.id===p.orderId&&o.country===c&&o.status!==undefined)?null:'badParams';
+    },
+    apply(w,p){
+      w.trainingQueue.find(o=>o.id===p.orderId)!.priority=p.priority as number;
+    },
+  });
+  registerCommand('setDeploymentProvince',{
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer),prov=p.province as number;
+      if(c===null||issuer==='frontai')return 'badIssuer';
+      if(!Number.isInteger(prov)||prov<0||prov>=w.prov.count)return 'badProvince';
+      if(w.prov.controller[prov]!==c)return 'notControlledByYou';
+      return w.trainingQueue.some(o=>o.id===p.orderId&&o.country===c&&o.status!==undefined)?null:'badParams';
+    },
+    apply(w,p){
+      w.trainingQueue.find(o=>o.id===p.orderId)!.province=p.province as number;
+    },
+  });
+  registerCommand('deployTraining',{
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||issuer==='frontai')return 'badIssuer';
+      const o=w.trainingQueue.find(o=>o.id===p.orderId&&o.country===c&&o.status==='ready');
+      if(!o)return 'badParams';
+      return w.prov.controller[o.province]===c?null:'notControlledByYou';
+    },
+    apply(w,p){
+      const index=w.trainingQueue.findIndex(o=>o.id===p.orderId);
+      deployTrainingOrder(w,w.trainingQueue[index]);
+      w.trainingQueue.splice(index,1);
     },
   });
 
