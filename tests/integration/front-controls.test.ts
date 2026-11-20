@@ -80,6 +80,7 @@ describe('front assignment and automation',()=>{
   it('v7-shaped save validates using the old hash',async()=>{
     const e=await createTestEngine(),w=e.world;
     const old=decode(e.serialize()) as any;
+    delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
     old.header.v=7;old.header.integrity=hashWorld(w,false,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);
     expect(e.loadFrom(encode(old)).ok).toBe(true);
