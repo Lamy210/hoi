@@ -15,3 +15,5 @@
 - [ ] 0.3 目的: 手動移動の停止・経路変更を先行実装。対象: systems/movement.ts, commands.ts, engine/ui.ts, GameScreen.tsx, panels.tsx。作業: 区間保持と全件検証、hold、次州・進捗表示。テスト: A06の先行範囲、A17〜A19。期待値: 進行区間の巻戻しなし、到着後停止、原子的拒否、v8継続。完了条件: CI合格・通常UI確認。append/戦闘中撤退は後続。
 
 - [ ] 0.4 目的: 戦線・作戦目標の地図表示。対象: engine/ui.ts, maprender/frontView.ts, unitOverlay.ts, canvasAdapter.ts, maplibreAdapter.ts, GameScreen.tsx。作業: 自国戦線の射影と選択・表示切替。テスト: A20〜A22。期待値: 無効州・敵対終了を除外、停止中は矢印非表示、地図投影を維持。完了条件: 最新CIと通常UI検証。MapLibre実機と境界編集は後続。
+
+- [ ] 0.5 目的: 軍団・軍集団への排他的指揮官配置。対象: military/armies.ts, commanders.ts, commands.ts, core/hash.ts, save/serialize.ts, combat.ts, ArmyManagement.tsx, panels.tsx。作業: 配置・解除・移籍・解放・v9・UI。テスト: A23〜A25。期待値: 役職重複なし、他国拒否、上位職による新規補正なし、旧保存互換。完了条件: 最新CI合格、通常UI検証。上位能力実装は後続。
