@@ -34,6 +34,7 @@ export function DivisionResources({unit:u,lang,context=false}: {unit:UiUnit;lang
 export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const ja = lang === 'ja';
   const [name,setName]=useState('');
+  const [editing,setEditing]=useState(false);
   const [armyId,setArmyId]=useState('');
   const [groupId,setGroupId]=useState('');
   const [scope,setScope]=useState('selection');
@@ -63,6 +64,8 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
       {armies.map(a=><button key={a.id} data-testid={'army-select-'+a.id} style={{borderColor:a.color}} onClick={()=>{setArmyId(String(a.id));onSelect(memberIds(a.id));}}>{a.name} · {memberIds(a.id).length}/{MAX_ARMY_UNITS}</button>)}
       <button data-testid="select-unassigned" onClick={()=>onSelect(units.filter(u=>u.armyId===null).map(u=>u.id))}>{label('未編入','Unassigned')} · {units.filter(u=>u.armyId===null).length}</button>
     </div>
+    <button data-testid="toggle-army-editor" aria-expanded={editing} onClick={()=>setEditing(!editing)}>{label(editing?'編成編集を閉じる':'編成を編集',editing?'Close editor':'Edit formations')}</button>
+    {editing && <>
     <div className="move-controls">
       <input data-testid="army-name" aria-label={label('編成名','Formation name')} value={name} onChange={e=>setName(e.target.value)} placeholder={label('編成名','Formation name')} maxLength={64}/>
       <button data-testid="create-army" disabled={!canCommand||!name.trim()} onClick={()=>create('createArmy')}>{label('軍団作成','Create army')}</button>
@@ -84,6 +87,7 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
       <button data-testid="unassign-army-group" disabled={!canCommand||!army||army.groupId===null} onClick={()=>army&&engineClient.command('assignArmyGroup',{armyIds:[army.id],groupId:null})}>{label('軍集団から解除','Remove from group')}</button>
       <button data-testid="delete-army-group" disabled={!canCommand||!group||armies.some(a=>a.groupId===group.id)} onClick={()=>group&&engineClient.command('deleteArmyGroup',{id:group.id})}>{label('空軍集団を削除','Delete empty group')}</button>
     </div>
+    </>}
     <select data-testid="army-summary-scope" aria-label={label('集計対象','Summary scope')} value={scope} onChange={e=>setScope(e.target.value)}><option value="selection">{label('選択部隊の集計','Selected units')}</option><option value="all">{label('全自国師団の集計','All deployed divisions')}</option></select>
     <div data-testid="army-summary">
       <div className="kv"><span>{label('師団数','Divisions')}</span><span>{summary.count}</span></div>
