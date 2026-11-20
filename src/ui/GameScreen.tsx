@@ -358,7 +358,7 @@ export function GameScreen() {
         {st.devMode && <button data-testid="btn-ai" onClick={() => appStore.set({ panel: 'aiLog', aiLogCountry: (snap.playerCountry + 1) % snap.countries.length })}>{t(lang, 'panel.aiLog')}</button>}
         <button onClick={() => appStore.set({ panel: 'settings' })}>⚙</button>
       </div>
-      {st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && st.panel !== 'saveLoad' && st.panel !== 'recruit' && st.panel !== 'production' && <PendingOrders />}
+      {st.panel !== 'fronts' && st.panel !== 'budget' && st.panel !== 'research' && st.panel !== 'diplomacy' && st.panel !== 'wars' && st.panel !== 'saveLoad' && st.panel !== 'recruit' && st.panel !== 'production' && <PendingOrders />}
       <div className="main-area">
         <div
           className="map-container"
@@ -411,6 +411,7 @@ export function GameScreen() {
                     onClick={() => selectUnits([u.id])}>
                     #{u.id} {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}<br />
                     {u.armyId !== null && <span>{snap.armies.find(a=>a.id===u.armyId)?.name} · </span>}
+                    {u.frontId>=0&&<span>{lang==='ja'?'戦線':'Front'} #{u.frontId} · </span>}{u.manualHold&&<span>{lang==='ja'?'手動優先':'Manual hold'} · </span>}
                     {nameOf(u.loc)} ({meta.provIds[u.loc]}) — {u.inBattle ? t(lang, 'panel.inBattle') : u.encircled ? t(lang, 'panel.encircled') : u.moving ? t(lang, 'misc.movingTo', { target: nameOf(u.target) }) : t(lang, 'units.idle')}
                   </button>
                   <details className="unit-resources-details"><summary>{lang === 'ja' ? '装備・補給' : 'Equipment & supply'}</summary><DivisionResources unit={u} lang={lang}/></details>
@@ -420,6 +421,8 @@ export function GameScreen() {
               <div className="move-controls">
                 <span data-testid="selected-unit-count">{t(lang, 'units.selected', { count: chosen.length })}</span>
                 <button data-testid="move-selected" disabled={!canMove} aria-pressed={moveMode} onClick={() => { setAttackMode(false); setDestination(''); setMoveMode(!moveMode); }}>{t(lang, moveMode ? 'units.cancelMove' : 'units.move')}</button>
+                <button data-testid="open-selected-fronts" disabled={!chosen.length} onClick={()=>appStore.set({panel:'fronts'})}>{lang==='ja'?'戦線へ割当':'Assign to front'}</button>
+                <button data-testid="resume-selected-automation" disabled={st.pendingCommands>0||!chosen.some(u=>u.manualHold)} onClick={()=>engineClient.command('setManualHold',{units:chosen.map(u=>u.id),hold:false})}>{lang==='ja'?'自動配置に復帰':'Resume automation'}</button>
                 <button data-testid="attack-selected" className="danger" disabled={!canMove || !attackTargets.length} aria-pressed={attackMode} onClick={() => { setMoveMode(false); setDestination(''); setAttackMode(!attackMode); }}>{t(lang, attackMode ? 'units.cancelAttack' : 'units.attack')}</button>
                 {chosen.length > 0 && <button data-testid="focus-unit" onClick={() => rendererRef.current?.focusProvince(chosen[0].loc)}>{t(lang, 'units.focus')}</button>}
               </div>
