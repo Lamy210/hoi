@@ -7,3 +7,5 @@
 - [ ] 3.2 目的: 軍団・作戦UI。対象: panels.tsx, engine/ui.ts, i18n.ts。作業: バー/矢印/実行停止。テスト: A10/A11。期待値: 通常操作。完了条件: E2E合格。
 - [ ] 4.1 目的: 保存。対象: save/serialize.ts, core/hash.ts。作業: 旧Front移行・命令状態保存。テスト: A12。期待値: 往復一致。完了条件: 実fixture合格。
 - [ ] 4.2 目的: 性能と公開。対象: docs/13, CI。作業: A13長期・性能・strict。テスト: 全回帰。期待値: 参照切れなし。完了条件: 最新HEADと公開確認。
+
+- [ ] 0.1 目的: 軍団/軍集団と軍需・補給一覧の先行実装。対象: military/armies.ts, armySummary.ts, commands.ts, save/serialize.ts, engine/ui.ts, ArmyManagement.tsx, GameScreen.tsx。作業: 所属/容量/参照/集計、v7、旧v6検証、一覧検索と選択。テスト: A01〜A03/A12の階層部分、装備不足/補給内訳、通常UI。期待値: 重複所属・非所有・上限超過を拒否、集計・位置一致、旧版移行。完了条件: 最新CI成功、旧実ファイル検証と作戦機能は後続、既存タスクは未完了維持。
