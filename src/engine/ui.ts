@@ -57,6 +57,8 @@ export interface UiTechDef {
 }
 
 export interface UiFront {
+  paused: boolean;
+  held: number;
   id: number;
   owner: number;
   enemy: number;
@@ -79,6 +81,7 @@ export interface UiCommander {
 }
 
 export interface UiUnit {
+  manualHold: boolean;
   armyId: number | null;
   manpower: number;
   maxManpower: number;
@@ -268,6 +271,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       id: u.id,
       templateId: u.templateId,
       armyId: u.armyId ?? null,
+      manualHold: u.manualHold ?? false,
       manpower: u.manpower, maxManpower: u.maxManpower,
       supplyBase: w.runtime.supplyEff[u.loc], supplyCapacityFactor: w.runtime.unitSupplyFactor.get(u.id) ?? 1,
       owner: u.owner,
@@ -293,6 +297,8 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     }));
   const fronts: UiFront[] = w.fronts.map((f) => ({
     id: f.id,
+    paused: f.paused ?? false,
+    held: w.units.filter(u => !u.destroyed && u.frontId === f.id && u.manualHold).length,
     owner: f.owner,
     enemy: f.enemy,
     stance: f.stance,

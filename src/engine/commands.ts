@@ -168,19 +168,20 @@ export function registerAllCommands(): void {
     validate(w, p, issuer) {
       const enemy = p.enemy as number;
       const country = actorCountry(w, issuer);
-      if (country === null) return 'badIssuer';
+      if (country === null || issuer === 'frontai') return 'badIssuer';
       if (!w.countries.alive[country]) return 'countryDead';
       if (!Number.isInteger(enemy) || enemy < 0 || enemy >= w.countries.count || !w.countries.alive[enemy]) return 'badTarget';
       if (enemy === country) return 'selfWar';
       if (!atWar(w, country, enemy)) return 'notAtWar';
       const provinces = p.provinces as number[] | undefined;
       if (provinces !== undefined) {
-        if (!Array.isArray(provinces) || provinces.length === 0) return 'badParams';
+        if (!Array.isArray(provinces) || provinces.length === 0 || new Set(provinces).size !== provinces.length) return 'badParams';
         for (const prov of provinces) {
           if (!Number.isInteger(prov) || prov < 0 || prov >= w.prov.count) return 'badProvince';
           if (w.prov.controller[prov] !== country) return 'notControlledByYou';
         }
       }
+      if (p.targets !== undefined && (!Array.isArray(p.targets) || new Set(p.targets).size !== p.targets.length || p.targets.some(x=>!Number.isInteger(x)||x<0||x>=w.prov.count||w.prov.controller[x]!==enemy))) return 'badParams';
       const cap = p.cap as number | undefined;
       if (cap !== undefined && (!Number.isInteger(cap) || cap < 1 || cap > 8)) return 'badParams';
       return null;
@@ -191,70 +192,83 @@ export function registerAllCommands(): void {
       const provinces = Array.isArray(p.provinces) ? (p.provinces as number[]).slice().sort((a, b) => a - b) : autoFrontProvinces(w, country, enemy);
       const targets = Array.isArray(p.targets) ? (p.targets as number[]).slice().sort((a, b) => a - b) : [];
       const cap = typeof p.cap === 'number' ? p.cap : 2;
-      const front = { id: w.nextFrontId++, owner: country, enemy, stance: 'hold' as const, provinces, targets, cap };
+      const front = { id: w.nextFrontId++, owner: country, enemy, stance: 'hold' as const, provinces, targets, cap, revision: 1, paused: false };
       w.fronts.push(front);
       void issuer;
     },
   });
 
   registerCommand('setFrontStance', {
-    validate(w, p, issuer) {
-      const front = frontOf(w, p.frontId as number);
-      const country = actorCountry(w, issuer);
-      if (!front) return 'noFront';
-      if (country === null || front.owner !== country) return 'notYourFront';
-      if (!['hold', 'attack', 'retreat'].includes(p.stance as string)) return 'badParams';
+    validate(w,p,issuer) {
+      const f = frontOf(w,p.frontId as number), c = actorCountry(w,issuer);
+      if (!f) return 'noFront';
+      if (c === null || c !== f.owner || issuer === 'frontai') return 'notYourFront';
+      if (!['hold','attack','retreat'].includes(p.stance as string)) return 'badParams';
+      if (p.cap !== undefined && (!Number.isInteger(p.cap) || (p.cap as number)<0 || (p.cap as number)>8)) return 'badParams';
+      if (p.targets !== undefined && (!Array.isArray(p.targets) || new Set(p.targets).size !== p.targets.length || p.targets.some(x=>!Number.isInteger(x)||x<0||x>=w.prov.count||w.prov.controller[x]!==f.enemy))) return 'badParams';
+      if (!atWar(w,f.owner,f.enemy) && p.stance === 'attack') return 'notAtWar';
+      if ((f.revision??1)>=Number.MAX_SAFE_INTEGER) return 'limitExceeded';
       return null;
     },
-    apply(w, p) {
-      const front = frontOf(w, p.frontId as number)!;
-      front.stance = p.stance as 'hold' | 'attack' | 'retreat';
-      if (Array.isArray(p.targets)) front.targets = (p.targets as number[]).slice().sort((a, b) => a - b);
-      if (typeof p.cap === 'number') front.cap = p.cap;
+    apply(w,p) {
+      const f=frontOf(w,p.frontId as number)!;
+      f.stance=p.stance as 'hold'|'attack'|'retreat';
+      if(Array.isArray(p.targets)) f.targets=(p.targets as number[]).slice().sort((a,b)=>a-b);
+      if(typeof p.cap==='number') f.cap=p.cap;
+      f.revision=(f.revision??1)+1;
     },
   });
-
+  registerCommand('setFrontPaused', {
+    validate(w,p,issuer) {
+      const f=frontOf(w,p.frontId as number);
+      if(!f) return 'noFront';
+      if(issuer==='frontai'||actorCountry(w,issuer)!==f.owner) return 'notYourFront';
+      if(typeof p.paused!=='boolean') return 'badParams';
+      if(!p.paused&&!atWar(w,f.owner,f.enemy)) return 'notAtWar';
+      return (f.revision??1)>=Number.MAX_SAFE_INTEGER?'limitExceeded':null;
+    },
+    apply(w,p){const f=frontOf(w,p.frontId as number)!; f.paused=p.paused as boolean;f.revision=(f.revision??1)+1;},
+  });
   registerCommand('deleteFront', {
-    validate(w, p, issuer) {
-      const front = frontOf(w, p.frontId as number);
-      const country = actorCountry(w, issuer);
-      if (!front) return 'noFront';
-      if (country === null || front.owner !== country) return 'notYourFront';
-      return null;
-    },
-    apply(w, p) {
-      const id = p.frontId as number;
-      w.fronts = w.fronts.filter((f) => f.id !== id);
-      for (const u of w.units) {
-        if (u.frontId === id) u.frontId = -1;
-      }
-    },
+    validate(w,p,issuer){const f=frontOf(w,p.frontId as number);return !f?'noFront':issuer==='frontai'||actorCountry(w,issuer)!==f.owner?'notYourFront':null;},
+    apply(w,p){w.fronts=w.fronts.filter(f=>f.id!==p.frontId);for(const u of w.units)if(u.frontId===p.frontId)u.frontId=-1;},
   });
-
   registerCommand('assignToFront', {
-    validate(w, p, issuer) {
-      const front = frontOf(w, p.frontId as number);
-      const country = actorCountry(w, issuer);
-      const ids = p.units as number[];
-      if (!Array.isArray(ids) || ids.length === 0) return 'noUnits';
-      if (!front) return 'noFront';
-      if (country === null || front.owner !== country) return 'notYourFront';
-      for (const id of ids) {
-        const u = w.units.find((x) => x.id === id);
-        if (!u) return 'unknownUnit:' + id;
-        if (u.owner !== country) return 'notYourUnit:' + id;
-        if (u.destroyed) return 'unitDestroyed:' + id;
-      }
+    validate(w,p,issuer) {
+      const f=frontOf(w,p.frontId as number), c=actorCountry(w,issuer), ids=p.units;
+      if(!f)return 'noFront';
+      if(c===null||f.owner!==c||issuer==='frontai')return 'notYourFront';
+      if(!atWar(w,c,f.enemy))return 'notAtWar';
+      if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';
+      for(const id of ids)if(!w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))return 'notYourUnit';
       return null;
     },
-    apply(w, p) {
-      const frontId = p.frontId as number;
-      const ids = p.units as number[];
-      for (const id of ids) {
-        const u = w.units.find((x) => x.id === id);
-        if (u) u.frontId = frontId;
-      }
+    apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id)){u.frontId=p.frontId as number;u.manualHold=false;}},
+  });
+  registerCommand('unassignFromFront', {
+    validate(w,p,issuer){const c=actorCountry(w,issuer),ids=p.units;if(c===null||issuer==='frontai')return 'badIssuer';if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))?null:'notYourUnit';},
+    apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id))u.frontId=-1;},
+  });
+  registerCommand('setManualHold', {
+    validate(w,p,issuer){const c=actorCountry(w,issuer),ids=p.units;if(c===null||issuer==='frontai')return 'badIssuer';if(typeof p.hold!=='boolean'||!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))?null:'notYourUnit';},
+    apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id))u.manualHold=p.hold as boolean;},
+  });
+  // Automated front orders are generation-bound and revalidated when consumed.
+  registerCommand('frontMove', {
+    validate(w,p,issuer){
+      const f=frontOf(w,p.frontId as number),c=actorCountry(w,issuer);
+      if(issuer==='player'||!f||c!==f.owner||f.paused||!atWar(w,f.owner,f.enemy)||p.revision!==(f.revision??1))return 'staleFrontOrder';
+      const u=w.units.find(x=>x.id===p.unitId&&!x.destroyed);
+      if(!u||u.owner!==c||u.frontId!==f.id||u.manualHold||u.path.length||u.encircled||w.runtime.activeBattles.has(u.loc))return 'staleFrontOrder';
+      const target=p.target as number;
+      if(!Number.isInteger(target)||target<0||target>=w.prov.count||target===u.loc)return 'badTarget';
+      if(w.prov.controller[target]===f.enemy){
+        const edge=getEdge(w,u.loc,target);
+        if(f.stance!=='attack'||f.cap<1||u.org<=0||w.prov.controller[u.loc]!==c||!edge||edge.strait||!Number.isFinite(segmentDays(w,u.loc,target))||(f.targets.length>0&&!f.targets.includes(target)))return 'staleFrontOrder';
+      }else if(w.prov.controller[target]!==c||!findPath(w,u.loc,target,c,false))return 'noPath';
+      return null;
     },
+    apply(w,p){const f=frontOf(w,p.frontId as number)!,u=w.units.find(x=>x.id===p.unitId)!;const target=p.target as number;u.path=w.prov.controller[target]===f.enemy?[u.loc,target]:findPath(w,u.loc,target,f.owner,false)!;u.segIdx=0;u.segProgress=0;u.segDays=segmentDays(w,u.path[0],u.path[1]);},
   });
 
   registerCommand('setTaxRate', {
@@ -406,6 +420,7 @@ export function registerAllCommands(): void {
       const target = p.target as number;
       const country = actorCountry(w, issuer);
       if (!Array.isArray(ids) || ids.length === 0) return 'noUnits';
+      if (issuer === 'frontai') return 'staleFrontOrder';
       if (issuer === 'player' && (ids.length > 256 || new Set(ids).size !== ids.length)) return 'badParams';
       if (!Number.isInteger(target) || target < 0 || target >= w.prov.count) return 'badTarget';
       if (country === null) return 'badIssuer';
@@ -417,7 +432,7 @@ export function registerAllCommands(): void {
         if (u.owner !== country) return 'notYourUnit:' + id;
         if (u.destroyed) return 'unitDestroyed:' + id;
         if (u.encircled) return 'unitEncircled:' + id;
-        if ((issuer === 'player' || issuer === 'frontai') && (u.path.length > 0 || w.runtime.activeBattles.has(u.loc))) return 'unitBusy:' + id;
+        if (issuer === 'player' && (u.path.length > 0 || w.runtime.activeBattles.has(u.loc))) return 'unitBusy:' + id;
         if (u.loc !== target) movable++;
       }
       if (movable === 0) return 'alreadyAtTarget';
@@ -437,6 +452,7 @@ export function registerAllCommands(): void {
       for (const id of ids) {
         const u = w.units.find((x) => x.id === id);
         if (!u || u.loc === target) continue;
+        if (issuer === 'player') u.manualHold = true;
         const path = findPath(w, u.loc, target, country)!;
         u.path = path;
         u.segIdx = 0;
@@ -473,6 +489,7 @@ export function registerAllCommands(): void {
         const u = w.units.find(x => x.id === id)!;
         const target = p.target as number;
         if (u.loc === target) continue;
+        if (issuer === 'player') u.manualHold = true;
         u.path = findPath(w, u.loc, target, country, false)!;
         u.segIdx = 0; u.segProgress = 0;
         u.segDays = segmentDays(w, u.path[0], u.path[1]);
@@ -499,10 +516,11 @@ export function registerAllCommands(): void {
       }
       return null;
     },
-    apply(w, p) {
+    apply(w, p, issuer) {
       const target = p.target as number;
       for (const id of p.units as number[]) {
         const u = w.units.find(x => x.id === id)!;
+        if (issuer === 'player') u.manualHold = true;
         u.path = [u.loc, target]; u.segIdx = 0; u.segProgress = 0;
         u.segDays = segmentDays(w, u.loc, target);
       }

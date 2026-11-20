@@ -1,7 +1,7 @@
 // 戦線AI（phase2-fronts-logistics）— 週次でプレイヤー戦線とAI戦線に同一ロジックを適用する。
 // 命令はコマンド経由（INV-3）。移動中（path>0）・包囲中の師団には触れない＝明示命令優先。
 import { deriveStream } from '../core/rng';
-import { effectiveSupply, type Front, type Unit, type WorldState } from '../core/state';
+import { atWar, effectiveSupply, type Front, type Unit, type WorldState } from '../core/state';
 import { registerSystem, weeklyOffset } from '../core/scheduler';
 import { findPath } from './movement';
 import { TERRAIN_DATA, unitPowerFactorsPure } from './combat';
@@ -15,7 +15,10 @@ function log(w: WorldState, country: number, module: string, options: string[], 
 
 function cmd(w: WorldState, front: Front, type: string, p: Record<string, unknown>): void {
   // プレイヤー戦線の命令は専用issuer 'frontai'（手動コマンドのuidと衝突しない・INV-6）
-  aiCmd(w, front.owner === w.playerCountry ? 'frontai' : 'ai:' + front.owner, type, p);
+  if (type !== 'moveUnits') return;
+  const unitId = (p.units as number[])[0];
+  if (w.runtime.commandsSinceLastTick.some(c => c.type === 'frontMove' && c.p.unitId === unitId)) return;
+  aiCmd(w, front.owner === w.playerCountry ? 'frontai' : 'ai:' + front.owner, 'frontMove', { unitId, target: p.target, frontId: front.id, revision: front.revision ?? 1 });
 }
 
 function unitExpectedPower(w: WorldState, u: Unit, provIdx: number, side: 'attack' | 'defend'): number {
@@ -25,13 +28,14 @@ function unitExpectedPower(w: WorldState, u: Unit, provIdx: number, side: 'attac
 }
 
 function unitsOfFront(w: WorldState, front: Front): Unit[] {
-  return w.units.filter((u) => !u.destroyed && u.frontId === front.id);
+  return w.units.filter((u) => !u.destroyed && u.owner === front.owner && u.frontId === front.id);
 }
 
 /** 戦線1本の週次命令（D-022: プレイヤー/AI共通ロジック） */
 export function runFront(w: WorldState, front: Front, rng: () => number): void {
+  if (front.paused || !atWar(w, front.owner, front.enemy)) return;
   const units = unitsOfFront(w, front);
-  const movable = units.filter((u) => u.path.length === 0 && !u.encircled);
+  const movable = units.filter((u) => u.path.length === 0 && !u.encircled && !u.manualHold && !w.runtime.activeBattles.has(u.loc));
   const provName = (p: number) => w.prov.nameJa[p] || w.prov.nameEn[p];
 
   if (front.stance === 'retreat') {
@@ -51,7 +55,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
         }
       }
       if (best >= 0) {
-        const path = findPath(w, u.loc, best, front.owner);
+        const path = findPath(w, u.loc, best, front.owner, false);
         if (path) {
           cmd(w, front, 'moveUnits', { units: [u.id], target: best });
           orders++;
@@ -70,11 +74,9 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       if (w.prov.controller[fp] !== front.owner) continue;
       const present = units.filter((u) => u.loc === fp && !u.destroyed).length;
       if (present >= 1) continue;
-      const spare = movable
-        .filter((u) => u.loc !== fp && front.provinces.includes(u.loc))
-        .sort((a, b) => a.id - b.id)[0];
+      const spare = movable.filter(u=>u.loc!==fp && !w.runtime.commandsSinceLastTick.some(c=>c.type==='frontMove'&&c.p.unitId===u.id) && (!front.provinces.includes(u.loc) || units.filter(x=>x.loc===u.loc).length>1)).sort((a,b)=>a.id-b.id).find(u=>findPath(w,u.loc,fp,front.owner,false)!==null);
       if (!spare) continue;
-      const path = findPath(w, spare.loc, fp, front.owner);
+      const path = findPath(w, spare.loc, fp, front.owner, false);
       if (path) {
         cmd(w, front, 'moveUnits', { units: [spare.id], target: fp });
         orders++;
@@ -110,7 +112,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
         }
       }
       if (nearest >= 0) {
-        const path = findPath(w, u.loc, nearest, front.owner);
+        const path = findPath(w, u.loc, nearest, front.owner, false);
         if (path) {
           cmd(w, front, 'moveUnits', { units: [u.id], target: nearest });
           musterOrders++;
@@ -128,15 +130,15 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       for (let i = w.adj.offsets[fp]; i < w.adj.offsets[fp + 1]; i++) {
         const ep = w.adj.targets[i];
         const ctrl = w.prov.controller[ep];
-        if (ctrl !== front.enemy || seen.has(ep)) continue;
+        if (ctrl !== front.enemy || seen.has(ep) || w.adj.strait[i] || (front.targets.length && !front.targets.includes(ep))) continue;
         seen.add(ep);
         let localPower = 0;
         const sources: Unit[] = [];
         for (let j = w.adj.offsets[ep]; j < w.adj.offsets[ep + 1]; j++) {
           const v = w.adj.targets[j];
-          if (w.prov.controller[v] !== front.owner) continue;
+          if (w.prov.controller[v] !== front.owner || w.adj.strait[j]) continue;
           for (const u of unitsOfFront(w, front)) {
-            if (u.loc !== v || u.path.length > 0 || u.encircled) continue;
+            if (u.loc !== v || u.path.length > 0 || u.encircled || u.manualHold || u.org <= 0 || w.runtime.activeBattles.has(u.loc)) continue;
             localPower += unitExpectedPower(w, u, ep, 'attack');
             sources.push(u);
           }
@@ -155,14 +157,14 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
     const best = candidates[0];
     const options = candidates.map((x) => 'attack:' + provName(x.target)).concat(['hold']);
     const scores = candidates.map((x) => x.ratio).concat([0]);
-    if (best && best.ratio > threshold) {
+    if (front.cap > 0 && best && best.ratio > threshold) {
       // 目標へ移動（投入上限・週4命令まで）
       const movable = unitsOfFront(w, front).filter((u) => u.path.length === 0 && !u.encircled);
       let sent = 0;
       for (const u of movable) {
-        if (sent >= Math.max(1, front.cap) || sent >= 4) break;
-        const path = findPath(w, u.loc, best.target, front.owner);
-        if (path) {
+        if (sent >= front.cap || sent >= 4) break;
+        const adjacent = w.adj.targets.slice(w.adj.offsets[u.loc],w.adj.offsets[u.loc+1]).some((p,i)=>p===best.target&&!w.adj.strait[w.adj.offsets[u.loc]+i]);
+        if (adjacent && w.prov.controller[u.loc]===front.owner && u.org>0) {
           cmd(w, front, 'moveUnits', { units: [u.id], target: best.target });
           sent++;
         }

@@ -1,0 +1,37 @@
+import { expect,test } from '@playwright/test';
+
+test('通常UIで複数師団の戦線割当・停止・再開・解除',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-KOR').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-province-search').click();
+  await page.getByTestId('province-search').fill('KP-07');
+  await page.getByTestId('search-result-KP-07').click();
+  await page.getByTestId('btn-declare-war').click();
+  await page.getByTestId('apply-pending').click();
+  const roster=page.getByTestId('unit-roster');
+  const ids=await roster.locator('[data-unit-id]').evaluateAll(rows=>rows.map(r=>r.getAttribute('data-unit-id')!));
+  expect(ids.length).toBeGreaterThanOrEqual(2);
+  await page.getByTestId('unit-roster-'+ids[0]).click();
+  await page.getByTestId('unit-check-'+ids[1]).check();
+  await page.getByTestId('open-selected-fronts').click();
+  await expect(page.getByTestId('front-selection-count')).toContainText('2');
+  await page.getByTestId('btn-create-front').click();
+  await page.getByTestId('apply-pending').click();
+  const front=page.getByTestId('fronts-modal').locator('button[data-testid^="front-pause-"]').first();
+  const key=await front.getAttribute('data-testid');
+  if(!key)throw new Error('No front');
+  const id=key.replace('front-pause-','');
+  await front.click();await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('front-state-'+id)).toHaveText('一時停止');
+  await page.getByTestId('front-assign-'+id).click();await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('front-'+id)).toContainText('割当師団: 2');
+  await front.click();await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('front-state-'+id)).toHaveText('実行可能');
+  await page.getByTestId('front-unassign-'+id).click();await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('front-'+id)).toContainText('割当師団: 0');
+  await page.getByTestId('close-fronts').click();
+});

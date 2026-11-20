@@ -460,69 +460,54 @@ export function BudgetPanel({ initialTab = 'budget' }: { initialTab?: 'budget' |
 }
 
 export function FrontsPanel() {
-  const st = useApp();
-  const lang = st.lang;
-  const snap = st.snap!;
-  const fronts = snap.fronts.filter((f) => f.owner === snap.playerCountry);
-  const enemies = snap.countries[snap.playerCountry].atWar;
-  const [enemy, setEnemy] = useState<number>(enemies[0] ?? -1);
-  return (
-    <div className="modal-backdrop" onClick={() => appStore.set({ panel: null })}>
-      <div className="modal" onClick={(e) => e.stopPropagation()} data-testid="fronts-modal">
-        <h3>{t(lang, 'panel.fronts')}</h3>
-        {enemies.length > 0 && (
-          <div className="row" style={{ marginBottom: 10 }}>
-            <select value={enemy} onChange={(e) => setEnemy(Number(e.target.value))}>
-              {enemies.map((c) => (
-                <option key={c} value={c}>{lang === 'ja' ? snap.countries[c].nameJa : snap.countries[c].nameEn}</option>
-              ))}
-            </select>
-            <button
-              className="primary"
-              data-testid="btn-create-front"
-              disabled={enemy < 0}
-              onClick={() => engineClient.command('createFront', { enemy })}
-            >
-              {t(lang, 'front.create')}
-            </button>
-          </div>
-        )}
-        {fronts.length === 0 && <div className="muted">{t(lang, 'front.none')}</div>}
-        {fronts.map((f) => (
-          <div key={f.id} className="panel-section" style={{ marginBottom: 8 }} data-testid={'front-' + f.id}>
-            <div className="kv">
-              <span className="k">{lang === 'ja' ? snap.countries[f.enemy].nameJa : snap.countries[f.enemy].nameEn}</span>
-              <span>{t(lang, 'front.assigned')}: {f.assigned} / {t(lang, 'front.cap')}: {f.cap}</span>
-            </div>
-            <div className="kv"><span className="k">{t(lang, 'front.stance')}</span>
-              <span className="row">
-                {(['hold', 'attack', 'retreat'] as const).map((st2) => (
-                  <button
-                    key={st2}
-                    className={f.stance === st2 ? 'primary' : ''}
-                    data-testid={'front-stance-' + st2}
-                    onClick={() => engineClient.command('setFrontStance', { frontId: f.id, stance: st2 })}
-                  >
-                    {t(lang, 'front.stance.' + st2)}
-                  </button>
-                ))}
-              </span>
-            </div>
-            <div className="kv"><span className="k">{t(lang, 'front.targets')}</span><span>{f.targets.length > 0 ? f.targets.map((tp) => (lang === 'ja' ? snap.countries[tp] && st.meta!.provNameJa[tp] : st.meta!.provNameEn[tp])).join(', ') : '—'}</span></div>
-            {st.selection.unitId !== null && (
-              <button onClick={() => engineClient.command('assignToFront', { units: [st.selection.unitId!], frontId: f.id })}>
-                {t(lang, 'front.assignSelected')}
-              </button>
-            )}
-            <div style={{ marginTop: 6 }}>
-              <button className="danger" onClick={() => engineClient.command('deleteFront', { frontId: f.id })}>{t(lang, 'front.delete')}</button>
-            </div>
-          </div>
-        ))}
-        <div style={{ marginTop: 10 }}><button onClick={() => appStore.set({ panel: null })}>{t(lang, 'common.close')}</button></div>
-      </div>
+  const st=useApp(), lang=st.lang, snap=st.snap!, meta=st.meta!;
+  const ja=lang==='ja';
+  const fronts=snap.fronts.filter(f=>f.owner===snap.playerCountry);
+  const enemies=snap.countries[snap.playerCountry].atWar;
+  const [enemy,setEnemy]=useState<number>(enemies[0]??-1);
+  const selected=snap.units.filter(u=>u.owner===snap.playerCountry&&(st.selection.unitIds??(st.selection.unitId===null?[]:[st.selection.unitId])).includes(u.id));
+  const ids=selected.map(u=>u.id);
+  const busy=st.pendingCommands>0;
+  const name=(p:number)=>ja?meta.provNameJa[p]:meta.provNameEn[p];
+  return <div className="modal-backdrop" onClick={()=>appStore.set({panel:null})}>
+    <div className="modal" onClick={e=>e.stopPropagation()} data-testid="fronts-modal">
+      <h3>{t(lang,'panel.fronts')}</h3>
+      <p data-testid="front-selection-count">{ja?'選択師団':'Selected divisions'}: {ids.length}</p>
+      {enemies.length>0&&<div className="row">
+        <select data-testid="front-enemy" value={enemy} onChange={e=>setEnemy(Number(e.target.value))}>
+          {enemies.map(c=><option key={c} value={c}>{ja?snap.countries[c].nameJa:snap.countries[c].nameEn}</option>)}
+        </select>
+        <button className="primary" data-testid="btn-create-front" disabled={busy||!enemies.includes(enemy)} onClick={()=>engineClient.command('createFront',{enemy})}>{t(lang,'front.create')}</button>
+      </div>}
+      {!fronts.length&&<div className="muted">{t(lang,'front.none')}</div>}
+      {fronts.map(f=><div key={f.id} className="panel-section" data-testid={'front-'+f.id}>
+        <h4>#{f.id} {ja?snap.countries[f.enemy].nameJa:snap.countries[f.enemy].nameEn}</h4>
+        <div className="kv"><span>{t(lang,'front.assigned')}: {f.assigned}</span><span>{ja?'手動優先':'Manual hold'}: {f.held}</span></div>
+        <div className="kv"><span>{ja?'自動作戦':'Automation'}</span><strong data-testid={'front-state-'+f.id}>{!enemies.includes(f.enemy)?(ja?'交戦終了':'War ended'):f.paused?(ja?'一時停止':'Paused'):(ja?'実行可能':'Enabled')}</strong></div>
+        <div className="row">
+          {(['hold','attack','retreat'] as const).map(stance=><button key={stance} className={f.stance===stance?'primary':''} disabled={busy||!enemies.includes(f.enemy)} data-testid={'front-stance-'+stance} onClick={()=>engineClient.command('setFrontStance',{frontId:f.id,stance})}>{t(lang,'front.stance.'+stance)}</button>)}
+          <button data-testid={'front-pause-'+f.id} disabled={busy||!enemies.includes(f.enemy)} onClick={()=>engineClient.command('setFrontPaused',{frontId:f.id,paused:!f.paused})}>{f.paused?(ja?'再開':'Resume'):(ja?'一時停止':'Pause')}</button>
+        </div>
+        <div className="kv"><span>{t(lang,'front.cap')}</span><select aria-label={t(lang,'front.cap')} data-testid={'front-cap-'+f.id} disabled={busy} value={f.cap} onChange={e=>engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,cap:Number(e.target.value)})}>{Array.from({length:9},(_,n)=><option key={n} value={n}>{n}</option>)}</select></div>
+        <div className="muted">{ja?'戦線州':'Front provinces'}: {f.provinces.map(name).join(', ')||'—'}</div>
+        <div className="kv"><span>{t(lang,'front.targets')}</span><span>{f.targets.map(name).join(', ')||(ja?'自動':'Automatic')}</span></div>
+        <div className="row">
+          <select aria-label={t(lang,'front.targets')} data-testid={'front-target-'+f.id} value={f.targets.length===1?f.targets[0]:-1} disabled={busy||!enemies.includes(f.enemy)} onChange={e=>engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,targets:Number(e.target.value)<0?[]:[Number(e.target.value)]})}>
+            <option value={-1}>{ja?'自動選択':'Automatic'}</option>
+            {meta.provIds.map((id,p)=>snap.controller[p]===f.enemy&&<option key={id} value={p}>{name(p)} ({id})</option>)}
+          </select>
+        </div>
+        <div className="row">
+          <button data-testid={'front-assign-'+f.id} disabled={busy||!ids.length||ids.length>256||!enemies.includes(f.enemy)} onClick={()=>engineClient.command('assignToFront',{units:ids,frontId:f.id})}>{t(lang,'front.assignSelected')} ({ids.length})</button>
+          <button data-testid={'front-unassign-'+f.id} disabled={busy||!selected.some(u=>u.frontId===f.id)} onClick={()=>engineClient.command('unassignFromFront',{units:selected.filter(u=>u.frontId===f.id).map(u=>u.id)})}>{ja?'選択師団の割当解除':'Unassign selected'}</button>
+          <button className="danger" disabled={busy} onClick={()=>engineClient.command('deleteFront',{frontId:f.id})}>{t(lang,'front.delete')}</button>
+        </div>
+      </div>)}
+      <p className="muted">{ja?'作戦は週次で評価されます。一時停止は新規自動命令を止め、すでに移動中の師団は現在の経路を維持します。':'Plans are evaluated weekly. Pausing stops new automatic orders; deployed movement paths continue.'}</p>
+      <PendingOrders/>
+      <button data-testid="close-fronts" onClick={()=>appStore.set({panel:null})}>{t(lang,'common.close')}</button>
     </div>
-  );
+  </div>;
 }
 
 export function SettingsModal() {
