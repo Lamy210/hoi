@@ -790,7 +790,9 @@ export function RecruitmentPanel() {
   const ownTemplates=snap.customTemplates.filter(t=>t.country===snap.playerCountry).sort((a,b)=>a.templateId-b.templateId||b.revision-a.revision).filter((t,i,all)=>i===0||all[i-1].templateId!==t.templateId);
   const selectedCustom=ownTemplates.find(t=>'custom:'+t.templateId===templateId);
   const customStats=selectedCustom?customTemplateStats(selectedCustom):null;
-  const template=selectedCustom&&customStats ? {nameJa:selectedCustom.name,nameEn:selectedCustom.name,...customStats}:divisionTemplate(templateId)!;
+  const builtin=divisionTemplate(templateId);
+  const template=selectedCustom&&customStats ? {nameJa:selectedCustom.name,nameEn:selectedCustom.name,...customStats}:builtin??DIVISION_TEMPLATES[1];
+  useEffect(()=>{if(templateId.startsWith('custom:')&&!selectedCustom)setTemplateId('standard-v1');},[templateId,selectedCustom]);
   const owned = meta.provIds.map((_, i) => i).filter(i => snap.controller[i] === snap.playerCountry);
   const valid = owned.includes(province);
   const nameOf = (p: number) => lang === 'ja' ? meta.provNameJa[p] : meta.provNameEn[p];
