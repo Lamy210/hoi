@@ -104,6 +104,7 @@ export function buildWorld(pack: Pack, opts: BuildOptions): WorldState {
     units: [],
     armies: [], armyGroups: [], nextArmyId: 1, nextArmyGroupId: 1,
     trainingQueue: [],
+    customTemplates: [], nextCustomTemplateId: 1,
     fronts: [],
     commanders: [],
     productionShare: pack.countries.map(() => 0.2),
