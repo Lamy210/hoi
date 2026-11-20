@@ -171,7 +171,7 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
   for (const u of w.units) h = hashUnit(h, u);
   for (const o of w.trainingQueue) {
     h = mixInt(h, o.id); h = mixInt(h, o.country); h = mixInt(h, o.province);
-    h = mixStr(h, o.templateId); h = mixInt(h, o.readyTick);
+    h = mixStr(h, o.templateId ?? ''); h = mixInt(h, o.readyTick);
   }
 
   for (const a of w.anchors) {
