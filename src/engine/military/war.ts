@@ -30,6 +30,8 @@ export function startWar(w: WorldState, aggressor: number, defender: number, cb:
 export function endWar(w: WorldState, war: War, mode: 'white' | 'demand' | 'victory' = 'white', demands: number[] = []): void {
   war.status = 'ended';
   war.endTick = w.tick;
+  // Stop queued front automation across peace/redeclaration; explicitly resume a new plan.
+  for (const f of w.fronts) if ((f.owner===war.aggressor&&f.enemy===war.defender)||(f.owner===war.defender&&f.enemy===war.aggressor)) { f.paused=true; if ((f.revision??1)<Number.MAX_SAFE_INTEGER) f.revision=(f.revision??1)+1; }
   const pair = [war.aggressor, war.defender];
   const demanded = mode === 'demand' && demands.length > 0
     ? new Set(validateDemands(w, war, war.offeredBy >= 0 ? war.offeredBy : war.aggressor, demands).valid)
