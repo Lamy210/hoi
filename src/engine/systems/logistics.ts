@@ -1,6 +1,7 @@
 // 補給システム — MVP: ソース（首都）からの到達性＋距離減衰（logistics-system仕様）。
 // Phase 3で容量つきフローへ置換するが、消費側API（supplyEff）契約は不変。
 import { clamp } from '../core/num';
+import { unitSupplyDemand } from '../military/unitComposition';
 import { addAlert, atWar, type WorldState } from '../core/state';
 import { registerSystem, weeklyOffset } from '../core/scheduler';
 import { techMods } from './research';
@@ -128,7 +129,7 @@ function applyCapacityFactors(w: WorldState): void {
       if (w.prov.controller[p] !== c) continue;
       if (p === w.countries.capital[c] || w.prov.terrain[p] === 3) hubs.push(p);
     }
-    const capLeft = hubs.map((p) => 6 + 3 * w.prov.infra[p]);
+    const capLeft = hubs.map((p) => (6 + 3 * w.prov.infra[p]) * 10);
     const units = w.units.filter((u) => !u.destroyed && u.owner === c);
     for (const u of units) {
       let bestHub = -1;
@@ -143,9 +144,14 @@ function applyCapacityFactors(w: WorldState): void {
           bestHub = hi;
         }
       }
-      if (bestHub >= 0 && capLeft[bestHub] >= 1) {
-        capLeft[bestHub] -= 1;
+      const demand = unitSupplyDemand(w,u);
+      if (bestHub >= 0 && capLeft[bestHub] >= demand) {
+        capLeft[bestHub] -= demand;
         w.runtime.unitSupplyFactor.set(u.id, 1);
+      } else if(bestHub >= 0 && demand > 0 && capLeft[bestHub] > 0) {
+        const ratio=capLeft[bestHub]/demand;
+        capLeft[bestHub]=0;
+        w.runtime.unitSupplyFactor.set(u.id,Math.max(0.5,ratio));
       } else {
         w.runtime.unitSupplyFactor.set(u.id, 0.5); // 容量超過またはハブなし
       }
