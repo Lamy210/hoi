@@ -13,7 +13,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 12;
+export const SAVE_SCHEMA_VERSION = 13;
 
 export interface SaveHeader {
   v: number;
@@ -176,7 +176,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 11 && h.v !== 10 && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 12 && h.v !== 11 && h.v !== 10 && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -265,7 +265,10 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
       const check=rev?previewTemplate({battalionIds:rev.battalionIds,supportIds:rev.supportIds}):null;
       const validTemplate=custom ? (h.v>=11&&o.templateId===undefined&&Number.isSafeInteger(o.customTemplateId)&&Number.isSafeInteger(o.customRevision)&&check?.ok) : !!divisionTemplate(o?.templateId);
       const daysLimit=custom?180:60;
-      if (!o || !Number.isSafeInteger(o.id) || o.id < 1 || o.id >= next || ids.has(o.id) || !Number.isInteger(o.country) || o.country < 0 || o.country >= ctryCount || !Number.isInteger(o.province) || o.province < 0 || o.province >= provCount || !validTemplate || !Number.isSafeInteger(o.readyTick) || o.readyTick <= h.tick || o.readyTick > h.tick + daysLimit) { violations.push('invalid training order'); continue; }
+      const modern=!!o&&o.status!==undefined;
+      const stateOk=modern ? (h.v>=13&&['queued','training','ready'].includes(o.status)&&Number.isInteger(o.priority)&&o.priority>=0&&o.priority<=9&&typeof o.autoDeploy==='boolean') : (!o||o.priority===undefined&&o.autoDeploy===undefined);
+      const timeOk=modern ? (o.status==='queued'?o.readyTick===-1:o.status==='ready'?Number.isSafeInteger(o.readyTick)&&o.readyTick>=0&&o.readyTick<=h.tick:Number.isSafeInteger(o.readyTick)&&o.readyTick>h.tick&&o.readyTick<=h.tick+daysLimit) : (Number.isSafeInteger(o?.readyTick)&&o.readyTick>h.tick&&o.readyTick<=h.tick+daysLimit);
+      if (!o || !stateOk || !timeOk || !Number.isSafeInteger(o.id) || o.id < 1 || o.id >= next || ids.has(o.id) || !Number.isInteger(o.country) || o.country < 0 || o.country >= ctryCount || !Number.isInteger(o.province) || o.province < 0 || o.province >= provCount || !validTemplate)  { violations.push('invalid training order'); continue; }
       ids.add(o.id);
       if (++counts[o.country] > MAX_TRAINING) violations.push('training queue limit');
     }
@@ -424,7 +427,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if(templateErrors.length)return {world:null,violations:templateErrors};
   const hierarchyErrors = validateHierarchy(w);
   if (hierarchyErrors.length) return { world: null, violations: hierarchyErrors };
-  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10, h.v >= 11, h.v >= 12);
+  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10, h.v >= 11, h.v >= 12, h.v >= 13);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }
