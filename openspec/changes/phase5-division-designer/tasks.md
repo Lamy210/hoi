@@ -25,3 +25,5 @@
 - [ ] 3.1a/3.2a 目的: v11独自師団の攻撃防御・幅・補給需要・速度・組織上限を計算へ反映。対象: military/unitComposition.ts, combat.ts, movement.ts, logistics.ts, engine/ui.ts, ArmyManagement.tsx。テスト: C01〜C05、戦闘幅の過大部隊フォールバック、旧固定3編成回帰と長期安定性。制約: 旧fixed各師団幅20、補給需要10、speed倍率1。完了条件: CI/PW/長期回帰。全プロダクトの編成戦闘バランス保証は後続。
 
 - [ ] 2.2a 目的: 既存師団の自由編成への改編（単一師団）。対象: commands.ts, panels.tsx。テスト: R01〜R05、負傷を無料回復しない、国在庫と師団保有の保存則、再編禁止状態、v11往復。期待値: 装備生成/二重返却なし。完了条件: CI/Playwright通過。一括改編・改編訓練は後続。
+
+- [ ] 2.1b 目的: 在庫不足の訓練注文をqueuedで保存・日次全量予約・ready手動配備。対象: military/templates.ts, systems/training.ts, commands.ts, core/hash.ts, save/serialize.ts, ui/panels.tsx。テスト: D24〜D28、v12旧注文の互換、二重配備/返金拒否、通常UI。期待値: 在庫0でも注文登録、優先度9を先に予約、支配喪失中ready維持、手動配備成功。完了条件: 最新CI合格。補充優先度との統合は後続。
