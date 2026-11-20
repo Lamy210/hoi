@@ -82,6 +82,8 @@ export interface UiCommander {
 }
 
 export interface UiUnit {
+  customTemplateId?: number;
+  customRevision?: number;
   manualHold: boolean;
   armyId: number | null;
   manpower: number;
@@ -275,6 +277,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     .map((u) => ({
       id: u.id,
       templateId: u.templateId,
+      customTemplateId: u.customTemplateId, customRevision: u.customRevision,
       armyId: u.armyId ?? null,
       manualHold: u.manualHold ?? false,
       manpower: u.manpower, maxManpower: u.maxManpower,
