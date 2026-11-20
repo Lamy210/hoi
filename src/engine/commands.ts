@@ -5,7 +5,7 @@ import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
 import { addAlert, atWar, type Cmd, type TreatyType, type WorldState } from './core/state';
 import { getEdge } from './map/adjacency';
-import { findPath, segmentDays } from './systems/movement';
+import { findPath, segmentDays, planMovementEdit } from './systems/movement';
 import { applyRelationDelta, endWar, startWar, warScoreFor } from './military/war';
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './scenario/unitCosts';
 import { autoAssignCommander } from './military/commanders';
@@ -493,6 +493,33 @@ export function registerAllCommands(): void {
         u.path = findPath(w, u.loc, target, country, false)!;
         u.segIdx = 0; u.segProgress = 0;
         u.segDays = segmentDays(w, u.path[0], u.path[1]);
+      }
+    },
+  });
+
+  // A null target stops after the already-started segment, never teleports a unit.
+  for (const kind of ['haltUnits','redirectUnits'] as const) registerCommand(kind, {
+    validate(w,p,issuer) {
+      const c=actorCountry(w,issuer),ids=p.units;
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';
+      const target=kind==='haltUnits'?null:p.target as number;
+      if(target!==null&&(!Number.isInteger(target)||target<0||target>=w.prov.count))return 'badTarget';
+      if(kind==='redirectUnits'&&target===null)return 'badTarget';
+      for(const id of ids){
+        const u=w.units.find(x=>x.id===id&&!x.destroyed);
+        if(!u||u.owner!==c)return 'notYourUnit';
+        if(u.encircled||w.runtime.activeBattles.has(u.loc))return 'unitBusy';
+        if(!planMovementEdit(w,u,target))return 'noPath';
+      }
+      return null;
+    },
+    apply(w,p,issuer){
+      const target=kind==='haltUnits'?null:p.target as number;
+      for(const id of p.units as number[]){
+        const u=w.units.find(x=>x.id===id)!;
+        Object.assign(u,planMovementEdit(w,u,target)!);
+        if(issuer==='player')u.manualHold=true;
       }
     },
   });
