@@ -32,7 +32,6 @@ export function createCanvasRenderer(
   let colors: string[] = [];
   let mode: 'political' | 'terrain' | 'supply' = 'political';
   let selected: number | null = null;
-  let fronts: { provinces: number[]; owner: number; stance: string }[] = [];
   let disposed = false;
   let baseScale = 1;
   let readyForInput = false;
@@ -193,17 +192,6 @@ export function createCanvasRenderer(
         ctx.stroke(f.path2d);
       }
     }
-    // 戦線ハイライト（phase2-fronts-logistics: 太枠＋スタンス別の破線）
-    for (const front of fronts) {
-      ctx.save();
-      ctx.strokeStyle = ds.countryColors[front.owner] ?? '#f2c94c';
-      ctx.lineWidth = front.stance === 'attack' ? 4 : 3;
-      if (front.stance === 'attack') ctx.setLineDash([8, 5]);
-      for (const f of feats) {
-        if (front.provinces.includes(f.provIdx)) ctx.stroke(f.path2d);
-      }
-      ctx.restore();
-    }
     // 補給モードの凡例
     if (mode === 'supply') {
       ctx.fillStyle = 'rgba(16,18,26,0.8)';
@@ -315,6 +303,7 @@ export function createCanvasRenderer(
   const renderer = {
     whenReady: () => ready,
     setUnitOverlay: units.set,
+    setFrontOverlay: units.setFronts,
     setColors(next: string[], dirty: Set<number>) {
       colors = next;
       if (dirty.size === 0) return;
@@ -357,9 +346,5 @@ export function createCanvasRenderer(
       draw();
     },
   } as MapRenderer & { setMode: (m: 'political' | 'terrain' | 'supply', colors: string[]) => void };
-  (renderer as unknown as { setFronts: (next: { provinces: number[]; owner: number; stance: string }[]) => void }).setFronts = (next) => {
-    fronts = next;
-    draw();
-  };
   return renderer;
 }

@@ -10,7 +10,18 @@ export interface MapUnitMarker {
   moving: boolean;
 }
 
+export interface MapFrontOverlay {
+  id: number;
+  provinces: number[];
+  links: {from:number;to:number}[];
+  targets: number[];
+  arrows: {from:number;to:number}[];
+  stance: string;
+  paused: boolean;
+  highlighted: boolean;
+}
 export interface MapRenderer {
+  setFrontOverlay(fronts: MapFrontOverlay[]): void;
   setUnitOverlay(markers: MapUnitMarker[], routes: number[][]): void;
   /** 準備完了まで待機（初回描画可能になったらresolve） */
   whenReady(): Promise<void>;

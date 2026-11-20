@@ -9,6 +9,7 @@ import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
 import type { MapDataSource, MapRenderer } from './maprender/types';
+import { frontView, type FrontVisibility } from './maprender/frontView';
 import { colorsForMode, diffIndices } from './maprender/types';
 import { createCanvasRenderer } from './maprender/canvasAdapter';
 import { TERRAIN_COLORS, terrainOf } from './maprender/terrainColors';
@@ -42,6 +43,7 @@ export function GameScreen() {
   const [attackMode, setAttackMode] = useState(false);
   const [destination, setDestination] = useState('');
   const [rosterOpen, setRosterOpen] = useState(true);
+  const [frontVisibility,setFrontVisibility]=useState<FrontVisibility>('all');
   const [rosterQuery, setRosterQuery] = useState('');
   const [rosterFilter, setRosterFilter] = useState('all');
   useEffect(() => {
@@ -155,7 +157,6 @@ export function GameScreen() {
       if (st.mapMode !== 'terrain') applyMode(st.mapMode, dirty);
     }
     prevArrRef.current = { owner: s.owner, controller: s.controller };
-    (r as any).setFronts?.(s.fronts.map((f) => ({ provinces: f.provinces, owner: f.owner, stance: f.stance })));
     r.setSelected(s.units.find(u => u.id === st.selection.unitId)?.loc ?? st.selection.prov);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st.snap?.tick, st.snap]);
@@ -210,6 +211,10 @@ export function GameScreen() {
     })), snap.units.filter(u => u.owner === snap.playerCountry && selected.has(u.id) && u.moving).map(u => u.route));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mapReady, snap, meta, st.selection, lang]);
+
+  useEffect(()=>{
+    if(mapReady&&snap)rendererRef.current?.setFrontOverlay(frontView(snap,selectedIds,frontVisibility));
+  },[mapReady,snap,st.selection,frontVisibility]);
 
   // Selecting a deployed division from recruitment or the context panel also centers the map.
   useEffect(() => {
@@ -375,6 +380,7 @@ export function GameScreen() {
         <div className="map-tools" aria-label={t(lang, 'map.controls')}>
           <button aria-label={t(lang, 'map.zoomIn')} data-testid="map-zoom-in" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(1.25)}>＋</button>
           <button aria-label={t(lang, 'map.zoomOut')} data-testid="map-zoom-out" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(0.8)}>－</button>
+          <select data-testid="front-visibility" aria-label={lang==='ja'?'戦線表示':'Front visibility'} value={frontVisibility} onChange={e=>setFrontVisibility(e.target.value as FrontVisibility)}><option value="all">{lang==='ja'?'全戦線':'All fronts'}</option><option value="selected">{lang==='ja'?'選択部隊の戦線':'Selected fronts'}</option><option value="off">{lang==='ja'?'戦線非表示':'Hide fronts'}</option></select>
           <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
         </div>
         {mapError && <div className="status-toast" role="alert">{mapError}</div>}
@@ -397,6 +403,16 @@ export function GameScreen() {
             <button data-testid="toggle-unit-roster" aria-expanded={rosterOpen} onClick={() => setRosterOpen(!rosterOpen)}>{t(lang, 'units.roster')} ({ownUnits.length}) {rosterOpen ? '▴' : '▾'}</button>
             {rosterOpen && <>
               <ArmyManagement key={snap.playerCountry + ':' + meta.packId} snap={snap} lang={lang} selectedIds={selectedIds} pending={st.pendingCommands} onSelect={ids => selectUnits(ids)} />
+              {snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy)).length>0&&<details className="front-overview" data-testid="front-overview"><summary>{lang==='ja'?'戦線一覧・地図表示':'Front overview'}</summary>
+                {snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy)).map(f=>{
+                  const members=ownUnits.filter(u=>u.frontId===f.id);
+                  const activeProvinces=f.provinces.filter(p=>snap.controller[p]===f.owner);
+                  return <div key={f.id} className="move-controls"><span>#{f.id} {t(lang,'front.stance.'+f.stance)} · {f.paused?(lang==='ja'?'停止':'Paused'):''} {members.length}</span>
+                    <button data-testid={'select-front-units-'+f.id} disabled={!members.length||members.length>256} onClick={()=>{selectUnits(members.map(u=>u.id),false);setFrontVisibility('selected');if(activeProvinces.length)rendererRef.current?.focusProvince(activeProvinces[0]);}}>{lang==='ja'?'割当師団を選択':'Select assigned'}</button>
+                    <button data-testid={'focus-front-'+f.id} disabled={!activeProvinces.length} onClick={()=>{setFrontVisibility('all');rendererRef.current?.focusProvince(activeProvinces[0]);}}>{lang==='ja'?'戦線へ':'Locate front'}</button></div>;
+                })}
+                <small>{lang==='ja'?'丸印＝戦線州、短線＝陸上隣接、菱形＝目標州、矢印＝作戦目標の概略（実移動経路ではありません）。':'Circle: front province; bar: land adjacency; diamond: target; arrow: schematic objective, not a movement route.'}</small>
+              </details>}
               <div className="muted">{t(lang, 'units.hint')}</div>
               <div className="move-controls">
                 <input data-testid="roster-query" aria-label={lang==='ja'?'師団・州・軍団の検索':'Search divisions'} placeholder={lang==='ja'?'師団ID・州・軍団名':'ID, province, army'} value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)}/>

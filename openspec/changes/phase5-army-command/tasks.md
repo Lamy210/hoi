@@ -13,3 +13,5 @@
 - [ ] 0.2 目的: 軍団選択と既存戦線を接続。対象: commands.ts, systems/fronts.ts, core/state.ts, save/serialize.ts, ui/panels.tsx, GameScreen.tsx。作業: 一括割当解除、停止・再開・手動hold、版付きfrontMove、攻勢目標、v8移行。テスト: A07/A08/A12の先行範囲と通常UI。期待値: 停止/旧版/講和/手動hold中の自動命令拒否。完了条件: CIと公開確認。完全な作戦管理は残す。
 
 - [ ] 0.3 目的: 手動移動の停止・経路変更を先行実装。対象: systems/movement.ts, commands.ts, engine/ui.ts, GameScreen.tsx, panels.tsx。作業: 区間保持と全件検証、hold、次州・進捗表示。テスト: A06の先行範囲、A17〜A19。期待値: 進行区間の巻戻しなし、到着後停止、原子的拒否、v8継続。完了条件: CI合格・通常UI確認。append/戦闘中撤退は後続。
+
+- [ ] 0.4 目的: 戦線・作戦目標の地図表示。対象: engine/ui.ts, maprender/frontView.ts, unitOverlay.ts, canvasAdapter.ts, maplibreAdapter.ts, GameScreen.tsx。作業: 自国戦線の射影と選択・表示切替。テスト: A20〜A22。期待値: 無効州・敵対終了を除外、停止中は矢印非表示、地図投影を維持。完了条件: 最新CIと通常UI検証。MapLibre実機と境界編集は後続。
