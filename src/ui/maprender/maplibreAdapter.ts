@@ -3,6 +3,7 @@
 // ラベルはフォントグリフサーバが不要なCanvasアダプタ側で描画（本アダプタはホバー/選択を提供）。
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import { createUnitOverlay } from './unitOverlay';
 import type { MapDataSource, MapRenderer } from './types';
 
 interface FCFeature {
@@ -49,6 +50,9 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
     { padding: 24, duration: 0 },
   );
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+  const units = createUnitOverlay(container, p => { const pt = map.project([ds.provLabelX[p], ds.provLabelY[p]]); return [pt.x, pt.y]; });
+  map.on('move', units.refresh);
+  map.on('resize', units.refresh);
 
   async function init(): Promise<void> {
     const lod1fc = (await ds.loadGeometry(1)) as unknown as FC;
@@ -141,6 +145,7 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
 
   return {
     whenReady: () => ready,
+    setUnitOverlay: units.set,
     setColors(next: string[], dirty: Set<number>) {
       colors = next;
       if (dirty.size === 0) return;
@@ -183,6 +188,9 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
       map.resize();
     },
     dispose() {
+      map.off('move', units.refresh);
+      map.off('resize', units.refresh);
+      units.dispose();
       map.remove();
     },
   } as MapRenderer & { setPickHandler: (h: (prov: number | null) => void) => void };
