@@ -9,6 +9,7 @@ export const TERRAIN = ['plains', 'hills', 'mountains', 'urban', 'forest', 'dese
 export type TerrainId = (typeof TERRAIN)[number];
 
 export interface Unit {
+  armyId?: number | null;
   templateId?: import('../military/templates').DivisionTemplateId;
   id: number;
   owner: number; // 国家インデックス
@@ -239,6 +240,10 @@ export interface WorldState {
   treaties: Treaty[]; // phase4-diplomacy-treaties
   wars: War[];
   units: Unit[];
+  armies: import('../military/armies').Army[];
+  armyGroups: import('../military/armies').ArmyGroup[];
+  nextArmyId: number;
+  nextArmyGroupId: number;
   trainingQueue: import('../military/templates').TrainingOrder[];
   fronts: Front[];
   commanders: Commander[];
