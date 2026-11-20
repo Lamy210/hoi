@@ -1,6 +1,8 @@
 // 戦闘システム — プロヴィンス単位バトル・日次解決・撤退・包囲・占領（combat-system仕様）。
 // 全ての係数はトレース可能（trace.tsのunitCombatTraceで再計算）。決定論ロールはPCG32派生ストリーム。
 import { divisionTemplate } from '../military/templates';
+import { selectCombatFront, unitComposition, unitOrgCap } from '../military/unitComposition';
+import type { TemplateStats } from '../military/templateStats';
 import { deriveStream } from '../core/rng';
 import { addAlert, atWar, effectiveSupply, type Unit, type WorldState } from '../core/state';
 import { registerSystem } from '../core/scheduler';
@@ -40,12 +42,13 @@ export function unitPowerFactorsPure(
   side: 'attack' | 'defend',
   weatherMod = 1.0,
   cmdrMod = 1.0,
+  composition: TemplateStats | null = null,
 ): PowerContrib[] {
   const t = TERRAIN_DATA[terrainIdx];
   const supplyMod = 0.5 + 0.5 * supplyEff;
   const mpFill = u.maxManpower > 0 ? u.manpower / u.maxManpower : 0;
-  const infFill = u.maxInfEquipment > 0 ? u.infEquipment / u.maxInfEquipment : 0;
-  const artFill = u.maxArtEquipment > 0 ? u.artEquipment / u.maxArtEquipment : 0;
+  const infFill = u.maxInfEquipment > 0 ? u.infEquipment / u.maxInfEquipment : 1;
+  const artFill = u.maxArtEquipment > 0 ? u.artEquipment / u.maxArtEquipment : 1;
   // 装備係数は2財の幾何平均（D-029）
   const eqFill = Math.sqrt(Math.max(0, infFill) * Math.max(0, artFill));
   const orgFrac = u.org / 100;
@@ -53,7 +56,7 @@ export function unitPowerFactorsPure(
   const sideMod = side === 'attack' ? t.atk : t.def;
   const weather = side === 'attack' ? weatherMod : 1.0; // 天候は攻撃側にのみ適用
   return [
-    { label: 'base', value: 40 * (u.maxManpower / 10000) * (side === 'attack' ? (divisionTemplate(u.templateId)?.attack ?? 1) : 1), formula: '40×size×templateAttack' },
+    { label: 'base', value: composition ? (side === 'attack' ? composition.attack : composition.defense) : 40 * (u.maxManpower / 10000) * (side === 'attack' ? (divisionTemplate(u.templateId)?.attack ?? 1) : 1), formula: composition ? (side === 'attack' ? 'Σbattalion.attack' : 'Σbattalion.defense') : '40×size×templateAttack' },
     { label: 'org', value: orgFrac, formula: 'org/100' },
     { label: 'manpower', value: mpFill, formula: 'manpower/maxManpower' },
     { label: 'equipment', value: eqFill, formula: 'sqrt(infFill×artFill)' },
@@ -73,7 +76,7 @@ export function unitPowerFactors(
   side: 'attack' | 'defend',
 ): PowerContrib[] {
   const eff = effectiveSupply(w, u);
-  return unitPowerFactorsPure(u, w.prov.terrain[provIdx], eff, side, weatherAttackMod(w, provIdx), commanderMod(w, u, side));
+  return unitPowerFactorsPure(u, w.prov.terrain[provIdx], eff, side, weatherAttackMod(w, provIdx), commanderMod(w, u, side),unitComposition(w,u));
 }
 
 function factorProduct(cs: PowerContrib[]): number {
@@ -113,11 +116,11 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
   const byId = (a: Unit, b: Unit) => a.id - b.id;
   const attackers = sides.attackers.slice().sort(byId);
   const defenders = sides.defenders.slice().sort(byId);
-  const frontA = attackers.slice(0, t.width);
-  const frontD = defenders.slice(0, t.width);
-
-  const powersA = frontA.map((u) => factorProduct(unitPowerFactors(w, u, provIdx, 'attack')));
-  const powersD = frontD.map((u) => factorProduct(unitPowerFactors(w, u, provIdx, 'defend')));
+  const selA=selectCombatFront(w,attackers,t.width);
+  const selD=selectCombatFront(w,defenders,t.width);
+  const frontA=selA.units,frontD=selD.units;
+  const powersA = frontA.map((u,i) => factorProduct(unitPowerFactors(w, u, provIdx, 'attack'))*selA.penalties[i]);
+  const powersD = frontD.map((u,i) => factorProduct(unitPowerFactors(w, u, provIdx, 'defend'))*selD.penalties[i]);
   const sumA = powersA.reduce((a, b) => a + b, 0) || 1e-9;
   const sumD = powersD.reduce((a, b) => a + b, 0) || 1e-9;
   const ratioA = sumA / (sumA + sumD);
@@ -164,7 +167,7 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
 
   // 崩壊チェック（戦力枯渇）
   for (const u of [...frontA, ...frontD]) {
-    if (!u.destroyed && (u.manpower < u.maxManpower * 0.05 || u.infEquipment < u.maxInfEquipment * 0.4 || u.artEquipment < u.maxArtEquipment * 0.25)) {
+    if (!u.destroyed && (u.manpower < u.maxManpower * 0.05 || u.infEquipment < u.maxInfEquipment * 0.4 || (u.maxArtEquipment > 0 && u.artEquipment < u.maxArtEquipment * 0.25))) {
       u.destroyed = true;
       addAlert(w, { kind: 'unitDestroyed', priority: 4, msgKey: 'alert.unitDestroyed', params: { where: prov.nameJa[provIdx] || prov.nameEn[provIdx] }, actor: u.owner, province: provIdx });
     }
@@ -284,7 +287,7 @@ function tickAttrition(w: WorldState, battles: Map<number, Sides>): void {
       // 安定度（phase3-politics）×技術（orgRegen）で回復速度変化
       const stabilityMod = 0.7 + w.stability[u.owner] * 0.3;
       const regen = ORG_REGEN_BASE * (0.2 + 0.8 * eff) * weatherOrgMod(w, u.loc) * (traitLogistics ? 1.15 : 1) * stabilityMod * (1 + techMods(w, u.owner, 'orgRegen'));
-      u.org = Math.min(100, u.org + regen);
+      u.org = Math.min(unitOrgCap(w,u), u.org + regen);
       // 補充（2財・国のプールから。供給効率で速度変化）
       const c = u.owner;
       const speed = 0.5 + 0.5 * eff;
