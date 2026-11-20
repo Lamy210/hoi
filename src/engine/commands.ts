@@ -1,5 +1,6 @@
 // コマンドレジストリ — 全コマンドの検証と適用（game-core仕様）。
 // UI（issuer='player'）とAI（issuer='ai:<id>'）は同一の検証を通る。
+import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
 import { addAlert, atWar, type Cmd, type TreatyType, type WorldState } from './core/state';
 import { findPath, segmentDays } from './systems/movement';
@@ -37,9 +38,7 @@ function actorCountry(w: WorldState, issuer: string): number | null {
 }
 
 function aiCmd(w: WorldState, issuer: string, type: string, p: Record<string, unknown>): void {
-  const c = issuerCountry(issuer);
-  const key = c !== null ? c : -1; // プレイヤー戦線AIの命令は key=-1 で採番
-  const seq = w.runtime.aiSeq[key] = (w.runtime.aiSeq[key] ?? 0) + 1;
+  const seq = allocateAiSequence(w, issuer);
   const cmd: Cmd = { issuer, seq, type, p };
   w.runtime.commandsSinceLastTick.push(cmd);
 }
