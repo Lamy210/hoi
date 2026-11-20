@@ -3,6 +3,8 @@ export interface MapUnitMarker {
   province: number;
   provinceId: string;
   count: number;
+  hostileCount: number;
+  battle: boolean;
   label: string;
   selected: boolean;
   moving: boolean;
