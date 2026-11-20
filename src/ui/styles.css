@@ -144,3 +144,6 @@ input, select {
 .front-label { fill:currentColor; font:bold 12px sans-serif; paint-order:stroke; stroke:#18212d; stroke-width:3px; }
 .front-plan.highlighted .front-province { stroke-width:3; }
 .front-overview { font-size:12px; }
+
+.formation-leader { display:block; font-size:11px; opacity:.85; }
+.formation-commanders { border-top:1px solid #566477; padding-top:5px; }

@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -224,6 +224,11 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
     h = mixStr(h, 'front-control-v8');
     for (const f of w.fronts) { h = mixBool(h, f.paused ?? false); h = mixFloat(h, f.revision ?? 1); }
     for (const u of w.units) h = mixBool(h, u.manualHold ?? false);
+  }
+  if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders){
+    h=mixStr(h,'formation-commanders-v9');
+    for(const a of w.armies)h=mixFloat(h,a.commanderId??-1);
+    for(const g of w.armyGroups)h=mixFloat(h,g.commanderId??-1);
   }
   return h >>> 0;
 }

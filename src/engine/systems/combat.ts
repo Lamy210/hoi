@@ -6,7 +6,7 @@ import { addAlert, atWar, effectiveSupply, type Unit, type WorldState } from '..
 import { registerSystem } from '../core/scheduler';
 import { tickMovement } from './movement';
 import { weatherAttackMod, weatherOrgMod } from './weather';
-import { commanderMod, commanderTrait } from '../military/commanders';
+import { commanderMod, commanderTrait, releaseCommander } from '../military/commanders';
 import { techMods } from './research';
 import { checkAnnexation } from '../military/war';
 import { addContribution, CONTRIB_CAPITAL, CONTRIB_OCCUPATION } from '../diplomacy/peace';
@@ -310,7 +310,11 @@ function tickAttrition(w: WorldState, battles: Map<number, Sides>): void {
   }
   // 破壊済みユニットの除去（ID順維持 → 決定論）
   for (let i = w.units.length - 1; i >= 0; i--) {
-    if (w.units[i].destroyed) w.units.splice(i, 1);
+    if (w.units[i].destroyed) {
+      const u=w.units[i];
+      if(u.commanderId>=0&&w.commanders.some(c=>c.id===u.commanderId&&c.assignedUnit===u.id))releaseCommander(w,u.commanderId);
+      w.units.splice(i, 1);
+    }
   }
 }
 

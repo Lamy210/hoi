@@ -204,13 +204,14 @@ export function ContextPanel() {
           <select
             data-testid="cmdr-select"
             value={u.commanderId}
+            disabled={st.pendingCommands>0 || u.owner!==snap.playerCountry}
             onChange={(e) => engineClient.command('assignCommander', { unitId: u.id, commanderId: Number(e.target.value) })}
           >
             <option value={-1}>{t(lang, 'cmdr.unassigned')}</option>
             {snap.commanders.filter((c) => c.country === u.owner).map((c) => (
               <option key={c.id} value={c.id}>
                 {(lang === 'ja' ? c.nameJa : c.nameEn)} S{c.skill} {t(lang, 'trait.' + ['attack', 'defense', 'logistics'][c.trait])}
-                {c.assignedUnit >= 0 && c.assignedUnit !== u.id ? ' *' : ''}
+                {c.assignedUnit >= 0 && c.assignedUnit !== u.id ? ' *' : ''}{snap.armies.find(a=>a.commanderId===c.id)?.name ? ' · '+snap.armies.find(a=>a.commanderId===c.id)!.name : ''}{snap.armyGroups.find(g=>g.commanderId===c.id)?.name ? ' · '+snap.armyGroups.find(g=>g.commanderId===c.id)!.name : ''}
               </option>
             ))}
           </select>

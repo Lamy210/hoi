@@ -62,11 +62,24 @@ export function commanderMod(w: WorldState, u: Unit, side: 'attack' | 'defend'):
 }
 
 /** 師団作成時の自動割当（空き指揮官の最skill者） */
+export function formationAssignment(w:WorldState,id:number):boolean {
+  return w.armies.some(a=>a.commanderId===id)||w.armyGroups.some(g=>g.commanderId===id);
+}
+/** One position at a time, including the legacy division role. */
+export function releaseCommander(w:WorldState,id:number):void {
+  if(id<0)return;
+  for(const u of w.units)if(u.commanderId===id)u.commanderId=-1;
+  for(const a of w.armies)if(a.commanderId===id)a.commanderId=-1;
+  for(const g of w.armyGroups)if(g.commanderId===id)g.commanderId=-1;
+  const c=w.commanders.find(c=>c.id===id);
+  if(c)c.assignedUnit=-1;
+}
 export function autoAssignCommander(w: WorldState, unit: Unit): void {
   const free = w.commanders
-    .filter((c) => c.country === unit.owner && c.assignedUnit < 0)
+    .filter((c) => c.country === unit.owner && !w.units.some(u=>!u.destroyed&&u.commanderId===c.id) && !formationAssignment(w,c.id))
     .sort((a, b) => b.skill - a.skill || a.id - b.id)[0];
   if (free) {
+    releaseCommander(w,free.id);
     free.assignedUnit = unit.id;
     unit.commanderId = free.id;
   }

@@ -1,0 +1,28 @@
+import {expect,test} from '@playwright/test';
+test('軍団・軍集団の指揮官配置と移籍を通常UIで確認する',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('toggle-army-editor').click();
+  await page.getByTestId('army-name').fill('第1軍団');
+  await page.getByTestId('create-army').click();await page.getByTestId('apply-pending').click();
+  await page.getByTestId('army-name').fill('第1軍集団');
+  await page.getByTestId('create-army-group').click();await page.getByTestId('apply-pending').click();
+  await page.getByTestId('army-target').selectOption('1');
+  await page.getByTestId('group-target').selectOption('1');
+  const army=page.getByTestId('army-commander-select'),group=page.getByTestId('group-commander-select');
+  const id=await army.locator('option').nth(1).getAttribute('value');
+  if(!id)throw new Error('No commander');
+  await army.selectOption(id);await page.getByTestId('apply-pending').click();
+  await expect(army).toHaveValue(id);
+  await expect(page.getByTestId('army-leader-1')).not.toHaveText('未配置');
+  await group.selectOption(id);await page.getByTestId('apply-pending').click();
+  await expect(group).toHaveValue(id);
+  await expect(army).toHaveValue('-1');
+  await expect(page.getByTestId('army-leader-1')).toHaveText('未配置');
+  await group.selectOption('-1');await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('group-leader-1')).toHaveText('未配置');
+});
