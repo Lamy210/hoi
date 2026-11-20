@@ -31,13 +31,10 @@ test('地図の師団カウンターと一覧から現在地を確認し、移�
   await page.getByTestId('map-zoom-in').click();
   await expect(marker).toBeVisible();
   await expect(page.getByTestId('date')).toHaveText('2026-01-01');
-  await page.getByTestId('move-destination').selectOption({ label: '神奈川県 (JP-14)' }).catch(async () => {
-    // Use stable province ID rather than relying on Japanese label spelling.
-    const select = page.getByTestId('move-destination');
-    const value = await select.locator('option').evaluateAll(options => (options.find(o => o.textContent?.includes('(JP-14)')) as HTMLOptionElement | undefined)?.value);
-    if (!value) throw new Error('Kanagawa option unavailable');
-    await select.selectOption(value);
-  });
+  const select = page.getByTestId('move-destination');
+  const value = await select.locator('option').evaluateAll(options => (options.find(o => o.textContent?.includes('(JP-14)')) as HTMLOptionElement | undefined)?.value);
+  if (!value) throw new Error('Kanagawa option unavailable');
+  await select.selectOption(value);
   await page.getByTestId('confirm-move').click();
   await expect(page.getByTestId('date')).toHaveText('2026-01-01');
   await expect(row).toHaveAttribute('data-location', 'JP-13');
