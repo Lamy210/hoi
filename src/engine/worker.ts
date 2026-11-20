@@ -2,6 +2,7 @@
 // 上り: コマンド（検証はエンジン内）。下り: 差分スナップショット。トレースはオンデマンド。
 import { createEngine, type Engine, type TraceRequest } from './engine';
 import { civilFromDays } from './clock/date';
+import { nextSequence } from './core/sequence';
 import type { Pack } from './scenario/types';
 
 let engine: Engine | null = null;
@@ -9,9 +10,12 @@ let pack: Pack | null = null;
 let playerSeq = 1;
 
 function resumePlayerSequence(engine: Engine): number {
-  return engine.world.journal.reduce((next, entry) =>
-    entry.issuer === 'player' && Number.isSafeInteger(entry.seq) && entry.seq >= next
-      ? entry.seq + 1 : next, 1);
+  // Player orders are not saved by the normal UI while pending; include queued orders defensively.
+  let last = engine.world.commandWatermarks.player ?? 0;
+  for (const command of engine.world.runtime.commandsSinceLastTick) {
+    if (command.issuer === 'player') last = Math.max(last, command.seq);
+  }
+  return nextSequence(last);
 }
 
 const post = (msg: unknown, transfer?: Transferable[]): void => {
