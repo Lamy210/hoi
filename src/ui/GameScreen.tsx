@@ -247,7 +247,10 @@ export function GameScreen() {
     if (rosterFilter === 'selected') return selectedIds.includes(u.id);
     return true;
   });
-  const canMove = chosen.length > 0 && chosen.length <= 256 && chosen.every(u => !u.moving && !u.encircled && !u.inBattle) && st.pendingCommands === 0;
+  const canControl = chosen.length > 0 && chosen.length <= 256 && chosen.every(u => !u.encircled && !u.inBattle) && st.pendingCommands === 0;
+  const canMove = canControl && chosen.every(u => !u.moving);
+  const canRedirect = canControl && chosen.every(u=>!u.moving || u.segmentProgress===0 || (u.nextProvince>=0 && !player.atWar.includes(snap.controller[u.nextProvince])));
+  const hasMoving = chosen.some(u=>u.moving);
   const attackTargets = chosen.length && canMove ? chosen[0].attackTargets.filter(p => chosen.every(u => u.attackTargets.includes(p))) : [];
   const nameOf = (p: number) => lang === 'ja' ? gameMeta.provNameJa[p] : gameMeta.provNameEn[p];
   function selectUnits(ids: number[], focus = true) {
@@ -266,9 +269,9 @@ export function GameScreen() {
     setAttackMode(false); setMoveMode(false); setDestination('');
   }
   function sendMove(prov: number) {
-    if (!canMove || !Number.isInteger(prov) || prov < 0 || prov >= gameMeta.provIds.length || chosen.every(u => u.loc === prov)) return;
+    if (!canRedirect || !Number.isInteger(prov) || prov < 0 || prov >= gameMeta.provIds.length || chosen.every(u => !u.moving && u.loc === prov)) return;
     if (player.atWar.includes(gameSnap.controller[prov])) { appStore.set({ statusMessage: t(lang, 'reason.useAttack') }); return; }
-    engineClient.command('travelUnits', { units: chosen.map(u => u.id), target: prov });
+    engineClient.command(hasMoving?'redirectUnits':'travelUnits', { units: chosen.map(u => u.id), target: prov });
     setMoveMode(false);
     setDestination('');
   }
@@ -420,7 +423,8 @@ export function GameScreen() {
               </div>
               <div className="move-controls">
                 <span data-testid="selected-unit-count">{t(lang, 'units.selected', { count: chosen.length })}</span>
-                <button data-testid="move-selected" disabled={!canMove} aria-pressed={moveMode} onClick={() => { setAttackMode(false); setDestination(''); setMoveMode(!moveMode); }}>{t(lang, moveMode ? 'units.cancelMove' : 'units.move')}</button>
+                <button data-testid="move-selected" disabled={!canRedirect} aria-pressed={moveMode} onClick={() => { setAttackMode(false); setDestination(''); setMoveMode(!moveMode); }}>{moveMode?t(lang,'units.cancelMove'):hasMoving?(lang==='ja'?'移動先変更':'Redirect'):t(lang,'units.move')}</button>
+                <button data-testid="halt-selected" disabled={!canControl} onClick={()=>{engineClient.command('haltUnits',{units:chosen.map(u=>u.id)});setMoveMode(false);setAttackMode(false);setDestination('');}}>{lang==='ja'?'停止・待機':'Halt / hold'}</button>
                 <button data-testid="open-selected-fronts" disabled={!chosen.length} onClick={()=>appStore.set({panel:'fronts'})}>{lang==='ja'?'戦線へ割当':'Assign to front'}</button>
                 <button data-testid="resume-selected-automation" disabled={st.pendingCommands>0||!chosen.some(u=>u.manualHold)} onClick={()=>engineClient.command('setManualHold',{units:chosen.map(u=>u.id),hold:false})}>{lang==='ja'?'自動配置に復帰':'Resume automation'}</button>
                 <button data-testid="attack-selected" className="danger" disabled={!canMove || !attackTargets.length} aria-pressed={attackMode} onClick={() => { setMoveMode(false); setDestination(''); setAttackMode(!attackMode); }}>{t(lang, attackMode ? 'units.cancelAttack' : 'units.attack')}</button>
@@ -429,13 +433,14 @@ export function GameScreen() {
               {attackMode && <div role="status" data-testid="attack-hint">{t(lang, 'units.attackHint')}</div>}
               {chosen.length > 0 && canMove && attackTargets.length === 0 && <div className="muted">{t(lang, 'units.attackInvalid')}</div>}
               {moveMode && <div role="status" data-testid="move-hint">{t(lang, 'units.destinationHint')}</div>}
-              {chosen.length > 0 && !canMove && <div className="muted">{t(lang, 'units.busy')}</div>}
+              {chosen.length > 0 && !canControl && <div className="muted">{t(lang, 'units.busy')}</div>}
+              {hasMoving && <div className="muted" data-testid="movement-edit-hint">{lang==='ja'?'停止・移動先変更は進行済み区間の到着後に反映されます。戦闘中の撤退命令とは異なります。':'Halt and redirect preserve a started segment. This is not retreat from battle.'}</div>}
               {chosen.length > 0 && <div className="move-controls">
                 <select data-testid="move-destination" aria-label={t(lang, 'units.destination')} value={destination} onChange={e => setDestination(e.target.value)}>
                   <option value="">{t(lang, 'units.destination')}</option>
                   {meta.provIds.map((id, i) => (attackMode ? attackTargets.includes(i) : !player.atWar.includes(snap.controller[i])) && <option key={id} value={i}>{nameOf(i)} ({id})</option>)}
                 </select>
-                {attackMode ? <button className="danger" data-testid="confirm-attack" disabled={!canMove || destination === '' || !attackTargets.includes(Number(destination))} onClick={() => sendAttack(Number(destination))}>{t(lang, 'units.attack')}</button> : <button data-testid="confirm-move" disabled={!canMove || destination === '' || chosen.every(u => u.loc === Number(destination))} onClick={() => sendMove(Number(destination))}>{t(lang, 'units.move')}</button>}
+                {attackMode ? <button className="danger" data-testid="confirm-attack" disabled={!canMove || destination === '' || !attackTargets.includes(Number(destination))} onClick={() => sendAttack(Number(destination))}>{t(lang, 'units.attack')}</button> : <button data-testid="confirm-move" disabled={!canRedirect || destination === '' || chosen.every(u => !u.moving && u.loc === Number(destination))} onClick={() => sendMove(Number(destination))}>{hasMoving?(lang==='ja'?'移動先変更':'Redirect'):t(lang,'units.move')}</button>}
               </div>}
             </>}
           </section>

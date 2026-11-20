@@ -92,6 +92,9 @@ export interface UiUnit {
   owner: number;
   loc: number;
   moving: boolean;
+  nextProvince: number;
+  segmentProgress: number;
+  segmentDays: number;
   target: number; // 移動先（移動中のみ有効）
   route: number[]; // 現在州から残りの実経路
   attackTargets: number[]; // 現状態で選択できる敵対隣接州（予告、適用時は再検証）
@@ -277,6 +280,9 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       owner: u.owner,
       loc: u.loc,
       moving: u.path.length > 0,
+      nextProvince: u.path.length > 0 ? u.path[u.segIdx+1] : -1,
+      segmentProgress: u.segProgress,
+      segmentDays: u.segDays,
       target: u.path.length > 0 ? u.path[u.path.length - 1] : -1,
       route: u.path.length > 0 ? [u.loc, ...u.path.slice(u.segIdx + 1)] : [],
       attackTargets: u.path.length || u.encircled || w.runtime.activeBattles.has(u.loc) ||
