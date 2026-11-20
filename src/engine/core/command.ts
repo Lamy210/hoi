@@ -3,6 +3,7 @@
 
 import type { Cmd, WorldState } from './state';
 import { addAlert } from './state';
+import { commandIssuerKey, validSequence } from './sequence';
 
 export interface Handler {
   /** 現状態に対する妥当性検査。違反理由を返す（null=有効）。副作用を持たないこと。 */
@@ -40,11 +41,16 @@ function pushJournal(w: WorldState, e: import('./state').JournalEntry): void {
 export function applyCommands(w: WorldState, cmds: Cmd[]): ApplyResult[] {
   const results: ApplyResult[] = [];
   for (const cmd of cmds) {
-    const dup = w.journal.find((j) => j.issuer === cmd.issuer && j.seq === cmd.seq);
-    if (dup) {
+    if (commandIssuerKey(cmd.issuer, w.countries.count) === null || !validSequence(cmd.seq)) {
+      results.push({ issuer: cmd.issuer, seq: cmd.seq, type: cmd.type, ok: false, reason: 'badSequence' });
+      continue;
+    }
+    if (cmd.seq <= (w.commandWatermarks[cmd.issuer] ?? 0)) {
       results.push({ issuer: cmd.issuer, seq: cmd.seq, type: cmd.type, ok: false, reason: 'duplicateCommand' });
       continue;
     }
+    // Rejected commands also consume their sequence; a replay must not become valid later.
+    w.commandWatermarks[cmd.issuer] = cmd.seq;
     const h = registry.get(cmd.type);
     if (!h) {
       pushJournal(w, { issuer: cmd.issuer, seq: cmd.seq, type: cmd.type, ok: false, reason: 'unknownCommand', tick: w.tick });
