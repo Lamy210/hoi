@@ -1,5 +1,6 @@
 // イベントシステム（phase2-events-basic）— パック定義の宣言的イベントを日次照合・適用する。
 // 発火はジャーナルへ記録（issuer=event）。once指定は1回のみ。照合順は定義順で決定論。
+import { allocateAiSequence } from '../core/sequence';
 import { addAlert, atWar, type WorldState } from '../core/state';
 import { registerSystem, getSystems } from '../core/scheduler';
 import { daysFromCivil } from '../clock/date';
@@ -104,7 +105,7 @@ function applyEffects(w: WorldState, def: EventDef): void {
           if (!atWar(w, ag, df)) {
             w.runtime.commandsSinceLastTick.push({
               issuer: 'ai:' + ag,
-              seq: (w.runtime.aiSeq[ag] = (w.runtime.aiSeq[ag] ?? 0) + 1),
+              seq: allocateAiSequence(w, 'ai:' + ag),
               type: 'declareWar',
               p: { defender: df },
             });
