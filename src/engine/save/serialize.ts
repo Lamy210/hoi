@@ -11,7 +11,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 7;
+export const SAVE_SCHEMA_VERSION = 8;
 
 export interface SaveHeader {
   v: number;
@@ -172,7 +172,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -240,6 +240,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
       if (!Number.isInteger(u.owner) || u.owner < 0 || u.owner >= ctryCount) violations.push('unit owner out of range: ' + u.id);
       if (!Number.isInteger(u.loc) || u.loc < 0 || u.loc >= provCount) violations.push('unit loc out of range: ' + u.id);
       if (![u.manpower, u.infEquipment, u.artEquipment].every((n) => Number.isFinite(n) && n >= 0)) violations.push('invalid stock in unit: ' + u.id);
+      if ((h.v < 8 && u.manualHold !== undefined) || (u.manualHold !== undefined && typeof u.manualHold !== 'boolean')) violations.push('invalid manual hold');
       if (u.frontId !== undefined && u.frontId < -1) violations.push('bad frontId in unit: ' + u.id);
     }
     const counts = new Array<number>(ctryCount).fill(0);
@@ -252,6 +253,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     for (const c of s.countries.population ?? []) if (!Number.isFinite(c) || c < 0) violations.push('invalid population');
     for (const c of s.prov.population ?? []) if (!Number.isFinite(c) || c < 0) violations.push('invalid prov population');
     for (const f of (s.fronts ?? []) as any[]) {
+      if ((h.v < 8 && (f.paused !== undefined || f.revision !== undefined)) || (f.paused !== undefined && typeof f.paused !== 'boolean') || (f.revision !== undefined && (!Number.isSafeInteger(f.revision) || f.revision < 1))) violations.push('invalid front control');
       if (f.owner < 0 || f.owner >= ctryCount) violations.push('front owner out of range: ' + f.id);
       if (f.enemy < 0 || f.enemy >= ctryCount) violations.push('front enemy out of range: ' + f.id);
       if (!['hold', 'attack', 'retreat'].includes(f.stance)) violations.push('front stance invalid: ' + f.id);
@@ -397,7 +399,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   recomputeSupply(w);
   const hierarchyErrors = validateHierarchy(w);
   if (hierarchyErrors.length) return { world: null, violations: hierarchyErrors };
-  const actual = hashWorld(w, h.v < 6, h.v >= 7);
+  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }
