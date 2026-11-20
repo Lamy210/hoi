@@ -17,3 +17,5 @@
 - [ ] 5.1 目的: リリース。対象: check.yml, docs/13。作業: strict、全回帰、acceptance.md D01〜D17の追跡、性能測定。テスト: CI/Pages。期待値: 合格、性能の実測記録。完了条件: 最新HEAD・実URL確認。
 
 - [ ] 0.3 目的: 永続命令状態のv6先行実装を検証。対象: core/sequence.ts, command.ts, hash.ts, save/serialize.ts, worker.ts, engineClient.ts。作業: 番号上限、未適用AI命令の保存、v4/v5旧hash検証。テスト: D15/構造不正/継続一致。期待値: 400件超後の再送拒否、キュー復元、旧既知番号の復元。完了条件: 最新CI合格。旧実ファイルと全体移行は4.1で確認。
+
+- [ ] 1.3a 目的: 自由師団編成の国家別作成・改訂・削除の先行実装。対象: military/customTemplates.ts, core/state.ts, commands.ts, core/hash.ts, save/serialize.ts, ui/DivisionDesignerPreview.tsx。作業: 楽観ロック、永続カタログ構成、v10移行、保存UI。テスト: D03〜D06の保存・改訂部分とUI、v9構造移行、破損拒否。期待値: 過去改訂保持、他国拒否、ID再利用なし。完了条件: PRの全CI成功。独自編成での募集・配備は2.1、全戦闘・兵站統合は3.xで継続。
