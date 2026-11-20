@@ -4,6 +4,7 @@ import EngineWorker from '../engine/worker?worker&inline';
 import { loadPack, defaultFetch, cryptoAvailable, loadVerifiedPackAsset } from '../engine/scenario/loader';
 import type { Pack } from '../engine/scenario/types';
 import type { UiMeta, UiSnapshot } from '../engine/ui';
+import type { TemplateComposition, TemplatePreview } from '../engine/military/templateStats';
 import type { TraceRequest, TraceResult } from '../engine/engine';
 import { appStore } from './store';
 import { saveAutosave } from './idb';
@@ -257,6 +258,11 @@ export class EngineClient {
     } finally {
       this.loading = false;
     }
+  }
+
+  async previewTemplate(composition: TemplateComposition): Promise<TemplatePreview> {
+    const m = await this.request({ type: 'previewTemplate', composition }, 'templatePreview', 8000);
+    return m.result as TemplatePreview;
   }
 
   async trace(req: TraceRequest): Promise<TraceResult | null> {
