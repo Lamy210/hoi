@@ -2,6 +2,7 @@
 // 全ストアを固定順で走査し、f64のビット列を決定論的に混合する。
 // 派生キャッシュ（runtime）は対象外（INV-8: 復元後に再計算される）。
 
+import { encode } from '@msgpack/msgpack';
 import { mixBool, mixFloat, mixInt, mixStr } from './rng';
 import type { Unit, WorldState } from './state';
 
@@ -29,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState): number {
+export function hashWorld(w: WorldState, legacy = false): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -197,6 +198,20 @@ export function hashWorld(w: WorldState): number {
     h = mixInt(h, s.sLo);
     h = mixInt(h, s.iHi);
     h = mixInt(h, s.iLo);
+  }
+  if (!legacy) {
+    h = mixStr(h, 'command-state-v6');
+    for (const key of Object.keys(w.commandWatermarks).sort()) {
+      h = mixStr(h, key); h = mixFloat(h, w.commandWatermarks[key]);
+    }
+    for (const key of Object.keys(w.runtime.aiSeq).sort()) {
+      h = mixStr(h, key); h = mixFloat(h, w.runtime.aiSeq[Number(key)]);
+    }
+    h = mixFloat(h, w.runtime.eventSeq);
+    for (const id of [...w.runtime.seenWars].sort((a,b) => a-b)) h = mixFloat(h, id);
+    const pending = encode(w.runtime.commandsSinceLastTick);
+    h = mixInt(h, pending.length);
+    for (const byte of pending) h = mixInt(h, byte);
   }
   return h >>> 0;
 }
