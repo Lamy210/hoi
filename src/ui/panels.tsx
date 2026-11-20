@@ -786,6 +786,7 @@ export function RecruitmentPanel() {
   const st = useApp(), snap = st.snap!, meta = st.meta!, lang = st.lang;
   const player = snap.countries[snap.playerCountry];
   const [templateId, setTemplateId] = useState<string>('standard-v1');
+  const [refitId,setRefitId] = useState<number>(st.selection.unitId??-1);
   const [province, setProvince] = useState(st.selection.prov !== null && snap.controller[st.selection.prov] === snap.playerCountry ? st.selection.prov : player.capital);
   const ownTemplates=snap.customTemplates.filter(t=>t.country===snap.playerCountry).sort((a,b)=>a.templateId-b.templateId||b.revision-a.revision).filter((t,i,all)=>i===0||all[i-1].templateId!==t.templateId);
   const selectedCustom=ownTemplates.find(t=>'custom:'+t.templateId===templateId);
@@ -796,6 +797,14 @@ export function RecruitmentPanel() {
   const owned = meta.provIds.map((_, i) => i).filter(i => snap.controller[i] === snap.playerCountry);
   const valid = owned.includes(province);
   const nameOf = (p: number) => lang === 'ja' ? meta.provNameJa[p] : meta.provNameEn[p];
+  const refitCandidate=snap.units.find(u=>u.id===refitId && u.owner===snap.playerCountry);
+  const refitCost=refitCandidate&&selectedCustom?[
+    Math.max(0,template.manpower-refitCandidate.maxManpower),
+    Math.max(0,template.infantry-refitCandidate.maxInfEquipment),
+    Math.max(0,template.artillery-refitCandidate.maxArtEquipment),
+  ]:null;
+  const canRefit=!!selectedCustom&&!!refitCandidate&&!!refitCost&&!refitCandidate.moving&&!refitCandidate.inBattle&&!refitCandidate.encircled&&snap.controller[refitCandidate.loc]===snap.playerCountry&&
+    player.manpowerPool>=refitCost[0]&&player.infEquipmentStock>=refitCost[1]&&player.artEquipmentStock>=refitCost[2]&&st.pendingCommands===0;
   const missing = player.manpowerPool < template.manpower ? 'reason.insufficientManpower' :
     player.infEquipmentStock < template.infantry ? 'reason.insufficientEquipment' :
     player.artEquipmentStock < template.artillery ? 'reason.insufficientArtillery' :
@@ -819,6 +828,17 @@ export function RecruitmentPanel() {
       <button className="primary" data-testid="start-training" disabled={!valid || !!missing || st.pendingCommands > 0} onClick={() => selectedCustom ? engineClient.command('startCustomTraining',{templateId:selectedCustom.templateId,revision:selectedCustom.revision,province}):engineClient.command('startTraining', { templateId, province })}>{t(lang, 'mil.startTraining')}</button>
       {missing && <span className="muted"> {t(lang, missing)}</span>}
       <DivisionDesignerPreview lang={lang} templates={snap.customTemplates} playerCountry={snap.playerCountry} pending={st.pendingCommands} />
+      <section className="panel-section" data-testid="custom-refit">
+        <h4>{lang==='ja'?'既存師団の編成変更':'Refit deployed division'}</h4>
+        <label>{lang==='ja'?'対象師団':'Division'} <select data-testid="refit-unit-select" value={refitCandidate?.id??-1} onChange={e=>setRefitId(Number(e.target.value))}>
+          <option value={-1}>{lang==='ja'?'師団を選択':'Select division'}</option>
+          {snap.units.filter(u=>u.owner===snap.playerCountry).map(u=><option key={u.id} value={u.id}>#{u.id} {nameOf(u.loc)}</option>)}
+        </select></label>
+        {refitCandidate&&<p data-testid="refit-current-template">{lang==='ja'?'現在の編成':'Current template'}: {refitCandidate.customTemplateId!==undefined? '#'+refitCandidate.customTemplateId+' v'+refitCandidate.customRevision : (refitCandidate.templateId??'legacy')}</p>}
+        <small>{lang==='ja'?'変更後の編成は上で選択した保存済み自由編成です。現在の不足装備を無償回復せず、増加した定数分のみ在庫から消費します。':'Target is the saved custom template selected above. Existing damage remains, only increased capacity is purchased.'}</small>
+        {refitCost&&<div data-testid="refit-delta">{lang==='ja'?'追加購入量（人員 / 歩兵装備 / 火砲）':'Additional purchases (manpower / infantry / artillery)'}: {refitCost.map(x=>fmtNumber(lang,x)).join(' / ')}</div>}
+        <button data-testid="refit-unit" disabled={!canRefit} onClick={()=>selectedCustom&&refitCandidate&&engineClient.command('refitUnit',{unitId:refitCandidate.id,templateId:selectedCustom.templateId,revision:selectedCustom.revision})}>{lang==='ja'?'師団を再編':'Refit division'}</button>
+      </section>
       <h4>{t(lang, 'mil.queue')} ({player.training.length}/{MAX_TRAINING})</h4>
       {player.training.map(o => {
         const custom=o.customTemplateId!==undefined?snap.customTemplates.find(t=>t.country===o.country&&t.templateId===o.customTemplateId&&t.revision===o.customRevision):null;

@@ -1,7 +1,7 @@
 // コマンドレジストリ — 全コマンドの検証と適用（game-core仕様）。
 // UI（issuer='player'）とAI（issuer='ai:<id>'）は同一の検証を通る。
 import { BATTALION_CATALOG_VERSION, previewTemplate } from './military/templateStats';
-import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName, trainingSpec } from './military/customTemplates';
+import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName, trainingSpec, customTemplateStats } from './military/customTemplates';
 import { MAX_ARMIES, MAX_GROUPS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES, validName, validColor } from './military/armies';
 import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
@@ -152,6 +152,44 @@ export function registerAllCommands(): void {
         battalionIds:[...(p.battalionIds as string[])],supportIds:[...(p.supportIds as string[])]});
     },
   });
+  registerCommand('refitUnit', {
+    validate(w,p,issuer) {
+      const country=actorCountry(w,issuer),unit=w.units.find(u=>u.id===p.unitId&&!u.destroyed);
+      if(country===null||!w.countries.alive[country]||issuer==='frontai')return 'badIssuer';
+      if(!unit||unit.owner!==country)return 'notYourUnit';
+      if(!Number.isSafeInteger(p.templateId)||!Number.isSafeInteger(p.revision))return 'badParams';
+      const rev=w.customTemplates.find(t=>t.country===country&&t.templateId===p.templateId&&t.revision===p.revision);
+      if(!rev)return 'notYourTemplate';
+      if(unit.path.length||unit.encircled||w.runtime.activeBattles.has(unit.loc))return 'unitBusy';
+      if(w.prov.controller[unit.loc]!==country)return 'notControlledByYou';
+      const target=customTemplateStats(rev);
+      if(w.countries.manpowerPool[country]<Math.max(0,target.manpower-unit.maxManpower))return 'insufficientManpower';
+      if(w.countries.infEquipmentStock[country]<Math.max(0,target.infantry-unit.maxInfEquipment))return 'insufficientEquipment';
+      if(w.countries.artEquipmentStock[country]<Math.max(0,target.artillery-unit.maxArtEquipment))return 'insufficientArtillery';
+      return null;
+    },
+    apply(w,p,issuer){
+      const country=actorCountry(w,issuer)!,u=w.units.find(u=>u.id===p.unitId)!;
+      const rev=w.customTemplates.find(t=>t.country===country&&t.templateId===p.templateId&&t.revision===p.revision)!;
+      const t=customTemplateStats(rev);
+      const change=(oldHeld:number,oldMax:number,newMax:number,pool:number[])=>{
+        const retained=Math.min(oldHeld,newMax);
+        const refund=Math.max(0,oldHeld-newMax);
+        const purchase=Math.max(0,newMax-oldMax);
+        pool[country]+=refund-purchase;
+        return retained+purchase;
+      };
+      u.manpower=change(u.manpower,u.maxManpower,t.manpower,w.countries.manpowerPool);
+      u.infEquipment=change(u.infEquipment,u.maxInfEquipment,t.infantry,w.countries.infEquipmentStock);
+      u.artEquipment=change(u.artEquipment,u.maxArtEquipment,t.artillery,w.countries.artEquipmentStock);
+      u.maxManpower=t.manpower;u.maxInfEquipment=t.infantry;u.maxArtEquipment=t.artillery;
+      u.org=Math.min(u.org,Math.min(100,t.org))*0.5;
+      u.customTemplateId=rev.templateId;u.customRevision=rev.revision;
+      delete u.templateId;
+      // Position, experience, army/front membership, commander and route are preserved.
+    },
+  });
+
   registerCommand('deleteTemplate', {
     validate(w,p,issuer){
       const c=actorCountry(w,issuer);
