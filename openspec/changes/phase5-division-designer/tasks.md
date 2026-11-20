@@ -21,3 +21,5 @@
 - [ ] 1.3a 目的: 自由師団編成の国家別作成・改訂・削除の先行実装。対象: military/customTemplates.ts, core/state.ts, commands.ts, core/hash.ts, save/serialize.ts, ui/DivisionDesignerPreview.tsx。作業: 楽観ロック、永続カタログ構成、v10移行、保存UI。テスト: D03〜D06の保存・改訂部分とUI、v9構造移行、破損拒否。期待値: 過去改訂保持、他国拒否、ID再利用なし。完了条件: PRの全CI成功。独自編成での募集・配備は2.1、全戦闘・兵站統合は3.xで継続。
 
 - [ ] 2.1a 目的: 保存済み自由編成の募集・配備の先行実装。対象: military/customTemplates.ts, templates.ts, systems/training.ts, commands.ts, core/state.ts, core/hash.ts, save/serialize.ts, ui/panels.tsx。作業: 不変版固定、即時全量資源予約、キャンセル返却、訓練満了時配備、v11、日英UI。テスト: D21〜D23、旧v10、既存固定3編成回帰。期待値: 二重返却・旧版改変・編成削除による予約喪失なし。完了条件: 全CI成功。待機注文・手動配備・編制戦闘補正は後続。
+
+- [ ] 3.1a/3.2a 目的: v11独自師団の攻撃防御・幅・補給需要・速度・組織上限を計算へ反映。対象: military/unitComposition.ts, combat.ts, movement.ts, logistics.ts, engine/ui.ts, ArmyManagement.tsx。テスト: C01〜C05、戦闘幅の過大部隊フォールバック、旧固定3編成回帰と長期安定性。制約: 旧fixed各師団幅20、補給需要10、speed倍率1。完了条件: CI/PW/長期回帰。全プロダクトの編成戦闘バランス保証は後続。
