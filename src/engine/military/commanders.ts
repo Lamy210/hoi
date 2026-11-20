@@ -76,9 +76,10 @@ export function releaseCommander(w:WorldState,id:number):void {
 }
 export function autoAssignCommander(w: WorldState, unit: Unit): void {
   const free = w.commanders
-    .filter((c) => c.country === unit.owner && c.assignedUnit < 0 && !formationAssignment(w,c.id))
+    .filter((c) => c.country === unit.owner && !w.units.some(u=>!u.destroyed&&u.commanderId===c.id) && !formationAssignment(w,c.id))
     .sort((a, b) => b.skill - a.skill || a.id - b.id)[0];
   if (free) {
+    releaseCommander(w,free.id);
     free.assignedUnit = unit.id;
     unit.commanderId = free.id;
   }
