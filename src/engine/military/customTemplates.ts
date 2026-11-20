@@ -29,7 +29,7 @@ export function trainingSpec(w:WorldState,order:Pick<TrainingOrder,'country'|'te
       artillery:stats.artillery,days:stats.days,customTemplateId:rev.templateId,customRevision:rev.revision};
   }
   const legacy=divisionTemplate(order.templateId);
-  return legacy?{...legacy}:null;
+  return legacy?{...legacy,templateId:legacy.id}:null;
 }
 export const MAX_CUSTOM_TEMPLATES = 128;
 export const MAX_CUSTOM_REVISIONS = 256;
