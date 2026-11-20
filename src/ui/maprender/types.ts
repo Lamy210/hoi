@@ -1,5 +1,15 @@
 // MapRenderer抽象（world-map仕様）＋地図モードの配色定義
+export interface MapUnitMarker {
+  province: number;
+  provinceId: string;
+  count: number;
+  label: string;
+  selected: boolean;
+  moving: boolean;
+}
+
 export interface MapRenderer {
+  setUnitOverlay(markers: MapUnitMarker[], routes: number[][]): void;
   /** 準備完了まで待機（初回描画可能になったらresolve） */
   whenReady(): Promise<void>;
   /** プロヴィンス配色を差分更新（dirtyのみ。spec: 差分再描画） */
