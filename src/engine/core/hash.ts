@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -229,6 +229,15 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
     h=mixStr(h,'formation-commanders-v9');
     for(const a of w.armies)h=mixFloat(h,a.commanderId??-1);
     for(const g of w.armyGroups)h=mixFloat(h,g.commanderId??-1);
+  }
+  if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&includeCustomTemplates){
+    h=mixStr(h,'custom-templates-v10'); h=mixFloat(h,w.nextCustomTemplateId);
+    for(const t of w.customTemplates){
+      h=mixInt(h,t.country);h=mixFloat(h,t.templateId);h=mixFloat(h,t.revision);
+      h=mixStr(h,t.name);h=mixStr(h,t.catalogVersion);
+      h=mixInt(h,t.battalionIds.length);for(const id of t.battalionIds)h=mixStr(h,id);
+      h=mixInt(h,t.supportIds.length);for(const id of t.supportIds)h=mixStr(h,id);
+    }
   }
   return h >>> 0;
 }
