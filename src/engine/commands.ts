@@ -348,11 +348,11 @@ export function registerAllCommands(): void {
       if(!Number.isInteger(target)||target<0||target>=w.prov.count||target===u.loc)return 'badTarget';
       if(w.prov.controller[target]===f.enemy){
         const edge=getEdge(w,u.loc,target);
-        if(f.stance!=='attack'||f.cap<1||u.org<=0||w.prov.controller[u.loc]!==c||!edge||edge.strait||!Number.isFinite(segmentDays(w,u.loc,target))||(f.targets.length>0&&!f.targets.includes(target)))return 'staleFrontOrder';
+        if(f.stance!=='attack'||f.cap<1||u.org<=0||w.prov.controller[u.loc]!==c||!edge||edge.strait||!Number.isFinite(segmentDays(w,u.loc,target,u))||(f.targets.length>0&&!f.targets.includes(target)))return 'staleFrontOrder';
       }else if(w.prov.controller[target]!==c||!findPath(w,u.loc,target,c,false))return 'noPath';
       return null;
     },
-    apply(w,p){const f=frontOf(w,p.frontId as number)!,u=w.units.find(x=>x.id===p.unitId)!;const target=p.target as number;u.path=w.prov.controller[target]===f.enemy?[u.loc,target]:findPath(w,u.loc,target,f.owner,false)!;u.segIdx=0;u.segProgress=0;u.segDays=segmentDays(w,u.path[0],u.path[1]);},
+    apply(w,p){const f=frontOf(w,p.frontId as number)!,u=w.units.find(x=>x.id===p.unitId)!;const target=p.target as number;u.path=w.prov.controller[target]===f.enemy?[u.loc,target]:findPath(w,u.loc,target,f.owner,false)!;u.segIdx=0;u.segProgress=0;u.segDays=segmentDays(w,u.path[0],u.path[1],u);},
   });
 
   registerCommand('setTaxRate', {
@@ -548,7 +548,7 @@ export function registerAllCommands(): void {
         u.path = path;
         u.segIdx = 0;
         u.segProgress = 0;
-        u.segDays = segmentDays(w, path[0], path[1]);
+        u.segDays = segmentDays(w, path[0], path[1],u);
       }
     },
   });
@@ -583,7 +583,7 @@ export function registerAllCommands(): void {
         if (issuer === 'player') u.manualHold = true;
         u.path = findPath(w, u.loc, target, country, false)!;
         u.segIdx = 0; u.segProgress = 0;
-        u.segDays = segmentDays(w, u.path[0], u.path[1]);
+        u.segDays = segmentDays(w, u.path[0], u.path[1],u);
       }
     },
   });
@@ -630,7 +630,7 @@ export function registerAllCommands(): void {
         if (u.path.length || u.encircled || w.runtime.activeBattles.has(u.loc) || u.org <= 0) return 'unitBusy';
         if (w.prov.controller[u.loc] !== country) return 'notControlledByYou';
         const edge = getEdge(w, u.loc, target);
-        if (!edge || edge.strait || !Number.isFinite(segmentDays(w, u.loc, target))) return 'attackNotAdjacent';
+        if (!edge || edge.strait || !Number.isFinite(segmentDays(w, u.loc, target,u))) return 'attackNotAdjacent';
       }
       return null;
     },
@@ -640,7 +640,7 @@ export function registerAllCommands(): void {
         const u = w.units.find(x => x.id === id)!;
         if (issuer === 'player') u.manualHold = true;
         u.path = [u.loc, target]; u.segIdx = 0; u.segProgress = 0;
-        u.segDays = segmentDays(w, u.loc, target);
+        u.segDays = segmentDays(w, u.loc, target,u);
       }
     },
   });

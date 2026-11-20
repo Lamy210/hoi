@@ -23,8 +23,11 @@ export function DivisionResources({unit:u,lang,context=false}: {unit:UiUnit;lang
       <progress aria-label={label} max={1} value={required>0 ? Math.min(1,Math.max(0,actual/required)):1}/>
       <small>{ja?'不足':'Deficit'}: {format(Math.max(0,required-actual))}</small>
     </div>)}
-    <div className="kv"><span>{ja?'組織率':'Organization'}</span><span>{format(u.org)} / 100</span></div>
-    <progress aria-label={ja?'組織率':'Organization'} max={100} value={u.org}/>
+    <div className="kv"><span>{ja?'組織率':'Organization'}</span><span>{format(u.org)} / {format(u.orgCap)}</span></div>
+    <progress aria-label={ja?'組織率':'Organization'} max={u.orgCap} value={u.org}/>
+    <div className="kv"><span>{ja?'戦闘幅':'Combat width'}</span><span>{format(u.combatWidth)}</span></div>
+    <div className="kv"><span>{ja?'基礎攻撃 / 防御':'Base attack / defense'}</span><span>{format(u.baseAttack)} / {format(u.baseDefense)}</span></div>
+    <div className="kv"><span>{ja?'補給需要 / 速度':'Supply demand / speed'}</span><span>{format(u.supplyDemand)} / ×{format(u.speedMultiplier)}</span></div>
     <div className="kv"><span>{ja?'実効補給効率':'Effective supply'}</span><span>{format(100*u.supply)}%</span></div>
     <progress aria-label={ja?'実効補給効率':'Effective supply'} max={1} value={u.supply}/>
     <small>{ja?'州の補給効率':'Province supply'} {format(100*u.supplyBase)}% × {ja?'容量係数':'Capacity factor'} {format(u.supplyCapacityFactor*100)}%</small>

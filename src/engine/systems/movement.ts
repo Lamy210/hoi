@@ -4,6 +4,7 @@
 import { bakedDistanceKm } from '../core/num';
 import { atWar, type Unit, type WorldState } from '../core/state';
 import { getEdge } from '../map/adjacency';
+import { unitSpeedMultiplier } from '../military/unitComposition';
 import { weatherMoveMod } from './weather';
 import { activeTreatyBetween, isAllied } from '../diplomacy/treaties';
 
@@ -18,10 +19,10 @@ export function supplySpeedMod(eff: number): number {
 }
 
 /** セグメント（from→to）の所要日数 */
-export function segmentDays(w: WorldState, from: number, to: number): number {
+export function segmentDays(w: WorldState, from: number, to: number, unit?: Unit): number {
   const e = getEdge(w, from, to);
   if (!e) return Infinity;
-  const speed = speedKmDay(w.prov.infra[from]) * supplySpeedMod(w.runtime.supplyEff[from]) * weatherMoveMod(w, from);
+  const speed = speedKmDay(w.prov.infra[from]) * supplySpeedMod(w.runtime.supplyEff[from]) * weatherMoveMod(w, from) * (unit ? unitSpeedMultiplier(w,unit) : 1);
   return e.km / speed;
 }
 
@@ -133,7 +134,7 @@ export function tickMovement(w: WorldState): void {
         u.path = [];
         u.segDays = 0;
       } else {
-        u.segDays = segmentDays(w, u.path[u.segIdx], u.path[u.segIdx + 1]);
+        u.segDays = segmentDays(w, u.path[u.segIdx], u.path[u.segIdx + 1],u);
       }
     }
   }
@@ -159,5 +160,5 @@ export function planMovementEdit(w: WorldState,u: Unit,target: number|null): Mov
   if(!suffix)return null;
   if(started)return {path:[u.loc,...suffix],segIdx:0,segProgress:u.segProgress,segDays:u.segDays};
   if(suffix.length===1)return {path:[],segIdx:0,segProgress:0,segDays:0};
-  return {path:suffix,segIdx:0,segProgress:0,segDays:segmentDays(w,suffix[0],suffix[1])};
+  return {path:suffix,segIdx:0,segProgress:0,segDays:segmentDays(w,suffix[0],suffix[1],u)};
 }
