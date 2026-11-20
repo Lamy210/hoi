@@ -10,6 +10,7 @@ import { computeScores } from './systems/score';
 import { techDefs } from './systems/research';
 import { contributionOf } from './diplomacy/peace';
 import { warScoreFor } from './military/war';
+import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMultiplier } from './military/unitComposition';
 import type { Alert } from './core/state';
 
 export interface UiCountry {
@@ -82,6 +83,12 @@ export interface UiCommander {
 }
 
 export interface UiUnit {
+  combatWidth: number;
+  baseAttack: number;
+  baseDefense: number;
+  orgCap: number;
+  supplyDemand: number;
+  speedMultiplier: number;
   customTemplateId?: number;
   customRevision?: number;
   manualHold: boolean;
@@ -276,6 +283,12 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     .filter((u) => !u.destroyed)
     .map((u) => ({
       id: u.id,
+      combatWidth:unitCombatWidth(w,u),
+      baseAttack:unitComposition(w,u)?.attack ?? 40*(u.maxManpower/10000),
+      baseDefense:unitComposition(w,u)?.defense ?? 40*(u.maxManpower/10000),
+      orgCap:unitOrgCap(w,u),
+      supplyDemand:unitSupplyDemand(w,u),
+      speedMultiplier:unitSpeedMultiplier(w,u),
       templateId: u.templateId,
       customTemplateId: u.customTemplateId, customRevision: u.customRevision,
       armyId: u.armyId ?? null,
