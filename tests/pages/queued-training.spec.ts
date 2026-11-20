@@ -12,7 +12,6 @@ test('在庫不足でも訓練注文を登録して優先度と配備州を管�
   await page.getByTestId('new-training-priority').selectOption('8');
   await page.getByTestId('queue-training').click();
   await page.getByTestId('apply-pending').click();
-  const queue=page.locator('[data-testid^="training-"]').filter({has:page.getByTestId('training-priority-')});
   const rows=page.locator('.panel-section[data-testid^="training-"]');
   await expect(rows).toHaveCount(1);
   const row=rows.first(),id=(await row.getAttribute('data-testid'))!.replace('training-','');
