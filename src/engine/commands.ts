@@ -8,7 +8,7 @@ import { getEdge } from './map/adjacency';
 import { findPath, segmentDays, planMovementEdit } from './systems/movement';
 import { applyRelationDelta, endWar, startWar, warScoreFor } from './military/war';
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './scenario/unitCosts';
-import { autoAssignCommander } from './military/commanders';
+import { autoAssignCommander, releaseCommander } from './military/commanders';
 import { autoFrontProvinces, frontOf } from './military/fronts';
 import { divisionTemplate, MAX_TRAINING } from './military/templates';
 import { refundTraining } from './systems/training';
@@ -387,30 +387,37 @@ export function registerAllCommands(): void {
   });
 
   registerCommand('assignCommander', {
-    validate(w, p, issuer) {
-      const unit = w.units.find((x) => x.id === p.unitId as number);
-      const country = actorCountry(w, issuer);
-      const cmdr = w.commanders.find((c) => c.id === p.commanderId as number);
-      if (!unit) return 'unknownUnit';
-      if (country === null || unit.owner !== country) return 'notYourUnit';
-      if (!cmdr) return 'noCommander';
-      if (cmdr.country !== country) return 'notYourCommander';
-      return null;
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer),u=w.units.find(u=>u.id===p.unitId&&!u.destroyed);
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(!u||u.owner!==c)return 'notYourUnit';
+      if(p.commanderId===-1)return null;
+      return w.commanders.some(x=>x.id===p.commanderId&&x.country===c)?null:'notYourCommander';
     },
-    apply(w, p) {
-      const unit = w.units.find((x) => x.id === p.unitId as number)!;
-      const cmdr = w.commanders.find((c) => c.id === p.commanderId as number)!;
-      // 既存の割当を解除
-      if (unit.commanderId >= 0) {
-        const prev = w.commanders.find((c) => c.id === unit.commanderId);
-        if (prev) prev.assignedUnit = -1;
-      }
-      if (cmdr.assignedUnit >= 0) {
-        const prevUnit = w.units.find((u) => u.id === cmdr.assignedUnit);
-        if (prevUnit) prevUnit.commanderId = -1;
-      }
-      unit.commanderId = cmdr.id;
-      cmdr.assignedUnit = unit.id;
+    apply(w,p){
+      const u=w.units.find(u=>u.id===p.unitId)!;
+      releaseCommander(w,u.commanderId);
+      if(p.commanderId===-1)return;
+      const c=w.commanders.find(c=>c.id===p.commanderId)!;
+      releaseCommander(w,c.id);u.commanderId=c.id;c.assignedUnit=u.id;
+    },
+  });
+  registerCommand('assignFormationCommander',{
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(p.kind!=='army'&&p.kind!=='group')return 'badParams';
+      const f=(p.kind==='army'?w.armies:w.armyGroups).find(f=>f.id===p.formationId);
+      if(!f||f.owner!==c)return 'notYourArmy';
+      if(p.commanderId===-1)return null;
+      return w.commanders.some(x=>x.id===p.commanderId&&x.country===c)?null:'notYourCommander';
+    },
+    apply(w,p){
+      const f=(p.kind==='army'?w.armies:w.armyGroups).find(f=>f.id===p.formationId)!;
+      releaseCommander(w,f.commanderId??-1);
+      if(p.commanderId===-1){f.commanderId=-1;return;}
+      const id=p.commanderId as number;
+      releaseCommander(w,id);f.commanderId=id;
     },
   });
 
@@ -606,7 +613,7 @@ export function registerAllCommands(): void {
       if (!w.armies.some(a => a.id === p.id && a.owner === c)) return 'notYourArmy';
       return w.units.some(u => u.armyId === p.id) ? 'armyNotEmpty' : null;
     },
-    apply(w,p) { w.armies = w.armies.filter(a => a.id !== p.id); },
+    apply(w,p) { const a=w.armies.find(a=>a.id===p.id)!;releaseCommander(w,a.commanderId??-1);w.armies = w.armies.filter(a => a.id !== p.id); },
   });
   registerCommand('deleteArmyGroup', {
     validate(w,p,issuer) {
@@ -615,7 +622,7 @@ export function registerAllCommands(): void {
       if (!w.armyGroups.some(a => a.id === p.id && a.owner === c)) return 'notYourArmy';
       return w.armies.some(a => a.groupId === p.id) ? 'armyNotEmpty' : null;
     },
-    apply(w,p) { w.armyGroups = w.armyGroups.filter(a => a.id !== p.id); },
+    apply(w,p) { const g=w.armyGroups.find(a=>a.id===p.id)!;releaseCommander(w,g.commanderId??-1);w.armyGroups = w.armyGroups.filter(a => a.id !== p.id); },
   });
 
   registerCommand('declareWar', {
