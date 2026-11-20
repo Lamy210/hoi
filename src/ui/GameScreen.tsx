@@ -38,6 +38,7 @@ export function GameScreen() {
   const [mapReady, setMapReady] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
   const [moveMode, setMoveMode] = useState(false);
+  const [attackMode, setAttackMode] = useState(false);
   const [destination, setDestination] = useState('');
   const [rosterOpen, setRosterOpen] = useState(true);
   useEffect(() => {
@@ -184,6 +185,7 @@ export function GameScreen() {
   const selectedIds = st.selection.unitIds ?? (st.selection.unitId === null ? [] : [st.selection.unitId]);
   useEffect(() => {
     setMoveMode(false);
+    setAttackMode(false);
     setDestination('');
   }, [st.selection, st.panel, st.meta]);
   useEffect(() => {
@@ -191,14 +193,16 @@ export function GameScreen() {
     const selected = new Set(selectedIds);
     const byProvince = new Map<number, UiUnit[]>();
     for (const u of snap.units) {
-      if (u.owner !== snap.playerCountry) continue;
+      if (u.owner !== snap.playerCountry && !snap.countries[snap.playerCountry].atWar.includes(u.owner)) continue;
       const list = byProvince.get(u.loc) ?? [];
       list.push(u);
       byProvince.set(u.loc, list);
     }
     rendererRef.current?.setUnitOverlay([...byProvince].map(([province, list]) => ({
-      province, provinceId: meta.provIds[province], count: list.length,
-      label: (lang === 'ja' ? meta.provNameJa[province] : meta.provNameEn[province]) + ' — ' + t(lang, 'game.divisions') + ' ' + list.length,
+      province, provinceId: meta.provIds[province], count: list.filter(u => u.owner === snap.playerCountry).length,
+      hostileCount: list.filter(u => u.owner !== snap.playerCountry).length,
+      battle: snap.battles.includes(province),
+      label: (lang === 'ja' ? meta.provNameJa[province] : meta.provNameEn[province]) + ' — ' + t(lang, 'units.friendly') + ' ' + list.filter(u => u.owner === snap.playerCountry).length + ' / ' + t(lang, 'units.hostile') + ' ' + list.filter(u => u.owner !== snap.playerCountry).length,
       selected: list.some(u => selected.has(u.id)), moving: list.some(u => u.moving),
     })), snap.units.filter(u => u.owner === snap.playerCountry && selected.has(u.id) && u.moving).map(u => u.route));
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -230,6 +234,7 @@ export function GameScreen() {
   const ownUnits = snap.units.filter(u => u.owner === snap.playerCountry);
   const chosen = ownUnits.filter(u => selectedIds.includes(u.id));
   const canMove = chosen.length > 0 && chosen.length <= 256 && chosen.every(u => !u.moving && !u.encircled && !u.inBattle) && st.pendingCommands === 0;
+  const attackTargets = chosen.length && canMove ? chosen[0].attackTargets.filter(p => chosen.every(u => u.attackTargets.includes(p))) : [];
   const nameOf = (p: number) => lang === 'ja' ? gameMeta.provNameJa[p] : gameMeta.provNameEn[p];
   function selectUnits(ids: number[], focus = true) {
     const valid = ownUnits.filter(u => ids.includes(u.id));
@@ -238,9 +243,18 @@ export function GameScreen() {
     appStore.set({ selection: { prov: first?.loc ?? null, unitId: first?.id ?? null, unitIds: valid.map(u => u.id), country: null }, trace: null });
     if (focus && first) rendererRef.current?.focusProvince(first.loc);
   }
+  function sendAttack(prov: number) {
+    if (!canMove || !attackTargets.includes(prov)) {
+      appStore.set({ statusMessage: t(lang, 'units.attackInvalid') });
+      return;
+    }
+    engineClient.command('attackUnits', { units: chosen.map(u => u.id), target: prov });
+    setAttackMode(false); setMoveMode(false); setDestination('');
+  }
   function sendMove(prov: number) {
     if (!canMove || !Number.isInteger(prov) || prov < 0 || prov >= gameMeta.provIds.length || chosen.every(u => u.loc === prov)) return;
-    engineClient.command('moveUnits', { units: chosen.map(u => u.id), target: prov });
+    if (player.atWar.includes(snap.controller[prov])) { appStore.set({ statusMessage: t(lang, 'reason.useAttack') }); return; }
+    engineClient.command('travelUnits', { units: chosen.map(u => u.id), target: prov });
     setMoveMode(false);
     setDestination('');
   }
@@ -253,14 +267,19 @@ export function GameScreen() {
     if (!chosen.length) return;
     e.preventDefault();
     const { prov } = provinceFromEvent(e);
-    if (prov !== null) sendMove(prov);
+    if (prov !== null) {
+      if (attackMode || player.atWar.includes(snap.controller[prov])) sendAttack(prov);
+      else sendMove(prov);
+    }
   }
   function handleMapClick(e: React.MouseEvent): void {
     const { prov, marker } = provinceFromEvent(e);
     if (prov === null) return;
+    if (attackMode) { sendAttack(prov); return; }
     if (moveMode) { sendMove(prov); return; }
     if (marker) {
       const ids = ownUnits.filter(u => u.loc === prov).map(u => u.id);
+      if (!ids.length) { appStore.set({ selection: { prov, unitId: null, country: null }, trace: null }); return; }
       selectUnits(e.shiftKey || e.ctrlKey || e.metaKey ? [...new Set([...selectedIds, ...ids])] : ids, false);
       return;
     }
@@ -290,7 +309,7 @@ export function GameScreen() {
   const atWarNow = player.atWar.length > 0;
 
   return (
-    <div className={"game" + (moveMode ? " move-mode" : "")}>
+    <div className={"game" + (moveMode || attackMode ? " move-mode" : "")}>
       <div className="topbar">
         <span className="color-dot" style={{ background: player.color }} />
         <span className="stat"><b>{lang === 'ja' ? player.nameJa : player.nameEn}</b></span>
@@ -376,17 +395,20 @@ export function GameScreen() {
               </div>
               <div className="move-controls">
                 <span data-testid="selected-unit-count">{t(lang, 'units.selected', { count: chosen.length })}</span>
-                <button data-testid="move-selected" disabled={!canMove} aria-pressed={moveMode} onClick={() => setMoveMode(!moveMode)}>{t(lang, moveMode ? 'units.cancelMove' : 'units.move')}</button>
+                <button data-testid="move-selected" disabled={!canMove} aria-pressed={moveMode} onClick={() => { setAttackMode(false); setDestination(''); setMoveMode(!moveMode); }}>{t(lang, moveMode ? 'units.cancelMove' : 'units.move')}</button>
+                <button data-testid="attack-selected" className="danger" disabled={!canMove || !attackTargets.length} aria-pressed={attackMode} onClick={() => { setMoveMode(false); setDestination(''); setAttackMode(!attackMode); }}>{t(lang, attackMode ? 'units.cancelAttack' : 'units.attack')}</button>
                 {chosen.length > 0 && <button data-testid="focus-unit" onClick={() => rendererRef.current?.focusProvince(chosen[0].loc)}>{t(lang, 'units.focus')}</button>}
               </div>
+              {attackMode && <div role="status" data-testid="attack-hint">{t(lang, 'units.attackHint')}</div>}
+              {chosen.length > 0 && canMove && attackTargets.length === 0 && <div className="muted">{t(lang, 'units.attackInvalid')}</div>}
               {moveMode && <div role="status" data-testid="move-hint">{t(lang, 'units.destinationHint')}</div>}
               {chosen.length > 0 && !canMove && <div className="muted">{t(lang, 'units.busy')}</div>}
               {chosen.length > 0 && <div className="move-controls">
                 <select data-testid="move-destination" aria-label={t(lang, 'units.destination')} value={destination} onChange={e => setDestination(e.target.value)}>
                   <option value="">{t(lang, 'units.destination')}</option>
-                  {meta.provIds.map((id, i) => <option key={id} value={i}>{nameOf(i)} ({id})</option>)}
+                  {meta.provIds.map((id, i) => (attackMode ? attackTargets.includes(i) : !player.atWar.includes(snap.controller[i])) && <option key={id} value={i}>{nameOf(i)} ({id})</option>)}
                 </select>
-                <button data-testid="confirm-move" disabled={!canMove || destination === '' || chosen.every(u => u.loc === Number(destination))} onClick={() => sendMove(Number(destination))}>{t(lang, 'units.move')}</button>
+                {attackMode ? <button className="danger" data-testid="confirm-attack" disabled={!canMove || destination === '' || !attackTargets.includes(Number(destination))} onClick={() => sendAttack(Number(destination))}>{t(lang, 'units.attack')}</button> : <button data-testid="confirm-move" disabled={!canMove || destination === '' || chosen.every(u => u.loc === Number(destination))} onClick={() => sendMove(Number(destination))}>{t(lang, 'units.move')}</button>}
               </div>}
             </>}
           </section>
