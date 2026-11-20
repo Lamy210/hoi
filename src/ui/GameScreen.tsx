@@ -152,7 +152,7 @@ export function GameScreen() {
     }
     prevArrRef.current = { owner: s.owner, controller: s.controller };
     (r as any).setFronts?.(s.fronts.map((f) => ({ provinces: f.provinces, owner: f.owner, stance: f.stance })));
-    r.setSelected(st.selection.prov);
+    r.setSelected(s.units.find(u => u.id === st.selection.unitId)?.loc ?? st.selection.prov);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [st.snap?.tick, st.snap]);
 
@@ -164,8 +164,8 @@ export function GameScreen() {
 
   // 選択ハイライト
   useEffect(() => {
-    rendererRef.current?.setSelected(st.selection.prov);
-  }, [st.selection.prov]);
+    rendererRef.current?.setSelected(appStore.get().snap?.units.find(u => u.id === st.selection.unitId)?.loc ?? st.selection.prov);
+  }, [st.selection.prov, st.selection.unitId]);
 
   // 重要アラートで自動一時停止（設定で無効化はMVPでは未対応・常時有効）
   const lastAlertLenRef = useRef(0);
@@ -226,18 +226,20 @@ export function GameScreen() {
   const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
 
+  const gameMeta = meta;
   const ownUnits = snap.units.filter(u => u.owner === snap.playerCountry);
   const chosen = ownUnits.filter(u => selectedIds.includes(u.id));
   const canMove = chosen.length > 0 && chosen.length <= 256 && chosen.every(u => !u.moving && !u.encircled && !u.inBattle) && st.pendingCommands === 0;
-  const nameOf = (p: number) => lang === 'ja' ? meta.provNameJa[p] : meta.provNameEn[p];
+  const nameOf = (p: number) => lang === 'ja' ? gameMeta.provNameJa[p] : gameMeta.provNameEn[p];
   function selectUnits(ids: number[], focus = true) {
-    const valid = ownUnits.filter(u => ids.includes(u.id)).slice(0, 256);
+    const valid = ownUnits.filter(u => ids.includes(u.id));
+    if (valid.length > 256) { appStore.set({ statusMessage: t(lang, 'units.limit') }); return; }
     const first = valid[0];
     appStore.set({ selection: { prov: first?.loc ?? null, unitId: first?.id ?? null, unitIds: valid.map(u => u.id), country: null }, trace: null });
     if (focus && first) rendererRef.current?.focusProvince(first.loc);
   }
   function sendMove(prov: number) {
-    if (!canMove || !Number.isInteger(prov) || prov < 0 || prov >= meta.provIds.length || chosen.every(u => u.loc === prov)) return;
+    if (!canMove || !Number.isInteger(prov) || prov < 0 || prov >= gameMeta.provIds.length || chosen.every(u => u.loc === prov)) return;
     engineClient.command('moveUnits', { units: chosen.map(u => u.id), target: prov });
     setMoveMode(false);
     setDestination('');
