@@ -18,7 +18,7 @@ test('自由師団編成を保存し、募集中に編成改訂しても訓練�
   const select=page.getByTestId('division-template');
   await expect(select.locator('option')).toHaveCount(4);
   await select.selectOption('custom:1');
-  await expect(page.getByTestId('template-cost')).toContainText('10000');
+  await expect(page.getByTestId('template-cost')).toContainText('10,000');
   await page.getByTestId('start-training').click();
   await page.getByTestId('apply-pending').click();
   const queue=page.locator('[data-testid^="training-"]');
