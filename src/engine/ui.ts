@@ -4,7 +4,7 @@ import { dailyEquipmentOutput } from './systems/production';
 import type { TrainingOrder, DivisionTemplateId } from './military/templates';
 import type { WorldState } from './core/state';
 import { formatDate, civilFromDays } from './clock/date';
-import { activeWarBetween, effectiveSupply } from './core/state';
+import { activeWarBetween, atWar, effectiveSupply } from './core/state';
 import { refreshWeather, seasonOfMonth } from './systems/weather';
 import { computeScores } from './systems/score';
 import { techDefs } from './systems/research';
@@ -86,6 +86,7 @@ export interface UiUnit {
   moving: boolean;
   target: number; // 移動先（移動中のみ有効）
   route: number[]; // 現在州から残りの実経路
+  attackTargets: number[]; // 現状態で選択できる敵対隣接州（予告、適用時は再検証）
   org: number;
   strength: number; // manpower/maxManpower
   infEquipment: number;
@@ -138,6 +139,8 @@ export interface UiSnapshot {
   countries: UiCountry[];
   units: UiUnit[];
   wars: UiWar[];
+  battles: number[];
+  occupation: { province: number; candidate: number; days: number }[];
   fronts: UiFront[];
   commanders: UiCommander[];
   techs: UiTechDef[];
@@ -262,6 +265,10 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       moving: u.path.length > 0,
       target: u.path.length > 0 ? u.path[u.path.length - 1] : -1,
       route: u.path.length > 0 ? [u.loc, ...u.path.slice(u.segIdx + 1)] : [],
+      attackTargets: u.path.length || u.encircled || w.runtime.activeBattles.has(u.loc) ||
+        u.org <= 0 || w.prov.controller[u.loc] !== u.owner ? [] :
+        w.adj.targets.slice(w.adj.offsets[u.loc], w.adj.offsets[u.loc + 1]).filter((p, i) =>
+          !w.adj.strait[w.adj.offsets[u.loc] + i] && atWar(w, u.owner, w.prov.controller[p])),
       org: Math.round(u.org * 10) / 10,
       strength: u.maxManpower > 0 ? Math.round((u.manpower / u.maxManpower) * 1000) / 1000 : 0,
       infEquipment: Math.round(u.infEquipment),
@@ -334,6 +341,8 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     countries,
     units,
     wars,
+    battles: [...w.runtime.activeBattles].sort((a,b) => a-b),
+    occupation: w.occupancyTimer.flatMap((days, province) => days > 0 ? [{province, candidate: w.occupierCandidate[province], days}] : []),
     fronts,
     commanders,
     techs: techs.map((t) => ({ id: t.id, cat: t.cat, req: t.req.slice(), days: t.days })),
