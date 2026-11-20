@@ -209,9 +209,11 @@ function tickOccupation(w: WorldState, battles: Map<number, Sides>): void {
   for (let p = 0; p < w.prov.count; p++) {
     const ctrl = w.prov.controller[p];
     const s = battles.get(p);
-    if (!s) continue;
-    const defendersPresent = s.defenders.length > 0;
-    const attackersPresent = s.attackers.length > 0;
+    if (!s) { w.occupancyTimer[p] = 0; w.occupierCandidate[p] = -1; continue; }
+    // Battle resolution can destroy or retreat units before occupation is evaluated.
+    const defendersPresent = s.defenders.some(u => !u.destroyed && u.loc === p);
+    const survivingAttackers = s.attackers.filter(u => !u.destroyed && !u.encircled && u.loc === p && atWar(w, u.owner, ctrl));
+    const attackersPresent = survivingAttackers.length > 0;
     if (defendersPresent || !attackersPresent) {
       w.occupancyTimer[p] = 0;
       w.occupierCandidate[p] = -1;
@@ -219,7 +221,7 @@ function tickOccupation(w: WorldState, battles: Map<number, Sides>): void {
     }
     // 防衛軍不在＋攻撃側在駐 → 占領タイマ進行
     let candidate = -1;
-    for (const u of s.attackers) {
+    for (const u of survivingAttackers) {
       if (candidate < 0 || u.owner < candidate) candidate = u.owner;
     }
     if (w.occupierCandidate[p] !== candidate) {

@@ -3,6 +3,7 @@
 import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
 import { addAlert, atWar, type Cmd, type TreatyType, type WorldState } from './core/state';
+import { getEdge } from './map/adjacency';
 import { findPath, segmentDays } from './systems/movement';
 import { applyRelationDelta, endWar, startWar, warScoreFor } from './military/war';
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './scenario/unitCosts';
@@ -415,7 +416,7 @@ export function registerAllCommands(): void {
         if (u.owner !== country) return 'notYourUnit:' + id;
         if (u.destroyed) return 'unitDestroyed:' + id;
         if (u.encircled) return 'unitEncircled:' + id;
-        if (issuer === 'player' && (u.path.length > 0 || w.runtime.activeBattles.has(u.loc))) return 'unitBusy:' + id;
+        if ((issuer === 'player' || issuer === 'frontai') && (u.path.length > 0 || w.runtime.activeBattles.has(u.loc))) return 'unitBusy:' + id;
         if (u.loc !== target) movable++;
       }
       if (movable === 0) return 'alreadyAtTarget';
@@ -440,6 +441,69 @@ export function registerAllCommands(): void {
         u.segIdx = 0;
         u.segProgress = 0;
         u.segDays = segmentDays(w, path[0], path[1]);
+      }
+    },
+  });
+
+  // Dedicated UI travel order: never routes through hostile-controlled territory.
+  registerCommand('travelUnits', {
+    validate(w, p, issuer) {
+      const country = actorCountry(w, issuer);
+      if (country === null || !w.countries.alive[country]) return 'badIssuer';
+      if (!Array.isArray(p.units) || p.units.length < 1 || p.units.length > 256 ||
+          new Set(p.units).size !== p.units.length) return 'badParams';
+      const target = p.target as number;
+      if (!Number.isInteger(target) || target < 0 || target >= w.prov.count) return 'badTarget';
+      if (atWar(w, country, w.prov.controller[target])) return 'useAttack';
+      let movable = false;
+      for (const id of p.units) {
+        const u = w.units.find(x => x.id === id && !x.destroyed);
+        if (!u || u.owner !== country) return 'notYourUnit';
+        if (u.path.length || u.encircled || w.runtime.activeBattles.has(u.loc)) return 'unitBusy';
+        if (u.loc === target) continue;
+        movable = true;
+        if (!findPath(w, u.loc, target, country, false)) return 'noPath';
+      }
+      return movable ? null : 'alreadyAtTarget';
+    },
+    apply(w, p, issuer) {
+      const country = actorCountry(w, issuer)!;
+      for (const id of p.units as number[]) {
+        const u = w.units.find(x => x.id === id)!;
+        const target = p.target as number;
+        if (u.loc === target) continue;
+        u.path = findPath(w, u.loc, target, country, false)!;
+        u.segIdx = 0; u.segProgress = 0;
+        u.segDays = segmentDays(w, u.path[0], u.path[1]);
+      }
+    },
+  });
+
+  registerCommand('attackUnits', {
+    validate(w, p, issuer) {
+      const country = actorCountry(w, issuer);
+      if (country === null || !w.countries.alive[country]) return 'badIssuer';
+      const ids = p.units;
+      const target = p.target as number;
+      if (!Array.isArray(ids) || ids.length < 1 || ids.length > 256 || new Set(ids).size !== ids.length) return 'badParams';
+      if (!Number.isInteger(target) || target < 0 || target >= w.prov.count) return 'badTarget';
+      if (!atWar(w, country, w.prov.controller[target])) return 'notAtWar';
+      for (const id of ids) {
+        const u = w.units.find(x => x.id === id && !x.destroyed);
+        if (!u || u.owner !== country) return 'notYourUnit';
+        if (u.path.length || u.encircled || w.runtime.activeBattles.has(u.loc) || u.org <= 0) return 'unitBusy';
+        if (w.prov.controller[u.loc] !== country) return 'notControlledByYou';
+        const edge = getEdge(w, u.loc, target);
+        if (!edge || edge.strait || !Number.isFinite(segmentDays(w, u.loc, target))) return 'attackNotAdjacent';
+      }
+      return null;
+    },
+    apply(w, p) {
+      const target = p.target as number;
+      for (const id of p.units as number[]) {
+        const u = w.units.find(x => x.id === id)!;
+        u.path = [u.loc, target]; u.segIdx = 0; u.segProgress = 0;
+        u.segDays = segmentDays(w, u.loc, target);
       }
     },
   });

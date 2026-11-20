@@ -52,8 +52,10 @@ export function createUnitOverlay(container: HTMLElement, project: (province: nu
         root.appendChild(button);
         buttons.set(m.province, button);
       }
-      button.className = 'unit-marker' + (m.selected ? ' selected' : '');
-      button.textContent = (m.moving ? '➜ ' : '▣ ') + m.count;
+      button.className = 'unit-marker' + (m.selected ? ' selected' : '') + (m.hostileCount && !m.count ? ' hostile' : '') + (m.battle ? ' battling' : '');
+      button.textContent = (m.battle ? '⚔ ' : m.moving ? '➜ ' : '▣ ') + (m.count ? String(m.count) : '') + (m.hostileCount ? (m.count ? ' / ' : '') + '敵/E' + m.hostileCount : '');
+      button.dataset.hostileCount = String(m.hostileCount);
+      button.dataset.battle = String(m.battle);
       button.title = m.label;
       button.setAttribute('aria-label', m.label);
       button.setAttribute('aria-pressed', String(m.selected));

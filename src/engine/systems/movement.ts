@@ -34,6 +34,7 @@ export function findPath(
   from: number,
   to: number,
   country: number,
+  allowHostile = true,
 ): number[] | null {
   if (from === to) return [from];
   const n = w.prov.count;
@@ -47,7 +48,7 @@ export function findPath(
     const ctrl = w.prov.controller[p];
     if (ctrl === country) return true;
     // 交戦国の領土は進攻により通過可。未開戦の他国領は通過不可（military-system仕様）
-    if (atWar(w, country, ctrl)) return true;
+    if (atWar(w, country, ctrl)) return allowHostile;
     // 通行権（access条約・同盟）があれば他国領を通過可（D-044）
     if (activeTreatyBetween(w, country, ctrl, 'access')) return true;
     if (isAllied(w, country, ctrl)) return true;
@@ -115,6 +116,13 @@ export function tickMovement(w: WorldState): void {
   for (const u of w.units) {
     if (u.destroyed || u.encircled) continue;
     if (u.path.length === 0 || u.segIdx >= u.path.length - 1) continue;
+    // Re-check today's access before an edge can be traversed (e.g. peace or access revoked).
+    const next = u.path[u.segIdx + 1], ctrl = w.prov.controller[next];
+    if (ctrl !== u.owner && !atWar(w, u.owner, ctrl) &&
+        !activeTreatyBetween(w, u.owner, ctrl, 'access') && !isAllied(w, u.owner, ctrl)) {
+      u.path = []; u.segIdx = 0; u.segProgress = 0; u.segDays = 0;
+      continue;
+    }
     u.segProgress += 1;
     if (u.segProgress >= u.segDays) {
       // セグメント完了 → 次州へ到着

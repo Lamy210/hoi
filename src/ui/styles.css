@@ -115,3 +115,6 @@ input, select {
 .move-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 6px 0; }
 .move-controls select { max-width: 100%; }
 .move-mode .map-container canvas { cursor: crosshair !important; }
+
+.unit-overlay .unit-marker.hostile { background: #813c40; border-color: #e7a4a4; }
+.unit-overlay .unit-marker.battling { box-shadow: 0 0 0 2px #eea655; }
