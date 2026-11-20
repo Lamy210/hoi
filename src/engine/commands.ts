@@ -405,6 +405,7 @@ export function registerAllCommands(): void {
       const target = p.target as number;
       const country = actorCountry(w, issuer);
       if (!Array.isArray(ids) || ids.length === 0) return 'noUnits';
+      if (issuer === 'player' && (ids.length > 256 || new Set(ids).size !== ids.length)) return 'badParams';
       if (!Number.isInteger(target) || target < 0 || target >= w.prov.count) return 'badTarget';
       if (country === null) return 'badIssuer';
       if (!w.countries.alive[country]) return 'badIssuer';
@@ -415,6 +416,7 @@ export function registerAllCommands(): void {
         if (u.owner !== country) return 'notYourUnit:' + id;
         if (u.destroyed) return 'unitDestroyed:' + id;
         if (u.encircled) return 'unitEncircled:' + id;
+        if (issuer === 'player' && (u.path.length > 0 || w.runtime.activeBattles.has(u.loc))) return 'unitBusy:' + id;
         if (u.loc !== target) movable++;
       }
       if (movable === 0) return 'alreadyAtTarget';
