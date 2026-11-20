@@ -15,5 +15,8 @@ export interface TrainingOrder {
   /** Frozen reference to one immutable custom revision; legacy orders keep templateId. */
   customTemplateId?: number;
   customRevision?: number;
-  readyTick: number;
+  readyTick: number; // -1 while queued without a resource reservation
+  status?: 'queued' | 'training' | 'ready'; // undefined = legacy immediate-reservation order
+  autoDeploy?: boolean;
+  priority?: number; // 0..9; only explicit queued orders
 }
