@@ -1,0 +1,35 @@
+import {expect,test} from '@playwright/test';
+test('在庫不足でも訓練注文を登録して優先度と配備州を管理する',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-recruit').click();
+  await page.getByTestId('division-template').selectOption('light-v1');
+  await page.getByTestId('new-training-autodeploy').uncheck();
+  await page.getByTestId('new-training-priority').selectOption('8');
+  await page.getByTestId('queue-training').click();
+  await page.getByTestId('apply-pending').click();
+  const queue=page.locator('[data-testid^="training-"]').filter({has:page.getByTestId('training-priority-')});
+  const rows=page.locator('.panel-section[data-testid^="training-"]');
+  await expect(rows).toHaveCount(1);
+  const row=rows.first(),id=(await row.getAttribute('data-testid'))!.replace('training-','');
+  await expect(page.getByTestId('training-state-'+id)).toContainText('訓練中');
+  await page.getByTestId('training-priority-'+id).selectOption('9');
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('training-priority-'+id)).toHaveValue('9');
+  const provinces=page.getByTestId('training-province-'+id);
+  const before=await provinces.inputValue();
+  const options=await provinces.locator('option').all();
+  let alternative='';
+  for(const option of options){const value=await option.getAttribute('value');if(value&&value!==before){alternative=value;break;}}
+  if(!alternative)throw new Error('No alternate owned province');
+  await provinces.selectOption(alternative);
+  await page.getByTestId('apply-pending').click();
+  await expect(provinces).toHaveValue(alternative);
+  await page.getByTestId('cancel-training-'+id).click();
+  await page.getByTestId('apply-pending').click();
+  await expect(rows).toHaveCount(0);
+});
