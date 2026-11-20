@@ -12,6 +12,8 @@ export interface Unit {
   armyId?: number | null;
   manualHold?: boolean; // 手動命令後は自動再配置を明示的に再開するまで抑止
   templateId?: import('../military/templates').DivisionTemplateId;
+  customTemplateId?: number;
+  customRevision?: number;
   id: number;
   owner: number; // 国家インデックス
   loc: number; // 現在のプロヴィンス（移動完了済み）
