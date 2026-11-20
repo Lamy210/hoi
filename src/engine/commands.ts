@@ -168,19 +168,20 @@ export function registerAllCommands(): void {
     validate(w, p, issuer) {
       const enemy = p.enemy as number;
       const country = actorCountry(w, issuer);
-      if (country === null) return 'badIssuer';
+      if (country === null || issuer === 'frontai') return 'badIssuer';
       if (!w.countries.alive[country]) return 'countryDead';
       if (!Number.isInteger(enemy) || enemy < 0 || enemy >= w.countries.count || !w.countries.alive[enemy]) return 'badTarget';
       if (enemy === country) return 'selfWar';
       if (!atWar(w, country, enemy)) return 'notAtWar';
       const provinces = p.provinces as number[] | undefined;
       if (provinces !== undefined) {
-        if (!Array.isArray(provinces) || provinces.length === 0) return 'badParams';
+        if (!Array.isArray(provinces) || provinces.length === 0 || new Set(provinces).size !== provinces.length) return 'badParams';
         for (const prov of provinces) {
           if (!Number.isInteger(prov) || prov < 0 || prov >= w.prov.count) return 'badProvince';
           if (w.prov.controller[prov] !== country) return 'notControlledByYou';
         }
       }
+      if (p.targets !== undefined && (!Array.isArray(p.targets) || new Set(p.targets).size !== p.targets.length || p.targets.some(x=>!Number.isInteger(x)||x<0||x>=w.prov.count||w.prov.controller[x]!==enemy))) return 'badParams';
       const cap = p.cap as number | undefined;
       if (cap !== undefined && (!Number.isInteger(cap) || cap < 1 || cap > 8)) return 'badParams';
       return null;
@@ -191,7 +192,7 @@ export function registerAllCommands(): void {
       const provinces = Array.isArray(p.provinces) ? (p.provinces as number[]).slice().sort((a, b) => a - b) : autoFrontProvinces(w, country, enemy);
       const targets = Array.isArray(p.targets) ? (p.targets as number[]).slice().sort((a, b) => a - b) : [];
       const cap = typeof p.cap === 'number' ? p.cap : 2;
-      const front = { id: w.nextFrontId++, owner: country, enemy, stance: 'hold' as const, provinces, targets, cap };
+      const front = { id: w.nextFrontId++, owner: country, enemy, stance: 'hold' as const, provinces, targets, cap, revision: 1, paused: false };
       w.fronts.push(front);
       void issuer;
     },
