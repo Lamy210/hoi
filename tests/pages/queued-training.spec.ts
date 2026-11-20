@@ -15,11 +15,11 @@ test('在庫不足でも訓練注文を登録して優先度と配備州を管�
   const rows=page.locator('.panel-section[data-testid^="training-"]');
   await expect(rows).toHaveCount(1);
   const row=rows.first(),id=(await row.getAttribute('data-testid'))!.replace('training-','');
-  await expect(page.getByTestId('training-state-'+id)).toContainText('訓練中');
-  await page.getByTestId('training-priority-'+id).selectOption('9');
+  await expect(page.getByTestId('queue-state-'+id)).toContainText('訓練中');
+  await page.getByTestId('queue-priority-'+id).selectOption('9');
   await page.getByTestId('apply-pending').click();
-  await expect(page.getByTestId('training-priority-'+id)).toHaveValue('9');
-  const provinces=page.getByTestId('training-province-'+id);
+  await expect(page.getByTestId('queue-priority-'+id)).toHaveValue('9');
+  const provinces=page.getByTestId('queue-province-'+id);
   const before=await provinces.inputValue();
   const options=await provinces.locator('option').all();
   let alternative='';
