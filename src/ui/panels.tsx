@@ -811,7 +811,7 @@ export function RecruitmentPanel() {
       </div>
       <button className="primary" data-testid="start-training" disabled={!valid || !!missing || st.pendingCommands > 0} onClick={() => engineClient.command('startTraining', { templateId, province })}>{t(lang, 'mil.startTraining')}</button>
       {missing && <span className="muted"> {t(lang, missing)}</span>}
-      <DivisionDesignerPreview lang={lang} />
+      <DivisionDesignerPreview lang={lang} templates={snap.customTemplates} playerCountry={snap.playerCountry} pending={st.pendingCommands} />
       <h4>{t(lang, 'mil.queue')} ({player.training.length}/{MAX_TRAINING})</h4>
       {player.training.map(o => {
         const d = divisionTemplate(o.templateId)!;
