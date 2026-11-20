@@ -78,3 +78,9 @@ v11で保存された独自師団の不変revisionをunitComposition()で解決�
 
 ## 先行実装スライス: 既存師団の原子的な改編（refit）
 refitUnit{unitId,templateId,revision}は保存済み自由編成の不変版を指定し、所有国・生存・自国支配州・移動/戦闘/包囲中でないこと・兵力/装備の追加必要量を、適用時に全件検証する。既存の自由編成/固定編成どちらの師団も改編できる。資源ごとに旧上限M、実保有H、新上限Nとするとretain=min(H,N), refund=max(0,H-N), buy=max(0,N-M), 新保有=retain+buy、国庫備蓄増減=refund-buy。旧損耗は無料回復せず、必要在庫不足なら原子的に拒否する。指揮官、師団ID、軍団/軍集団、frontId、所在地、経験値は保持。組織率=min(旧組織率,新編成上限)×0.5。更新後は旧templateIdを除きcustomTemplateId/customRevisionへ固定する。v11のUnit参照/現有・上限ハッシュとsave検証をそのまま使用するためschemaは変更しない。今後の複数師団一括改編・装備優先配分・再編訓練は別スライス。
+
+## 先行実装: 在庫待ち訓練注文・訓練優先・手動配備（v13）
+既存のstartTraining/startCustomTrainingは即時資源予約・完了時自動配備のまま維持する。新規enqueueTraining{templateId,revision?,province,priority:0..9,autoDeploy:boolean}を追加し、テンプレートIDは固定組込stringまたは保存済みcustom数値+revisionとして実行時に所有国を検証する。注文作成時にはnextUnitIdで部隊IDを予約するが、人員・装備在庫は予約しない。status='queued'、readyTick=-1、priority/autoDeployを保存する。日次にqueued注文を優先度降順、同順位はorderId昇順で処理し、全財/人員が揃うものから全量引当してtraining状態（readyTick=tick+duration）へ移す。不足注文はqueuedのまま残り、次の注文を阻害しない。移動可能な配備先を失った注文はqueuedまたはreadyに留まる。
+trainingは期間満了でreadyへ遷移。autoDeploy=trueかつ自国支配州なら同日配備、falseならreadyのまま保持。deployTraining{orderId}でreadyのみ自国支配州へ手動配備でき、成功時は注文を一度だけ取り除く。setDeploymentProvince{orderId,province}は自国支配州だけを設定、setTrainingPriority{orderId,priority}は未配備注文にのみ有効。cancelTrainingはqueuedなら返金0、training/readyなら引当済み資源を生存国へ一度だけ全額返す。消滅国家は予約を返却せず注文を破棄（独立の喪失台帳は後続）。
+v13セーブでは注文のstatus/priority/autoDeployとreadyTick=-1を明示的にハッシュ・構造検査。旧v4〜v12は旧ハッシュで検証して従来注文のstatusなし・即時予約/自動配備を維持する。キャンセル済みIDは再利用しない。上限20注文/国、既存師団のID重複は拒否する。
+**未実装:** 途中訓練の生産割当予約率、損耗補充と訓練の統合優先度、兵站手動輸送、消滅国喪失台帳。これらは今後の軍需生産ライン実装で再検討する。
