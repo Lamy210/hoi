@@ -74,9 +74,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       if (w.prov.controller[fp] !== front.owner) continue;
       const present = units.filter((u) => u.loc === fp && !u.destroyed).length;
       if (present >= 1) continue;
-      const spare = movable
-        .filter((u) => u.loc !== fp && front.provinces.includes(u.loc))
-        .sort((a, b) => a.id - b.id)[0];
+      const spare = movable.filter(u=>u.loc!==fp && !w.runtime.commandsSinceLastTick.some(c=>c.type==='frontMove'&&c.p.unitId===u.id) && (!front.provinces.includes(u.loc) || units.filter(x=>x.loc===u.loc).length>1)).sort((a,b)=>a.id-b.id).find(u=>findPath(w,u.loc,fp,front.owner,false)!==null);
       if (!spare) continue;
       const path = findPath(w, spare.loc, fp, front.owner, false);
       if (path) {
