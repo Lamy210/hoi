@@ -231,6 +231,7 @@ export function GameScreen() {
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
 
   const gameMeta = meta;
+  const gameSnap = snap;
   const ownUnits = snap.units.filter(u => u.owner === snap.playerCountry);
   const chosen = ownUnits.filter(u => selectedIds.includes(u.id));
   const canMove = chosen.length > 0 && chosen.length <= 256 && chosen.every(u => !u.moving && !u.encircled && !u.inBattle) && st.pendingCommands === 0;
@@ -253,7 +254,7 @@ export function GameScreen() {
   }
   function sendMove(prov: number) {
     if (!canMove || !Number.isInteger(prov) || prov < 0 || prov >= gameMeta.provIds.length || chosen.every(u => u.loc === prov)) return;
-    if (player.atWar.includes(snap.controller[prov])) { appStore.set({ statusMessage: t(lang, 'reason.useAttack') }); return; }
+    if (player.atWar.includes(gameSnap.controller[prov])) { appStore.set({ statusMessage: t(lang, 'reason.useAttack') }); return; }
     engineClient.command('travelUnits', { units: chosen.map(u => u.id), target: prov });
     setMoveMode(false);
     setDestination('');
@@ -268,7 +269,7 @@ export function GameScreen() {
     e.preventDefault();
     const { prov } = provinceFromEvent(e);
     if (prov !== null) {
-      if (attackMode || player.atWar.includes(snap.controller[prov])) sendAttack(prov);
+      if (attackMode || player.atWar.includes(gameSnap.controller[prov])) sendAttack(prov);
       else sendMove(prov);
     }
   }
