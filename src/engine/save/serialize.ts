@@ -3,6 +3,7 @@
 import { encode, decode } from '@msgpack/msgpack';
 import { divisionTemplate, MAX_TRAINING } from '../military/templates';
 import { commandIssuerKey, validSequence, legacyWatermarks } from '../core/sequence';
+import { validateHierarchy } from '../military/armies';
 import { hashWorld } from '../core/hash';
 import type { WorldState } from '../core/state';
 import { buildAdjacency } from '../map/adjacency';
@@ -10,7 +11,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 6;
+export const SAVE_SCHEMA_VERSION = 7;
 
 export interface SaveHeader {
   v: number;
@@ -70,6 +71,7 @@ function packStores(w: WorldState): Record<string, unknown> {
     treaties: w.treaties,
     wars: w.wars,
     units: w.units,
+    armies: w.armies, armyGroups: w.armyGroups,
     trainingQueue: w.trainingQueue,
     fronts: w.fronts,
     commanders: w.commanders,
@@ -105,6 +107,7 @@ function packStores(w: WorldState): Record<string, unknown> {
     journalStart: w.journalStart,
     counters: {
       nextUnitId: w.nextUnitId,
+      nextArmyId: w.nextArmyId, nextArmyGroupId: w.nextArmyGroupId,
       nextWarId: w.nextWarId,
       nextAlertId: w.nextAlertId,
       nextFrontId: w.nextFrontId,
@@ -169,7 +172,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -208,11 +211,13 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!Array.isArray(s.journal) || s.journal.some((entry: any) => !isRecord(entry) || !validSequence(entry.seq) || (entry.issuer !== 'event' && commandIssuerKey(entry.issuer, ctryCount) === null))) return { world: null, violations: ['invalid command journal'] };
   if (s.aiSeq !== undefined && (!isRecord(s.aiSeq) || Object.entries(s.aiSeq).some(([key, seq]) => (key !== '-1' && commandIssuerKey('ai:' + key, ctryCount) === null) || !validSequence(seq)))) return { world: null, violations: ['invalid AI sequence counters'] };
   if (s.eventSeq !== undefined && !validSequence(s.eventSeq)) return { world: null, violations: ['invalid event sequence counter'] };
-  if (h.v === 6) {
+  if (h.v >= 6) {
     if (!isRecord(s.commandWatermarks) || Object.entries(s.commandWatermarks).some(([issuer, seq]) => commandIssuerKey(issuer, ctryCount) === null || !validSequence(seq))) return { world: null, violations: ['invalid command watermarks'] };
     if (s.journal.some((entry: any) => entry.issuer !== 'event' && (s.commandWatermarks[entry.issuer] ?? 0) < entry.seq)) return { world: null, violations: ['watermark behind journal'] };
     if (!Array.isArray(s.pendingCommands) || s.pendingCommands.some((cmd: any) => !isRecord(cmd) || commandIssuerKey(cmd.issuer, ctryCount) === null || !validSequence(cmd.seq) || typeof cmd.type !== 'string' || !isRecord(cmd.p))) return { world: null, violations: ['invalid pending commands'] };
   }
+  if (h.v >= 7 && (!Array.isArray(s.armies) || !Array.isArray(s.armyGroups) || !validSequence(s.counters.nextArmyId) || !validSequence(s.counters.nextArmyGroupId))) return { world: null, violations: ['invalid army hierarchy stores'] };
+  if (h.v < 7 && (s.armies !== undefined || s.armyGroups !== undefined || s.counters.nextArmyId !== undefined || s.counters.nextArmyGroupId !== undefined || (Array.isArray(s.units) && s.units.some((u: any) => u?.armyId !== undefined)))) return { world: null, violations: ['legacy save contains v7 hierarchy'] };
   const owner: number[] = s.prov.owner;
   const controller: number[] = s.prov.controller;
   if (!Array.isArray(owner) || owner.length !== provCount) violations.push('owner array size mismatch');
@@ -330,6 +335,8 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     treaties: s.treaties ?? [],
     wars: s.wars,
     units: s.units,
+    armies: s.armies ?? [], armyGroups: s.armyGroups ?? [],
+    nextArmyId: s.counters.nextArmyId ?? 1, nextArmyGroupId: s.counters.nextArmyGroupId ?? 1,
     trainingQueue: s.trainingQueue ?? [],
     fronts: s.fronts ?? [],
     commanders: s.commanders ?? [],
@@ -388,7 +395,9 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   };
   // 派生再計算 → 整合ハッシュ検証（INV-8）
   recomputeSupply(w);
-  const actual = hashWorld(w, h.v < 6);
+  const hierarchyErrors = validateHierarchy(w);
+  if (hierarchyErrors.length) return { world: null, violations: hierarchyErrors };
+  const actual = hashWorld(w, h.v < 6, h.v >= 7);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }
