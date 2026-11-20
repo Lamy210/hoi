@@ -46,6 +46,7 @@ describe('師団募集・配備', () => {
   it('旧v4の構造は訓練なしで復元し、不正な訓練データは拒否する', async () => {
     const e = await createTestEngine();
     const old = decode(e.serialize()) as any;
+    delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
     old.header.v = 4;
     old.header.integrity = hashWorld(e.world, true);
     delete old.stores.armies; delete old.stores.armyGroups;
