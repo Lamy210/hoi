@@ -19,7 +19,7 @@ export function summarizeDivisions(units: readonly UiUnit[]) {
   return { ...sum, org: units.length ? sum.org / units.length : null, supply: units.length ? sum.supply / units.length : null };
 }
 
-export function DivisionResources({unit:u,lang}: {unit:UiUnit;lang:Lang}) {
+export function DivisionResources({unit:u,lang,context=false}: {unit:UiUnit;lang:Lang;context?:boolean}) {
   const ja = lang === 'ja';
   const format = (v:number) => v.toLocaleString(ja?'ja-JP':'en-US',{maximumFractionDigits:1});
   const rows = [
@@ -27,7 +27,7 @@ export function DivisionResources({unit:u,lang}: {unit:UiUnit;lang:Lang}) {
     [ja?'歩兵装備':'Infantry equipment',u.infEquipment,u.maxInfEquipment],
     [ja?'火砲':'Artillery',u.artEquipment,u.maxArtEquipment],
   ] as const;
-  return <div className="division-resources" data-testid={'unit-resources-'+u.id}>
+  return <div className="division-resources" data-testid={(context?'context-unit-resources-':'unit-resources-')+u.id}>
     {rows.map(([label,actual,required]) => <div key={label}>
       <div className="kv"><span>{label}</span><span>{format(actual)} / {format(required)}</span></div>
       <progress aria-label={label} max={1} value={required>0 ? Math.min(1,Math.max(0,actual/required)):1}/>
