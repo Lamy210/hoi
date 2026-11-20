@@ -9,6 +9,7 @@ test('通常UIで軍団・軍集団を作成し師団を編入、集計・所在
   const roster=page.getByTestId('unit-roster');
   const ids=await roster.locator('[data-unit-id]').evaluateAll(rows=>rows.map(r=>r.getAttribute('data-unit-id')!));
   expect(ids.length).toBeGreaterThanOrEqual(2);
+  await page.getByTestId('toggle-army-editor').click();
   await page.getByTestId('army-name').fill('第1軍団');
   await page.getByTestId('create-army').click(); await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('army-select-1')).toContainText('第1軍団');
