@@ -1,0 +1,43 @@
+import { expect,test } from '@playwright/test';
+
+test('自由師団編成を保存し、募集中に編成改訂しても訓練中の版が固定される',async({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-recruit').click();
+  await page.getByTestId('open-division-designer').click();
+  await page.getByTestId('custom-template-name').fill('保存済み歩兵');
+  await expect(page.getByTestId('designer-stat-game.manpower')).toHaveText('10000');
+  await page.getByTestId('save-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  const select=page.getByTestId('division-template');
+  await expect(select.locator('option')).toHaveCount(4);
+  await select.selectOption('custom:1');
+  await expect(page.getByTestId('template-cost')).toContainText('10000');
+  await page.getByTestId('start-training').click();
+  await page.getByTestId('apply-pending').click();
+  const queue=page.locator('[data-testid^="training-"]');
+  await expect(queue).toHaveCount(1);
+  await expect(queue.first()).toContainText('保存済み歩兵');
+  await page.getByTestId('saved-template-select').selectOption('1');
+  await page.getByTestId('support-engineer-v1').check();
+  await page.getByTestId('custom-template-name').fill('工兵付き');
+  await page.getByTestId('save-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(queue.first()).toContainText('保存済み歩兵');
+  await expect(select.locator('option').last()).toContainText('v2');
+  await expect(page.getByTestId('delete-custom-template')).toBeEnabled();
+  await page.getByTestId('delete-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  // Reference protection: the template remains while a training order uses its old revision.
+  await expect(select.locator('option')).toHaveCount(4);
+  await queue.first().locator('button').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(queue).toHaveCount(0);
+  expect(errors).toEqual([]);
+});
