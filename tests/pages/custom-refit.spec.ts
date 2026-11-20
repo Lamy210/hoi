@@ -1,0 +1,28 @@
+import {expect,test} from '@playwright/test';
+test('保存した自由編成を既存師団に適用する',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-recruit').click();
+  await page.getByTestId('open-division-designer').click();
+  await page.getByTestId('custom-template-name').fill('再編師団');
+  for(let i=0;i<4;i++)await page.getByTestId('remove-infantry-v1').click();
+  await page.getByTestId('save-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  await page.getByTestId('division-template').selectOption('custom:1');
+  const select=page.getByTestId('refit-unit-select');
+  const options=await select.locator('option').count();
+  expect(options).toBeGreaterThan(1);
+  await select.selectOption({index:1});
+  const before=await page.getByTestId('refit-current-template').textContent();
+  expect(before).not.toContain('#1 v1');
+  await expect(page.getByTestId('refit-delta')).toBeVisible();
+  await expect(page.getByTestId('refit-unit')).toBeEnabled();
+  await page.getByTestId('refit-unit').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('refit-current-template')).toContainText('#1 v1');
+  await expect(page.getByTestId('refit-delta')).toBeVisible();
+});
