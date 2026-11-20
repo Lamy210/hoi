@@ -15,3 +15,5 @@
 - [ ] 4.2 目的: UI編集。対象: ui/panels.tsx, engine/ui.ts, i18n.ts。作業: プレビュー/編集/改訂確認。テスト: 日英・操作。期待値: 表示と計算一致。完了条件: Playwright合格。
 - [ ] 4.3 目的: UI運用。対象: ui/panels.tsx, GameScreen.tsx。作業: 募集→配備→戦線、失敗表示。テスト: 停止・復元・配備喪失。期待値: 通常プレイ可能。完了条件: production E2E合格。
 - [ ] 5.1 目的: リリース。対象: check.yml, docs/13。作業: strict、全回帰、acceptance.md D01〜D17の追跡、性能測定。テスト: CI/Pages。期待値: 合格、性能の実測記録。完了条件: 最新HEAD・実URL確認。
+
+- [ ] 0.3 目的: 永続命令状態のv6先行実装を検証。対象: core/sequence.ts, command.ts, hash.ts, save/serialize.ts, worker.ts, engineClient.ts。作業: 番号上限、未適用AI命令の保存、v4/v5旧hash検証。テスト: D15/構造不正/継続一致。期待値: 400件超後の再送拒否、キュー復元、旧既知番号の復元。完了条件: 最新CI合格。旧実ファイルと全体移行は4.1で確認。
