@@ -279,13 +279,13 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
         u.org <= 0 || w.prov.controller[u.loc] !== u.owner ? [] :
         w.adj.targets.slice(w.adj.offsets[u.loc], w.adj.offsets[u.loc + 1]).filter((p, i) =>
           !w.adj.strait[w.adj.offsets[u.loc] + i] && atWar(w, u.owner, w.prov.controller[p])),
-      org: Math.round(u.org * 10) / 10,
+      org: u.org,
       strength: u.maxManpower > 0 ? Math.round((u.manpower / u.maxManpower) * 1000) / 1000 : 0,
       infEquipment: u.infEquipment,
       maxInfEquipment: u.maxInfEquipment,
       artEquipment: u.artEquipment,
       maxArtEquipment: u.maxArtEquipment,
-      supply: Math.round(effectiveSupply(w, u) * 1000) / 1000,
+      supply: effectiveSupply(w, u),
       frontId: u.frontId,
       commanderId: u.commanderId,
       encircled: u.encircled,
