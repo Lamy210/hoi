@@ -55,3 +55,6 @@ enqueueTrainingのorderIdはnextUnitIdを予約し重複不可、cancel後も再
 
 ## 先行実装スライス: 編成プレビュー
 5Bの先行スライスでは builtin-v1 の仮カタログ、純粋集計関数 templateStats.ts と Worker read-only RPC (previewTemplate → templatePreview) を追加する。UIの入力は battalionIds/supportIds のみ。結果は ok/catalogVersion/stats または ok=false/reason。UIは直近の入力に対応する応答のみ表示。試算操作はtick、命令キュー、備蓄、部隊、セーブに影響しない。既存の固定3編成の募集とv5を維持する。カタログのパック駆動化、版付き保存、独自編成の募集、戦闘/兵站への統合は未実装であり、tasks 0.1/1.1/1.2/4.2等を完了扱いにしない。初期カタログは支援2種のみ、最大5種は将来拡張上限。D01/D02および入力検証をunitで、D16のうち非破壊プレビューを通常UIで検証する。
+
+## 先行実装スライス: v6命令状態
+v6はissuerごとの適用・却下済み最大seqをcommandWatermarksに、次tickの未適用命令をpendingCommandsに保存する。player、frontai、ai:<有効国index>のみを命令発行元として認め、seqは正のsafe integer。event履歴は別の内部イベント番号。最大番号以下は拒否し履歴切捨てに依存しない。v4/v5は従来のハッシュを用いて検証後、保持履歴と旧AI発行済みカウンタから既知最大値を復元する。旧版で失われた命令や古いプレイヤーseqは復元できない。新版は命令キューと採番状態をハッシュ対象にする。UIによる保存は引き続き未適用プレイヤー命令がない境界で実行。エンジン直接保存した命令は復元し、UIに未適用件数を表示する。独自編成保存・全世界ハッシュの網羅化・旧実ファイルの確認は後続。v6公開後のPhase5B内の追加非互換な保存変更には新しい版を割り当てる。
