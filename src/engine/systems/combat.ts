@@ -7,6 +7,7 @@ import { deriveStream } from '../core/rng';
 import { addAlert, atWar, effectiveSupply, type Unit, type WorldState } from '../core/state';
 import { registerSystem } from '../core/scheduler';
 import { tickMovement } from './movement';
+import { reinforceIdleUnits } from './reinforcement';
 import { weatherAttackMod, weatherOrgMod } from './weather';
 import { commanderMod, commanderTrait, releaseCommander } from '../military/commanders';
 import { techMods } from './research';
@@ -288,29 +289,10 @@ function tickAttrition(w: WorldState, battles: Map<number, Sides>): void {
       const stabilityMod = 0.7 + w.stability[u.owner] * 0.3;
       const regen = ORG_REGEN_BASE * (0.2 + 0.8 * eff) * weatherOrgMod(w, u.loc) * (traitLogistics ? 1.15 : 1) * stabilityMod * (1 + techMods(w, u.owner, 'orgRegen'));
       u.org = Math.min(unitOrgCap(w,u), u.org + regen);
-      // 補充（2財・国のプールから。供給効率で速度変化）
-      const c = u.owner;
-      const speed = 0.5 + 0.5 * eff;
-      const mpNeed = u.maxManpower - u.manpower;
-      const mpAdd = Math.min(mpNeed, 40 * speed, w.countries.manpowerPool[c]);
-      if (mpAdd > 0) {
-        w.countries.manpowerPool[c] -= mpAdd;
-        u.manpower += mpAdd;
-      }
-      const infNeed = u.maxInfEquipment - u.infEquipment;
-      const infAdd = Math.min(infNeed, 25 * speed, w.countries.infEquipmentStock[c]);
-      if (infAdd > 0) {
-        w.countries.infEquipmentStock[c] -= infAdd;
-        u.infEquipment += infAdd;
-      }
-      const artNeed = u.maxArtEquipment - u.artEquipment;
-      const artAdd = Math.min(artNeed, 5 * speed, w.countries.artEquipmentStock[c]);
-      if (artAdd > 0) {
-        w.countries.artEquipmentStock[c] -= artAdd;
-        u.artEquipment += artAdd;
-      }
+      // 補充は日次の組織回復・損耗処理後に優先度順で適用する。
     }
   }
+  reinforceIdleUnits(w,new Set([...battles].filter(([,s])=>s.attackers.length>0).map(([p])=>p)));
   // 破壊済みユニットの除去（ID順維持 → 決定論）
   for (let i = w.units.length - 1; i >= 0; i--) {
     if (w.units[i].destroyed) {

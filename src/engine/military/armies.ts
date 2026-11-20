@@ -1,6 +1,6 @@
 import type { WorldState } from '../core/state';
 
-export interface Army { id: number; owner: number; name: string; color: string; groupId: number | null; commanderId?: number }
+export interface Army { id: number; owner: number; name: string; color: string; groupId: number | null; commanderId?: number; reinforcementPriority?: number }
 export interface ArmyGroup { id: number; owner: number; name: string; color: string; commanderId?: number }
 export const MAX_ARMIES = 256, MAX_GROUPS = 64, MAX_ARMY_UNITS = 24, MAX_GROUP_ARMIES = 5;
 export const ARMY_COLORS = ['#4479b6','#638b64','#ad8150','#8b70b4','#aa6666'] as const;
@@ -24,6 +24,7 @@ export function validateHierarchy(w: WorldState): string[] {
   }
   for (const a of w.armies) {
     if (!a || !safeId(a.id) || a.id >= w.nextArmyId || armies.has(a.id) || !ownerOk(a.owner) || !validName(a.name) || !validColor(a.color)) { out.push('invalid army'); continue; }
+    if(a.reinforcementPriority!==undefined && (!Number.isInteger(a.reinforcementPriority)||a.reinforcementPriority<0||a.reinforcementPriority>9)) out.push('invalid army reinforcement priority');
     armies.set(a.id,a); ac.set(a.owner,(ac.get(a.owner)??0)+1);
     if (ac.get(a.owner)! > MAX_ARMIES) out.push('army limit');
     if (a.groupId !== null) {

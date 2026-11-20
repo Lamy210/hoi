@@ -1,0 +1,23 @@
+import {effectiveSupply,type Unit,type WorldState} from '../core/state';
+
+export const DEFAULT_REINFORCEMENT_PRIORITY = 5;
+
+/** Only idle, non-encircled and non-combat troops are eligible.
+ * Higher-priority armies receive scarce resources first.
+ * Equal priorities preserve the original stable deployed-unit order.
+ */
+export function reinforceIdleUnits(w:WorldState,battleLocations:ReadonlySet<number>):void {
+  const armyPriority=new Map(w.armies.map(a=>[a.id,a.reinforcementPriority??DEFAULT_REINFORCEMENT_PRIORITY]));
+  const getPriority=(u:Unit)=>armyPriority.get(u.armyId??-1)??DEFAULT_REINFORCEMENT_PRIORITY;
+  const eligible=w.units.filter(u=>!u.destroyed&&!u.encircled&&!u.path.length&&!battleLocations.has(u.loc));
+  eligible.sort((a,b)=>getPriority(b)-getPriority(a));
+  for(const u of eligible){
+    const c=u.owner, speed=0.5+0.5*effectiveSupply(w,u);
+    const mpAdd=Math.min(Math.max(0,u.maxManpower-u.manpower),40*speed,w.countries.manpowerPool[c]);
+    if(mpAdd>0){w.countries.manpowerPool[c]-=mpAdd;u.manpower+=mpAdd;}
+    const infAdd=Math.min(Math.max(0,u.maxInfEquipment-u.infEquipment),25*speed,w.countries.infEquipmentStock[c]);
+    if(infAdd>0){w.countries.infEquipmentStock[c]-=infAdd;u.infEquipment+=infAdd;}
+    const artAdd=Math.min(Math.max(0,u.maxArtEquipment-u.artEquipment),5*speed,w.countries.artEquipmentStock[c]);
+    if(artAdd>0){w.countries.artEquipmentStock[c]-=artAdd;u.artEquipment+=artAdd;}
+  }
+}

@@ -703,6 +703,19 @@ export function registerAllCommands(): void {
     },
     apply(w,p,issuer) { w.armyGroups.push({id:w.nextArmyGroupId++,owner:actorCountry(w,issuer)!,name:p.name as string,color:p.color as string}); },
   });
+  registerCommand('setArmyReinforcementPriority', {
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(!Number.isInteger(p.priority)||(p.priority as number)<0||(p.priority as number)>9)return 'badParams';
+      return w.armies.some(a=>a.id===p.armyId&&a.owner===c)?null:'notYourArmy';
+    },
+    apply(w,p){
+      const a=w.armies.find(a=>a.id===p.armyId)!;
+      a.reinforcementPriority=p.priority as number;
+    },
+  });
+
   registerCommand('assignArmy', {
     validate(w,p,issuer) {
       const c = actorCountry(w,issuer), ids = p.unitIds;

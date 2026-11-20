@@ -1,0 +1,20 @@
+import {expect,test} from '@playwright/test';
+test('軍団補充優先度を0～9から選択し適用・保存する',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('toggle-army-editor').click();
+  await page.getByTestId('army-name').fill('補充優先軍');
+  await page.getByTestId('create-army').click();
+  await page.getByTestId('apply-pending').click();
+  await page.getByTestId('army-target').selectOption('1');
+  const select=page.getByTestId('army-reinforcement-priority');
+  await expect(select).toHaveValue('5');
+  await select.selectOption('9');await page.getByTestId('apply-pending').click();
+  await expect(select).toHaveValue('9');
+  await select.selectOption('0');await page.getByTestId('apply-pending').click();
+  await expect(select).toHaveValue('0');
+});
