@@ -24,23 +24,14 @@ describe('セーブ/ロード', () => {
     expect(r.world).not.toBeNull();
     expect(hashWorld(r.world!)).toBe(hashWorld(engine.world));
 
-    // 復元後も同一tick数進めると同一ハッシュ
+    // 保存境界の未適用AI命令も保持し、同じEngineファサードで継続を比較する。
+    const restored = await createTestEngine(1, 12, 'JPN');
+    expect(restored.loadFrom(buf).ok).toBe(true);
     for (let t = 0; t < 60; t++) {
       engine.stepTick();
-      r.world!.runtime.commandsSinceLastTick = [];
-      // 復元側はコマンドなしで進行（AIのみ）
-      const restored = r.world!;
-      // stepTick相当を手動実行（Engineファサードではなく世界直操作）
-      const { applyCommands } = await import('../../src/engine/core/command');
-      applyCommands(restored, restored.runtime.commandsSinceLastTick);
-      restored.runtime.commandsSinceLastTick = [];
-      restored.tick++;
-      const { runDailySystems, runWeeklySystems, runMonthlySystems } = await import('../../src/engine/core/scheduler');
-      runDailySystems(restored);
-      runWeeklySystems(restored);
-      runMonthlySystems(restored);
+      restored.stepTick();
+      expect(hashWorld(restored.world), 'tick ' + restored.world.tick).toBe(hashWorld(engine.world));
     }
-    expect(hashWorld(r.world!)).toBe(hashWorld(engine.world));
   });
 
   it('改ざんセーブは拒否される（不正セーブ処理）', async () => {
