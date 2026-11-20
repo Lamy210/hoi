@@ -3,7 +3,6 @@
 import { createEngine, type Engine, type TraceRequest } from './engine';
 import { civilFromDays } from './clock/date';
 import { previewTemplate } from './military/templateStats';
-import { nextSequence } from './core/sequence';
 import type { Pack } from './scenario/types';
 
 let engine: Engine | null = null;
@@ -15,7 +14,9 @@ function resumePlayerSequence(engine: Engine): number {
   for (const command of engine.world.runtime.commandsSinceLastTick) {
     if (command.issuer === 'player') last = Math.max(last, command.seq);
   }
-  return nextSequence(last);
+  // Exhaustion must not turn an already successful load into a failed RPC.
+  // The command handler rejects an unsafe next number before enqueuing.
+  return last + 1;
 }
 
 const post = (msg: unknown, transfer?: Transferable[]): void => {
@@ -78,7 +79,7 @@ self.onmessage = async (ev: MessageEvent) => {
         const r = engine.loadFrom(msg.buf);
         if (r.ok) {
           playerSeq = resumePlayerSequence(engine);
-          reply({ type: 'loaded', ok: true, meta: engine.getUiMeta(), snap: engine.getUiSnapshot(0) });
+          reply({ type: 'loaded', ok: true, meta: engine.getUiMeta(), snap: engine.getUiSnapshot(0), pendingPlayerCommands: engine.world.runtime.commandsSinceLastTick.filter(c => c.issuer === 'player').length });
         } else {
           reply({ type: 'loaded', ok: false, violations: r.violations });
         }
