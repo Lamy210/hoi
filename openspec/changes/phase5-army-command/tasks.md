@@ -9,3 +9,5 @@
 - [ ] 4.2 目的: 性能と公開。対象: docs/13, CI。作業: A13長期・性能・strict。テスト: 全回帰。期待値: 参照切れなし。完了条件: 最新HEADと公開確認。
 
 - [ ] 0.1 目的: 軍団/軍集団と軍需・補給一覧の先行実装。対象: military/armies.ts, armySummary.ts, commands.ts, save/serialize.ts, engine/ui.ts, ArmyManagement.tsx, GameScreen.tsx。作業: 所属/容量/参照/集計、v7、旧v6検証、一覧検索と選択。テスト: A01〜A03/A12の階層部分、装備不足/補給内訳、通常UI。期待値: 重複所属・非所有・上限超過を拒否、集計・位置一致、旧版移行。完了条件: 最新CI成功、旧実ファイル検証と作戦機能は後続、既存タスクは未完了維持。
+
+- [ ] 0.2 目的: 軍団選択と既存戦線を接続。対象: commands.ts, systems/fronts.ts, core/state.ts, save/serialize.ts, ui/panels.tsx, GameScreen.tsx。作業: 一括割当解除、停止・再開・手動hold、版付きfrontMove、攻勢目標、v8移行。テスト: A07/A08/A12の先行範囲と通常UI。期待値: 停止/旧版/講和/手動hold中の自動命令拒否。完了条件: CIと公開確認。完全な作戦管理は残す。
