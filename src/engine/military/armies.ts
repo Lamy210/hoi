@@ -1,7 +1,7 @@
 import type { WorldState } from '../core/state';
 
-export interface Army { id: number; owner: number; name: string; color: string; groupId: number | null }
-export interface ArmyGroup { id: number; owner: number; name: string; color: string }
+export interface Army { id: number; owner: number; name: string; color: string; groupId: number | null; commanderId?: number }
+export interface ArmyGroup { id: number; owner: number; name: string; color: string; commanderId?: number }
 export const MAX_ARMIES = 256, MAX_GROUPS = 64, MAX_ARMY_UNITS = 24, MAX_GROUP_ARMIES = 5;
 export const ARMY_COLORS = ['#4479b6','#638b64','#ad8150','#8b70b4','#aa6666'] as const;
 export function validName(name: unknown): name is string {
@@ -35,6 +35,13 @@ export function validateHierarchy(w: WorldState): string[] {
     if (u.armyId == null) continue;
     if (!safeId(u.armyId) || armies.get(u.armyId)?.owner !== u.owner) out.push('invalid unit army reference');
     else { units.set(u.armyId,(units.get(u.armyId)??0)+1); if (units.get(u.armyId)! > MAX_ARMY_UNITS) out.push('army membership limit'); }
+  }
+  const assigned=new Set<number>();
+  for(const f of [...w.armies,...w.armyGroups]) {
+    if(f.commanderId===undefined||f.commanderId===-1)continue;
+    const c=w.commanders.find(c=>c.id===f.commanderId);
+    if(!safeId(f.commanderId)||!c||c.country!==f.owner||c.assignedUnit!==-1||assigned.has(c.id)||w.units.some(u=>u.commanderId===c.id))out.push('invalid formation commander');
+    else assigned.add(c.id);
   }
   return out;
 }
