@@ -5,6 +5,8 @@ import { appStore } from './store';
 import { t } from './i18n';
 import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
+import { divisionTemplate } from '../engine/military/templates';
+import type { UiUnit } from '../engine/ui';
 import type { MapDataSource, MapRenderer } from './maprender/types';
 import { colorsForMode, diffIndices } from './maprender/types';
 import { createCanvasRenderer } from './maprender/canvasAdapter';
@@ -35,6 +37,9 @@ export function GameScreen() {
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
+  const [moveMode, setMoveMode] = useState(false);
+  const [destination, setDestination] = useState('');
+  const [rosterOpen, setRosterOpen] = useState(true);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -175,6 +180,37 @@ export function GameScreen() {
     lastAlertLenRef.current = log.length;
   }, [st.alertLog]);
 
+  // The same selection drives the roster, counters, route and context panel.
+  const selectedIds = st.selection.unitIds ?? (st.selection.unitId === null ? [] : [st.selection.unitId]);
+  useEffect(() => {
+    setMoveMode(false);
+    setDestination('');
+  }, [st.selection, st.panel, st.meta]);
+  useEffect(() => {
+    if (!mapReady || !snap || !meta) return;
+    const selected = new Set(selectedIds);
+    const byProvince = new Map<number, UiUnit[]>();
+    for (const u of snap.units) {
+      if (u.owner !== snap.playerCountry) continue;
+      const list = byProvince.get(u.loc) ?? [];
+      list.push(u);
+      byProvince.set(u.loc, list);
+    }
+    rendererRef.current?.setUnitOverlay([...byProvince].map(([province, list]) => ({
+      province, provinceId: meta.provIds[province], count: list.length,
+      label: (lang === 'ja' ? meta.provNameJa[province] : meta.provNameEn[province]) + ' — ' + t(lang, 'game.divisions') + ' ' + list.length,
+      selected: list.some(u => selected.has(u.id)), moving: list.some(u => u.moving),
+    })), snap.units.filter(u => u.owner === snap.playerCountry && selected.has(u.id) && u.moving).map(u => u.route));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapReady, snap, meta, st.selection, lang]);
+
+  // Selecting a deployed division from recruitment or the context panel also centers the map.
+  useEffect(() => {
+    if (!mapReady || st.selection.unitId === null) return;
+    const u = appStore.get().snap?.units.find(x => x.id === st.selection.unitId);
+    if (u) rendererRef.current?.focusProvince(u.loc);
+  }, [mapReady, st.selection.unitId]);
+
   if (!meta || !snap) {
     return <div className="screen"><div className="muted">{t(lang, 'misc.loading')}</div></div>;
   }
@@ -190,17 +226,40 @@ export function GameScreen() {
   const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
 
+  const ownUnits = snap.units.filter(u => u.owner === snap.playerCountry);
+  const chosen = ownUnits.filter(u => selectedIds.includes(u.id));
+  const canMove = chosen.length > 0 && chosen.length <= 256 && chosen.every(u => !u.moving && !u.encircled && !u.inBattle) && st.pendingCommands === 0;
+  const nameOf = (p: number) => lang === 'ja' ? meta.provNameJa[p] : meta.provNameEn[p];
+  function selectUnits(ids: number[], focus = true) {
+    const valid = ownUnits.filter(u => ids.includes(u.id)).slice(0, 256);
+    const first = valid[0];
+    appStore.set({ selection: { prov: first?.loc ?? null, unitId: first?.id ?? null, unitIds: valid.map(u => u.id), country: null }, trace: null });
+    if (focus && first) rendererRef.current?.focusProvince(first.loc);
+  }
+  function sendMove(prov: number) {
+    if (!canMove || !Number.isInteger(prov) || prov < 0 || prov >= meta.provIds.length || chosen.every(u => u.loc === prov)) return;
+    engineClient.command('moveUnits', { units: chosen.map(u => u.id), target: prov });
+    setMoveMode(false);
+    setDestination('');
+  }
+  function provinceFromEvent(e: React.MouseEvent): { prov: number | null; marker: boolean } {
+    const marker = (e.target as Element).closest<HTMLElement>('[data-unit-province]');
+    return marker ? { prov: Number(marker.dataset.unitProvince), marker: true } :
+      { prov: rendererRef.current?.pickAt(e.clientX, e.clientY) ?? null, marker: false };
+  }
+  function handleMapContext(e: React.MouseEvent) {
+    if (!chosen.length) return;
+    e.preventDefault();
+    const { prov } = provinceFromEvent(e);
+    if (prov !== null) sendMove(prov);
+  }
   function handleMapClick(e: React.MouseEvent): void {
-    const r = rendererRef.current;
-    const snapNow = appStore.get().snap;
-    if (!r || !snapNow) return;
-    const prov = r.pickAt(e.clientX, e.clientY);
+    const { prov, marker } = provinceFromEvent(e);
     if (prov === null) return;
-    const unit = st.selection.unitId !== null ? snapNow.units.find((u) => u.id === st.selection.unitId) : null;
-    if (unit && unit.owner === snapNow.playerCountry && unit.loc !== prov && !unit.moving && !unit.encircled) {
-      // 選択中師団の移動命令（合法性はエンジンが検証・却下時は警告表示）
-      engineClient.command('moveUnits', { units: [unit.id], target: prov });
-      appStore.set({ selection: { prov, unitId: unit.id, country: null } });
+    if (moveMode) { sendMove(prov); return; }
+    if (marker) {
+      const ids = ownUnits.filter(u => u.loc === prov).map(u => u.id);
+      selectUnits(e.shiftKey || e.ctrlKey || e.metaKey ? [...new Set([...selectedIds, ...ids])] : ids, false);
       return;
     }
     appStore.set({ selection: { prov, unitId: null, country: null }, trace: null });
@@ -229,7 +288,7 @@ export function GameScreen() {
   const atWarNow = player.atWar.length > 0;
 
   return (
-    <div className="game">
+    <div className={"game" + (moveMode ? " move-mode" : "")}>
       <div className="topbar">
         <span className="color-dot" style={{ background: player.color }} />
         <span className="stat"><b>{lang === 'ja' ? player.nameJa : player.nameEn}</b></span>
@@ -271,6 +330,7 @@ export function GameScreen() {
           ref={mapRef}
           data-testid="map"
           onClick={handleMapClick}
+          onContextMenu={handleMapContext}
           onMouseMove={handleMapMove}
           onMouseLeave={() => setHoverProv(null)}
         />
@@ -295,6 +355,39 @@ export function GameScreen() {
         )}
         <AlertFeed />
         <div className="right-panel">
+          <section className="panel-section unit-roster" data-testid="unit-roster">
+            <button data-testid="toggle-unit-roster" aria-expanded={rosterOpen} onClick={() => setRosterOpen(!rosterOpen)}>{t(lang, 'units.roster')} ({ownUnits.length}) {rosterOpen ? '▴' : '▾'}</button>
+            {rosterOpen && <>
+              <div className="muted">{t(lang, 'units.hint')}</div>
+              <div className="unit-roster-list">
+                {ownUnits.map(u => <div className="unit-roster-entry" key={u.id}>
+                  <input type="checkbox" aria-label={t(lang, 'units.select') + ' #' + u.id} data-testid={'unit-check-' + u.id}
+                    checked={selectedIds.includes(u.id)} disabled={!selectedIds.includes(u.id) && chosen.length >= 256}
+                    onChange={e => selectUnits(e.target.checked ? [...selectedIds, u.id] : selectedIds.filter(id => id !== u.id), false)} />
+                  <button data-testid={'unit-roster-' + u.id} data-unit-id={u.id} data-location={meta.provIds[u.loc]} aria-pressed={selectedIds.includes(u.id)}
+                    onClick={() => selectUnits([u.id])}>
+                    #{u.id} {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}<br />
+                    {nameOf(u.loc)} ({meta.provIds[u.loc]}) — {u.inBattle ? t(lang, 'panel.inBattle') : u.encircled ? t(lang, 'panel.encircled') : u.moving ? t(lang, 'misc.movingTo', { target: nameOf(u.target) }) : t(lang, 'units.idle')}
+                  </button>
+                </div>)}
+                {!ownUnits.length && <span className="muted">{t(lang, 'units.none')}</span>}
+              </div>
+              <div className="move-controls">
+                <span data-testid="selected-unit-count">{t(lang, 'units.selected', { count: chosen.length })}</span>
+                <button data-testid="move-selected" disabled={!canMove} aria-pressed={moveMode} onClick={() => setMoveMode(!moveMode)}>{t(lang, moveMode ? 'units.cancelMove' : 'units.move')}</button>
+                {chosen.length > 0 && <button data-testid="focus-unit" onClick={() => rendererRef.current?.focusProvince(chosen[0].loc)}>{t(lang, 'units.focus')}</button>}
+              </div>
+              {moveMode && <div role="status" data-testid="move-hint">{t(lang, 'units.destinationHint')}</div>}
+              {chosen.length > 0 && !canMove && <div className="muted">{t(lang, 'units.busy')}</div>}
+              {chosen.length > 0 && <div className="move-controls">
+                <select data-testid="move-destination" aria-label={t(lang, 'units.destination')} value={destination} onChange={e => setDestination(e.target.value)}>
+                  <option value="">{t(lang, 'units.destination')}</option>
+                  {meta.provIds.map((id, i) => <option key={id} value={i}>{nameOf(i)} ({id})</option>)}
+                </select>
+                <button data-testid="confirm-move" disabled={!canMove || destination === '' || chosen.every(u => u.loc === Number(destination))} onClick={() => sendMove(Number(destination))}>{t(lang, 'units.move')}</button>
+              </div>}
+            </>}
+          </section>
           <ContextPanel />
         </div>
         {search !== null && (
