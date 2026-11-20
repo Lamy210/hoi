@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { UiSnapshot, UiUnit } from '../engine/ui';
 import { ARMY_COLORS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES } from '../engine/military/armies';
 import { engineClient } from './engineClient';
+import { appStore } from './store';
 
 type Lang = 'ja' | 'en';
 type Props = { snap: UiSnapshot; lang: Lang; selectedIds: number[]; pending: number; onSelect: (ids: number[]) => void };
@@ -101,6 +102,6 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
       <div className="kv"><span>{label('平均補給効率','Average supply')}</span><span>{summary.supply===null?'—':fmt(summary.supply*100)+'%'}</span></div>
       <div className="kv"><span>{label('補給50%未満','Supply below 50%')}</span><span>{summary.supplyLow}</span></div>
     </div>
-    <button data-testid="army-supply-map" onClick={()=>import('./store').then(({appStore})=>appStore.set({mapMode:'supply'}))}>{label('補給マップ','Supply map')}</button>
+    <button data-testid="army-supply-map" onClick={()=>appStore.set({mapMode:'supply'})}>{label('補給マップ','Supply map')}</button>
   </section>;
 }
