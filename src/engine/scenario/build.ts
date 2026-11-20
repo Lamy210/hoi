@@ -137,6 +137,7 @@ export function buildWorld(pack: Pack, opts: BuildOptions): WorldState {
     rng: {},
     anchors: [],
     journal: [],
+    commandWatermarks: {},
     journalStart: 0,
     nextUnitId: 1,
     nextWarId: 1,
