@@ -2,6 +2,7 @@
 // derivedCache（runtime・adjacency）は保存せず、復元時に再計算する（INV-8）。
 import { encode, decode } from '@msgpack/msgpack';
 import { divisionTemplate, MAX_TRAINING } from '../military/templates';
+import { commandIssuerKey, validSequence, legacyWatermarks } from '../core/sequence';
 import { hashWorld } from '../core/hash';
 import type { WorldState } from '../core/state';
 import { buildAdjacency } from '../map/adjacency';
@@ -9,7 +10,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 5;
+export const SAVE_SCHEMA_VERSION = 6;
 
 export interface SaveHeader {
   v: number;
@@ -99,6 +100,8 @@ function packStores(w: WorldState): Record<string, unknown> {
     rng: w.rng,
     anchors: w.anchors,
     journal: w.journal,
+    commandWatermarks: w.commandWatermarks,
+    pendingCommands: w.runtime.commandsSinceLastTick,
     journalStart: w.journalStart,
     counters: {
       nextUnitId: w.nextUnitId,
@@ -166,7 +169,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -176,11 +179,11 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (violations.length > 0) return { world: null, violations };
 
   if (!isRecord(blob.stores)) return { world: null, violations: ['stores missing or invalid'] };
-  if (h.v === 5) {
+  if (h.v >= 5) {
     if (!Number.isInteger(blob.payloadChecksum) || blob.payloadChecksum !== savePayloadChecksum(h, blob.stores)) {
       return { world: null, violations: ['save payload checksum mismatch'] };
     }
-    // v5は本エンジンの決定論的なMessagePack表現を唯一の書式とする。
+    // v5以降は本エンジンの決定論的なMessagePack表現を唯一の書式とする。
     // 重複キーや代替バイト表現などデコード時に失われる差異も拒否する。
     const canonical = encode({ header: h, stores: blob.stores, payloadChecksum: blob.payloadChecksum });
     if (canonical.length !== buf.length || canonical.some((v, i) => v !== buf[i])) {
@@ -197,10 +200,19 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     return { world: null, violations: ['header and stores mismatch'] };
   }
   if (h.v === 4 && (s.trainingQueue !== undefined || (Array.isArray(s.units) && s.units.some((u: any) => u?.templateId !== undefined)))) return { world: null, violations: ['v4 contains v5 data'] };
-  if (h.v === 5 && !Array.isArray(s.trainingQueue)) return { world: null, violations: ['training queue missing'] };
+  if (h.v >= 5 && !Array.isArray(s.trainingQueue)) return { world: null, violations: ['training queue missing'] };
+  if (h.v < 6 && (s.commandWatermarks !== undefined || s.pendingCommands !== undefined)) return { world: null, violations: ['legacy save contains v6 commands'] };
   // 構造検証（範囲・参照）
   const provCount = pack.provinces.length;
   const ctryCount = pack.countries.length;
+  if (!Array.isArray(s.journal) || s.journal.some((entry: any) => !isRecord(entry) || !validSequence(entry.seq) || (entry.issuer !== 'event' && commandIssuerKey(entry.issuer, ctryCount) === null))) return { world: null, violations: ['invalid command journal'] };
+  if (s.aiSeq !== undefined && (!isRecord(s.aiSeq) || Object.entries(s.aiSeq).some(([key, seq]) => (key !== '-1' && commandIssuerKey('ai:' + key, ctryCount) === null) || !validSequence(seq)))) return { world: null, violations: ['invalid AI sequence counters'] };
+  if (s.eventSeq !== undefined && !validSequence(s.eventSeq)) return { world: null, violations: ['invalid event sequence counter'] };
+  if (h.v === 6) {
+    if (!isRecord(s.commandWatermarks) || Object.entries(s.commandWatermarks).some(([issuer, seq]) => commandIssuerKey(issuer, ctryCount) === null || !validSequence(seq))) return { world: null, violations: ['invalid command watermarks'] };
+    if (s.journal.some((entry: any) => entry.issuer !== 'event' && (s.commandWatermarks[entry.issuer] ?? 0) < entry.seq)) return { world: null, violations: ['watermark behind journal'] };
+    if (!Array.isArray(s.pendingCommands) || s.pendingCommands.some((cmd: any) => !isRecord(cmd) || commandIssuerKey(cmd.issuer, ctryCount) === null || !validSequence(cmd.seq) || typeof cmd.type !== 'string' || !isRecord(cmd.p))) return { world: null, violations: ['invalid pending commands'] };
+  }
   const owner: number[] = s.prov.owner;
   const controller: number[] = s.prov.controller;
   if (!Array.isArray(owner) || owner.length !== provCount) violations.push('owner array size mismatch');
@@ -347,6 +359,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     rng: s.rng,
     anchors: s.anchors,
     journal: s.journal,
+    commandWatermarks: s.commandWatermarks ?? {},
     journalStart: s.journalStart,
     nextUnitId: s.counters.nextUnitId,
     nextWarId: s.counters.nextWarId,
@@ -366,7 +379,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
       decisionLog: {},
       alerts: [],
       alertsSeenByUi: 0,
-      commandsSinceLastTick: [],
+      commandsSinceLastTick: s.pendingCommands ?? [],
       aiSeq: s.aiSeq ?? {},
       eventSeq: s.eventSeq ?? 1,
       seenWars: new Set<number>(s.seenWars ?? []),
@@ -375,9 +388,10 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   };
   // 派生再計算 → 整合ハッシュ検証（INV-8）
   recomputeSupply(w);
-  const actual = hashWorld(w);
+  const actual = hashWorld(w, h.v < 6);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }
+  if (h.v < 6) w.commandWatermarks = legacyWatermarks(w);
   return { world: w, violations: [] };
 }

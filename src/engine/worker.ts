@@ -10,9 +10,13 @@ let pack: Pack | null = null;
 let playerSeq = 1;
 
 function resumePlayerSequence(engine: Engine): number {
-  return engine.world.journal.reduce((next, entry) =>
-    entry.issuer === 'player' && Number.isSafeInteger(entry.seq) && entry.seq >= next
-      ? entry.seq + 1 : next, 1);
+  let last = engine.world.commandWatermarks.player ?? 0;
+  for (const command of engine.world.runtime.commandsSinceLastTick) {
+    if (command.issuer === 'player') last = Math.max(last, command.seq);
+  }
+  // Exhaustion must not turn an already successful load into a failed RPC.
+  // The command handler rejects an unsafe next number before enqueuing.
+  return last + 1;
 }
 
 const post = (msg: unknown, transfer?: Transferable[]): void => {
@@ -75,7 +79,7 @@ self.onmessage = async (ev: MessageEvent) => {
         const r = engine.loadFrom(msg.buf);
         if (r.ok) {
           playerSeq = resumePlayerSequence(engine);
-          reply({ type: 'loaded', ok: true, meta: engine.getUiMeta(), snap: engine.getUiSnapshot(0) });
+          reply({ type: 'loaded', ok: true, meta: engine.getUiMeta(), snap: engine.getUiSnapshot(0), pendingPlayerCommands: engine.world.runtime.commandsSinceLastTick.filter(c => c.issuer === 'player').length });
         } else {
           reply({ type: 'loaded', ok: false, violations: r.violations });
         }

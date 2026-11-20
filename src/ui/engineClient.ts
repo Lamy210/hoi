@@ -251,7 +251,7 @@ export class EngineClient {
       const m = await this.request({ type: 'load', buf: copy }, 'loaded', 15000, [copy.buffer as ArrayBuffer]);
       if (m.ok) {
         const snap = m.snap as UiSnapshot;
-        appStore.set({ snap, pendingCommands: 0, selection: { prov: null, unitId: null, country: null }, alertLog: snap.alerts ?? [], lastAlertId: snap.lastAlertId, meta: m.meta as UiMeta });
+        appStore.set({ snap, pendingCommands: m.pendingPlayerCommands ?? 0, selection: { prov: null, unitId: null, country: null }, alertLog: snap.alerts ?? [], lastAlertId: snap.lastAlertId, meta: m.meta as UiMeta });
         this.onSnapshotHook?.();
       }
       return { ok: m.ok as boolean, violations: m.violations as string[] | undefined };
