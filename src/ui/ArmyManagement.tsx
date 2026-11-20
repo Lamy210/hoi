@@ -50,6 +50,9 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const summary=summarizeDivisions(scope==='all'?units:selected);
   const fmt=(n:number)=>n.toLocaleString(ja?'ja-JP':'en-US',{maximumFractionDigits:1});
   const canCommand=pending===0;
+  const commanders=snap.commanders.filter(c=>c.country===country);
+  const commanderName=(id:number|undefined)=>{const c=commanders.find(c=>c.id===id);return c?(ja?c.nameJa:c.nameEn)+' S'+c.skill:(ja?'未配置':'Unassigned');};
+  const role=(id:number)=>{const a=armies.find(a=>a.commanderId===id),g=groups.find(g=>g.commanderId===id),c=commanders.find(c=>c.id===id);return a?a.name:g?g.name:c&&c.assignedUnit>=0?(ja?'師団 #':'Division #')+c.assignedUnit:(ja?'空き':'Available');};
   const label=(j:string,e:string)=>ja?j:e;
   const create=(kind:'createArmy'|'createArmyGroup')=>{
     const nextName=name.trim();
@@ -60,8 +63,8 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   return <section className="army-management" data-testid="army-management">
     <h4>{label('陸軍指揮・編成','Army command')}</h4>
     <div className="army-bar">
-      {groups.map(g=><button key={g.id} data-testid={'group-select-'+g.id} style={{borderColor:g.color}} onClick={()=>{setGroupId(String(g.id));onSelect(groupUnits(g.id));}}>{g.name} · {armies.filter(a=>a.groupId===g.id).length}/{MAX_GROUP_ARMIES}</button>)}
-      {armies.map(a=><button key={a.id} data-testid={'army-select-'+a.id} style={{borderColor:a.color}} onClick={()=>{setArmyId(String(a.id));onSelect(memberIds(a.id));}}>{a.name} · {memberIds(a.id).length}/{MAX_ARMY_UNITS}</button>)}
+      {groups.map(g=><button key={g.id} data-testid={'group-select-'+g.id} style={{borderColor:g.color}} onClick={()=>{setGroupId(String(g.id));onSelect(groupUnits(g.id));}}>{g.name} · {armies.filter(a=>a.groupId===g.id).length}/{MAX_GROUP_ARMIES}<small className="formation-leader" data-testid={'group-leader-'+g.id}>{commanderName(g.commanderId)}</small></button>)}
+      {armies.map(a=><button key={a.id} data-testid={'army-select-'+a.id} style={{borderColor:a.color}} onClick={()=>{setArmyId(String(a.id));onSelect(memberIds(a.id));}}>{a.name} · {memberIds(a.id).length}/{MAX_ARMY_UNITS}<small className="formation-leader" data-testid={'army-leader-'+a.id}>{commanderName(a.commanderId)}</small></button>)}
       <button data-testid="select-unassigned" onClick={()=>onSelect(units.filter(u=>u.armyId===null).map(u=>u.id))}>{label('未編入','Unassigned')} · {units.filter(u=>u.armyId===null).length}</button>
     </div>
     <button data-testid="toggle-army-editor" aria-expanded={editing} onClick={()=>setEditing(!editing)}>{label(editing?'編成編集を閉じる':'編成を編集',editing?'Close editor':'Edit formations')}</button>
@@ -86,6 +89,16 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
       <button data-testid="assign-army-group" disabled={!canCommand||!army||!group||armies.filter(a=>a.groupId===group.id&&a.id!==army.id).length>=MAX_GROUP_ARMIES} onClick={()=>army&&group&&engineClient.command('assignArmyGroup',{armyIds:[army.id],groupId:group.id})}>{label('軍団を軍集団へ編入','Assign army to group')}</button>
       <button data-testid="unassign-army-group" disabled={!canCommand||!army||army.groupId===null} onClick={()=>army&&engineClient.command('assignArmyGroup',{armyIds:[army.id],groupId:null})}>{label('軍集団から解除','Remove from group')}</button>
       <button data-testid="delete-army-group" disabled={!canCommand||!group||armies.some(a=>a.groupId===group.id)} onClick={()=>group&&engineClient.command('deleteArmyGroup',{id:group.id})}>{label('空軍集団を削除','Delete empty group')}</button>
+    </div>
+    <div className="formation-commanders">
+      <small>{label('指揮官を選ぶと以前の役職から移籍します。上位指揮官は現在、管理専用で戦闘補正はありません。','Assigning transfers the commander from their previous role. Formation commanders are management-only for now.')}</small>
+      {([{kind:'army',formation:army},{kind:'group',formation:group}] as const).map(({kind,formation:f})=>f&&<label key={kind} className="move-controls">
+        {kind==='army'?label('軍団指揮官','Army commander'):label('軍集団司令官','Group commander')}
+        <select data-testid={kind+'-commander-select'} disabled={!canCommand} value={f.commanderId??-1} onChange={e=>engineClient.command('assignFormationCommander',{kind,formationId:f.id,commanderId:Number(e.target.value)})}>
+          <option value={-1}>{label('未配置','Unassigned')}</option>
+          {commanders.map(c=><option key={c.id} value={c.id}>{commanderName(c.id)} · {role(c.id)}</option>)}
+        </select>
+      </label>)}
     </div>
     </>}
     <select data-testid="army-summary-scope" aria-label={label('集計対象','Summary scope')} value={scope} onChange={e=>setScope(e.target.value)}><option value="selection">{label('選択部隊の集計','Selected units')}</option><option value="all">{label('全自国師団の集計','All deployed divisions')}</option></select>
