@@ -47,6 +47,9 @@ describe('師団募集・配備', () => {
     const e = await createTestEngine();
     const old = decode(e.serialize()) as any;
     old.header.v = 4;
+    old.header.integrity = hashWorld(e.world, true);
+    delete old.stores.commandWatermarks;
+    delete old.stores.pendingCommands;
     delete old.stores.trainingQueue;
     delete old.payloadChecksum;
     expect(e.loadFrom(encode(old)).ok).toBe(true);
