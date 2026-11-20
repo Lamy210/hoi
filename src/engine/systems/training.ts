@@ -1,11 +1,12 @@
 import { addAlert, type WorldState, type Unit } from '../core/state';
 import { registerSystem } from '../core/scheduler';
 import { autoAssignCommander } from '../military/commanders';
-import { divisionTemplate, type TrainingOrder } from '../military/templates';
+import { trainingSpec } from '../military/customTemplates';
+import { type TrainingOrder } from '../military/templates';
 
 export function refundTraining(w: WorldState, order: TrainingOrder): void {
   if (!w.countries.alive[order.country]) return;
-  const t = divisionTemplate(order.templateId)!;
+  const t = trainingSpec(w, order)!;
   w.countries.manpowerPool[order.country] += t.manpower;
   w.countries.infEquipmentStock[order.country] += t.infantry;
   w.countries.artEquipmentStock[order.country] += t.artillery;
@@ -20,9 +21,10 @@ export function tickTraining(w: WorldState): void {
       continue;
     }
     if (w.tick < order.readyTick) { remaining.push(order); continue; }
-    const t = divisionTemplate(order.templateId)!;
+    const t = trainingSpec(w, order)!;
     const unit: Unit = {
-      id: order.id, owner: c, loc: p, templateId: t.id, path: [], segIdx: 0, segProgress: 0, segDays: 0,
+      id: order.id, owner: c, loc: p, path: [], segIdx: 0, segProgress: 0, segDays: 0,
+      ...(t.templateId ? {templateId:t.templateId} : {customTemplateId:t.customTemplateId,customRevision:t.customRevision}),
       manpower: t.manpower, maxManpower: t.manpower,
       infEquipment: t.infantry, maxInfEquipment: t.infantry,
       artEquipment: t.artillery, maxArtEquipment: t.artillery,

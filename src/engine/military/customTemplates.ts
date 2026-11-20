@@ -1,3 +1,5 @@
+import { divisionTemplate, type DivisionTemplateId } from './templates';
+import type { TrainingOrder } from './templates';
 import type { WorldState } from '../core/state';
 import {
   BATTALION_CATALOG_VERSION, previewTemplate, type TemplateComposition, type TemplateStats,
@@ -11,6 +13,24 @@ export interface CustomTemplateRevision extends TemplateComposition {
   catalogVersion: string;
 }
 
+export interface TrainingSpec {
+  nameJa: string; nameEn: string;
+  manpower: number; infantry: number; artillery: number; days: number;
+  templateId?: DivisionTemplateId; customTemplateId?: number; customRevision?: number;
+}
+export function trainingSpec(w:WorldState,order:Pick<TrainingOrder,'country'|'templateId'|'customTemplateId'|'customRevision'>):TrainingSpec|null {
+  if(order.customTemplateId!==undefined || order.customRevision!==undefined){
+    if(order.templateId!==undefined || !Number.isSafeInteger(order.customTemplateId) ||
+      !Number.isSafeInteger(order.customRevision))return null;
+    const rev=w.customTemplates.find(t=>t.country===order.country && t.templateId===order.customTemplateId && t.revision===order.customRevision);
+    if(!rev)return null;
+    const stats=customTemplateStats(rev);
+    return {nameJa:rev.name,nameEn:rev.name,manpower:stats.manpower,infantry:stats.infantry,
+      artillery:stats.artillery,days:stats.days,customTemplateId:rev.templateId,customRevision:rev.revision};
+  }
+  const legacy=divisionTemplate(order.templateId);
+  return legacy?{...legacy,templateId:legacy.id}:null;
+}
 export const MAX_CUSTOM_TEMPLATES = 128;
 export const MAX_CUSTOM_REVISIONS = 256;
 

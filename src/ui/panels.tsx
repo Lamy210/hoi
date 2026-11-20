@@ -1,8 +1,9 @@
 // パネル群 — 警告フィード／コンテキストパネル／セーブ・ロード／設定／AI判断ログ／外交（phase4）
+import { customTemplateStats } from '../engine/military/customTemplates';
 import { OCCUPATION_DAYS } from '../engine/systems/combat';
 import { DivisionResources } from './ArmyManagement';
 import { DivisionDesignerPreview } from './DivisionDesignerPreview';
-import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from '../engine/military/templates';
+import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING } from '../engine/military/templates';
 import { useEffect, useState } from 'react';
 import { useApp } from './App';
 import { appStore, fmtNumber } from './store';
@@ -784,9 +785,14 @@ export function PendingOrders() {
 export function RecruitmentPanel() {
   const st = useApp(), snap = st.snap!, meta = st.meta!, lang = st.lang;
   const player = snap.countries[snap.playerCountry];
-  const [templateId, setTemplateId] = useState<DivisionTemplateId>('standard-v1');
+  const [templateId, setTemplateId] = useState<string>('standard-v1');
   const [province, setProvince] = useState(st.selection.prov !== null && snap.controller[st.selection.prov] === snap.playerCountry ? st.selection.prov : player.capital);
-  const template = divisionTemplate(templateId)!;
+  const ownTemplates=snap.customTemplates.filter(t=>t.country===snap.playerCountry).sort((a,b)=>a.templateId-b.templateId||b.revision-a.revision).filter((t,i,all)=>i===0||all[i-1].templateId!==t.templateId);
+  const selectedCustom=ownTemplates.find(t=>'custom:'+t.templateId===templateId);
+  const customStats=selectedCustom?customTemplateStats(selectedCustom):null;
+  const builtin=divisionTemplate(templateId);
+  const template=selectedCustom&&customStats ? {nameJa:selectedCustom.name,nameEn:selectedCustom.name,...customStats}:builtin??DIVISION_TEMPLATES[1];
+  useEffect(()=>{if(templateId.startsWith('custom:')&&!selectedCustom)setTemplateId('standard-v1');},[templateId,selectedCustom]);
   const owned = meta.provIds.map((_, i) => i).filter(i => snap.controller[i] === snap.playerCountry);
   const valid = owned.includes(province);
   const nameOf = (p: number) => lang === 'ja' ? meta.provNameJa[p] : meta.provNameEn[p];
@@ -798,8 +804,9 @@ export function RecruitmentPanel() {
     <div className="modal" data-testid="recruit-modal" onClick={e => e.stopPropagation()}>
       <h3>{t(lang, 'mil.recruit')}</h3>
       <PendingOrders />
-      <div className="row"><label>{t(lang, 'mil.template')} <select data-testid="division-template" value={templateId} onChange={e => setTemplateId(e.target.value as DivisionTemplateId)}>
+      <div className="row"><label>{t(lang, 'mil.template')} <select data-testid="division-template" value={templateId} onChange={e => setTemplateId(e.target.value)}>
         {DIVISION_TEMPLATES.map(d => <option key={d.id} value={d.id}>{lang === 'ja' ? d.nameJa : d.nameEn}</option>)}
+        {ownTemplates.map(d=><option key={'custom:'+d.templateId} value={'custom:'+d.templateId}>{d.name} · #{d.templateId} v{d.revision}</option>)}
       </select></label><label>{t(lang, 'mil.deployProvince')} <select data-testid="deploy-province" value={province} onChange={e => setProvince(Number(e.target.value))}>
         {owned.map(p => <option key={p} value={p}>{nameOf(p)}</option>)}
       </select></label></div>
@@ -809,12 +816,13 @@ export function RecruitmentPanel() {
         <div className="kv"><span>{t(lang, 'prod.artStock')}</span><span>{fmtNumber(lang, template.artillery)} / {fmtNumber(lang, Math.floor(player.artEquipmentStock))}</span></div>
         <div className="kv"><span>{t(lang, 'mil.trainingDays')}</span><span>{template.days}</span></div>
       </div>
-      <button className="primary" data-testid="start-training" disabled={!valid || !!missing || st.pendingCommands > 0} onClick={() => engineClient.command('startTraining', { templateId, province })}>{t(lang, 'mil.startTraining')}</button>
+      <button className="primary" data-testid="start-training" disabled={!valid || !!missing || st.pendingCommands > 0} onClick={() => selectedCustom ? engineClient.command('startCustomTraining',{templateId:selectedCustom.templateId,revision:selectedCustom.revision,province}):engineClient.command('startTraining', { templateId, province })}>{t(lang, 'mil.startTraining')}</button>
       {missing && <span className="muted"> {t(lang, missing)}</span>}
       <DivisionDesignerPreview lang={lang} templates={snap.customTemplates} playerCountry={snap.playerCountry} pending={st.pendingCommands} />
       <h4>{t(lang, 'mil.queue')} ({player.training.length}/{MAX_TRAINING})</h4>
       {player.training.map(o => {
-        const d = divisionTemplate(o.templateId)!;
+        const custom=o.customTemplateId!==undefined?snap.customTemplates.find(t=>t.country===o.country&&t.templateId===o.customTemplateId&&t.revision===o.customRevision):null;
+        const d=custom?{nameJa:custom.name,nameEn:custom.name,days:customTemplateStats(custom).days}:divisionTemplate(o.templateId)!;
         const remaining = Math.max(0, o.readyTick - snap.tick);
         return <div className="panel-section" key={o.id} data-testid={'training-' + o.id}>
           <div className="kv"><span>{lang === 'ja' ? d.nameJa : d.nameEn} #{o.id} — {nameOf(o.province)}</span><span>{remaining}/{d.days}</span></div>

@@ -1,7 +1,7 @@
 // コマンドレジストリ — 全コマンドの検証と適用（game-core仕様）。
 // UI（issuer='player'）とAI（issuer='ai:<id>'）は同一の検証を通る。
 import { BATTALION_CATALOG_VERSION, previewTemplate } from './military/templateStats';
-import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName } from './military/customTemplates';
+import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName, trainingSpec } from './military/customTemplates';
 import { MAX_ARMIES, MAX_GROUPS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES, validName, validColor } from './military/armies';
 import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
@@ -195,6 +195,31 @@ export function registerAllCommands(): void {
       w.trainingQueue.push({ id: w.nextUnitId++, country: c, province: p.province as number, templateId: t.id, readyTick: w.tick + t.days });
     },
   });
+  registerCommand('startCustomTraining', {
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer),prov=p.province as number;
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(!Number.isSafeInteger(p.templateId)||!Number.isSafeInteger(p.revision))return 'badParams';
+      const t=trainingSpec(w,{country:c,customTemplateId:p.templateId as number,customRevision:p.revision as number});
+      if(!t)return 'notYourTemplate';
+      if(!Number.isInteger(prov)||prov<0||prov>=w.prov.count)return 'badProvince';
+      if(w.prov.controller[prov]!==c)return 'notControlledByYou';
+      if(w.trainingQueue.filter(o=>o.country===c).length>=MAX_TRAINING||w.nextUnitId>=Number.MAX_SAFE_INTEGER)return 'trainingFull';
+      if(w.countries.manpowerPool[c]<t.manpower)return 'insufficientManpower';
+      if(w.countries.infEquipmentStock[c]<t.infantry)return 'insufficientEquipment';
+      if(w.countries.artEquipmentStock[c]<t.artillery)return 'insufficientArtillery';
+      return null;
+    },
+    apply(w,p,issuer){
+      const c=actorCountry(w,issuer)!,t=trainingSpec(w,{country:c,customTemplateId:p.templateId as number,customRevision:p.revision as number})!;
+      w.countries.manpowerPool[c]-=t.manpower;
+      w.countries.infEquipmentStock[c]-=t.infantry;
+      w.countries.artEquipmentStock[c]-=t.artillery;
+      w.trainingQueue.push({id:w.nextUnitId++,country:c,province:p.province as number,
+        customTemplateId:p.templateId as number,customRevision:p.revision as number,readyTick:w.tick+t.days});
+    },
+  });
+
   registerCommand('cancelTraining', {
     validate(w, p, issuer) {
       const c = actorCountry(w, issuer);

@@ -11,6 +11,9 @@ export interface TrainingOrder {
   id: number;
   country: number;
   province: number;
-  templateId: DivisionTemplateId;
+  templateId?: DivisionTemplateId;
+  /** Frozen reference to one immutable custom revision; legacy orders keep templateId. */
+  customTemplateId?: number;
+  customRevision?: number;
   readyTick: number;
 }
