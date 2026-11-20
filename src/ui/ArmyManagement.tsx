@@ -93,6 +93,11 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
       <button data-testid="unassign-army-group" disabled={!canCommand||!army||army.groupId===null} onClick={()=>army&&engineClient.command('assignArmyGroup',{armyIds:[army.id],groupId:null})}>{label('軍集団から解除','Remove from group')}</button>
       <button data-testid="delete-army-group" disabled={!canCommand||!group||armies.some(a=>a.groupId===group.id)} onClick={()=>group&&engineClient.command('deleteArmyGroup',{id:group.id})}>{label('空軍集団を削除','Delete empty group')}</button>
     </div>
+    {army&&<label className="move-controls">{label('軍団の補充優先度（0〜9）','Army reinforcement priority (0-9)')}
+      <select data-testid="army-reinforcement-priority" disabled={!canCommand} value={army.reinforcementPriority??5} onChange={e=>engineClient.command('setArmyReinforcementPriority',{armyId:army.id,priority:Number(e.target.value)})}>
+        {Array.from({length:10},(_,n)=><option key={n} value={n}>{n}{n===5?' · '+label('標準','Normal'):''}</option>)}
+      </select>
+    </label>}
     <div className="formation-commanders">
       <small>{label('指揮官を選ぶと以前の役職から移籍します。上位指揮官は現在、管理専用で戦闘補正はありません。','Assigning transfers the commander from their previous role. Formation commanders are management-only for now.')}</small>
       {([{kind:'army',formation:army},{kind:'group',formation:group}] as const).map(({kind,formation:f})=>f&&<label key={kind} className="move-controls">
