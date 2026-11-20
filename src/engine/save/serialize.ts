@@ -3,6 +3,7 @@
 import { encode, decode } from '@msgpack/msgpack';
 import { divisionTemplate, MAX_TRAINING } from '../military/templates';
 import { commandIssuerKey, validSequence, legacyWatermarks } from '../core/sequence';
+import { validateCustomTemplates } from '../military/customTemplates';
 import { validateHierarchy } from '../military/armies';
 import { hashWorld } from '../core/hash';
 import type { WorldState } from '../core/state';
@@ -11,7 +12,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 9;
+export const SAVE_SCHEMA_VERSION = 10;
 
 export interface SaveHeader {
   v: number;
@@ -73,6 +74,7 @@ function packStores(w: WorldState): Record<string, unknown> {
     units: w.units,
     armies: w.armies, armyGroups: w.armyGroups,
     trainingQueue: w.trainingQueue,
+    customTemplates: w.customTemplates,
     fronts: w.fronts,
     commanders: w.commanders,
     productionShare: w.productionShare,
@@ -107,6 +109,7 @@ function packStores(w: WorldState): Record<string, unknown> {
     journalStart: w.journalStart,
     counters: {
       nextUnitId: w.nextUnitId,
+      nextCustomTemplateId: w.nextCustomTemplateId,
       nextArmyId: w.nextArmyId, nextArmyGroupId: w.nextArmyGroupId,
       nextWarId: w.nextWarId,
       nextAlertId: w.nextAlertId,
@@ -172,7 +175,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -218,6 +221,10 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   }
   if (h.v >= 7 && (!Array.isArray(s.armies) || !Array.isArray(s.armyGroups) || !validSequence(s.counters.nextArmyId) || !validSequence(s.counters.nextArmyGroupId))) return { world: null, violations: ['invalid army hierarchy stores'] };
   if (h.v < 7 && (s.armies !== undefined || s.armyGroups !== undefined || s.counters.nextArmyId !== undefined || s.counters.nextArmyGroupId !== undefined || (Array.isArray(s.units) && s.units.some((u: any) => u?.armyId !== undefined)))) return { world: null, violations: ['legacy save contains v7 hierarchy'] };
+  if(h.v>=10 && (!Array.isArray(s.customTemplates) || !isRecord(s.counters) || !validSequence(s.counters.nextCustomTemplateId)))
+    return {world:null,violations:['invalid custom template stores']};
+  if(h.v<10&&(s.customTemplates!==undefined||s.counters.nextCustomTemplateId!==undefined))
+    return {world:null,violations:['legacy save contains v10 custom templates']};
   const owner: number[] = s.prov.owner;
   const controller: number[] = s.prov.controller;
   if (!Array.isArray(owner) || owner.length !== provCount) violations.push('owner array size mismatch');
@@ -340,6 +347,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     armies: s.armies ?? [], armyGroups: s.armyGroups ?? [],
     nextArmyId: s.counters.nextArmyId ?? 1, nextArmyGroupId: s.counters.nextArmyGroupId ?? 1,
     trainingQueue: s.trainingQueue ?? [],
+    customTemplates: s.customTemplates ?? [], nextCustomTemplateId: s.counters.nextCustomTemplateId ?? 1,
     fronts: s.fronts ?? [],
     commanders: s.commanders ?? [],
     productionShare: s.productionShare ?? pack.countries.map(() => 0.2),
@@ -398,9 +406,11 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   // 派生再計算 → 整合ハッシュ検証（INV-8）
   recomputeSupply(w);
   if(h.v<9&&[...w.armies,...w.armyGroups].some(f=>f.commanderId!==undefined))return {world:null,violations:['legacy save contains v9 formation commanders']};
+  const templateErrors=validateCustomTemplates(w);
+  if(templateErrors.length)return {world:null,violations:templateErrors};
   const hierarchyErrors = validateHierarchy(w);
   if (hierarchyErrors.length) return { world: null, violations: hierarchyErrors };
-  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9);
+  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }

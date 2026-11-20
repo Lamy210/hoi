@@ -1,0 +1,36 @@
+import { expect, test } from '@playwright/test';
+
+test('自由編成を保存し編集履歴が次tickとUIへ反映される', async ({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-recruit').click();
+  await page.getByTestId('open-division-designer').click();
+  await expect(page.getByTestId('designer-stat-game.manpower')).toHaveText('10000');
+  await page.getByTestId('custom-template-name').fill('試験歩兵');
+  await page.getByTestId('save-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('saved-template-select').locator('option')).toHaveCount(2);
+  await expect(page.getByTestId('saved-template-select').locator('option').nth(1)).toContainText('試験歩兵');
+  await page.getByTestId('saved-template-select').selectOption('1');
+  await page.getByTestId('support-engineer-v1').check();
+  await expect(page.getByTestId('designer-stat-game.manpower')).toHaveText('10200');
+  await page.getByTestId('custom-template-name').fill('工兵付き歩兵');
+  await page.getByTestId('save-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('saved-template-select').locator('option').nth(1)).toContainText('v2');
+  await page.getByTestId('new-custom-template').click();
+  await page.getByTestId('saved-template-select').selectOption('1');
+  await expect(page.getByTestId('custom-template-name')).toHaveValue('工兵付き歩兵');
+  await expect(page.getByTestId('support-engineer-v1')).toBeChecked();
+  await page.getByTestId('delete-custom-template').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('saved-template-select').locator('option')).toHaveCount(1);
+  await expect(page.getByTestId('division-template').locator('option')).toHaveCount(3);
+  expect(errors).toEqual([]);
+});

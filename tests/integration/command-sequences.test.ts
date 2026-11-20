@@ -60,6 +60,7 @@ describe('persistent command sequences', () => {
     applyCommands(w, [{ issuer: 'player', seq: 20, type: 'unknown', p: {} }]);
     w.runtime.aiSeq[0] = 500;
     const old = decode(e.serialize()) as any;
+    delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
     old.header.v = version;
     old.header.integrity = hashWorld(w, true);
     delete old.stores.armies; delete old.stores.armyGroups;

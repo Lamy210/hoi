@@ -91,6 +91,7 @@ describe('army hierarchy and military overview',()=>{
   it('v6-shaped save validates with original hash and migrates unassigned',async()=>{
     const {e,w}=await fixture();
     const old=decode(e.serialize()) as any;
+    delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
     old.header.v=6;old.header.integrity=hashWorld(w,false,false);
     delete old.stores.armies;delete old.stores.armyGroups;
     delete old.stores.counters.nextArmyId;delete old.stores.counters.nextArmyGroupId;

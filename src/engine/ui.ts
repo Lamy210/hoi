@@ -150,6 +150,7 @@ export interface UiSnapshot {
   season: string;
   countries: UiCountry[];
   units: UiUnit[];
+  customTemplates: import('./military/customTemplates').CustomTemplateRevision[];
   armies: import('./military/armies').Army[];
   armyGroups: import('./military/armies').ArmyGroup[];
   wars: UiWar[];
@@ -364,6 +365,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     season: seasonOfMonth(civilFromDays(w.epochDays + w.tick).m),
     countries,
     units,
+    customTemplates: w.customTemplates.map(t=>({...t,battalionIds:t.battalionIds.slice(),supportIds:t.supportIds.slice()})),
     armies: w.armies.map(a => ({...a})), armyGroups: w.armyGroups.map(g => ({...g})),
     wars,
     battles: [...w.runtime.activeBattles].sort((a,b) => a-b),

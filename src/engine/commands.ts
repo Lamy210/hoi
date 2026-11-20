@@ -1,5 +1,7 @@
 // コマンドレジストリ — 全コマンドの検証と適用（game-core仕様）。
 // UI（issuer='player'）とAI（issuer='ai:<id>'）は同一の検証を通る。
+import { BATTALION_CATALOG_VERSION, previewTemplate } from './military/templateStats';
+import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName } from './military/customTemplates';
 import { MAX_ARMIES, MAX_GROUPS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES, validName, validColor } from './military/armies';
 import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
@@ -110,6 +112,63 @@ export function registerAllCommands(): void {
         actor: country, province: prov,
       });
       void issuer;
+    },
+  });
+
+  // Custom templates are country-scoped, immutable per revision and never silently refit existing units.
+  registerCommand('createTemplate', {
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(!validTemplateName(p.name))return 'badParams';
+      if(!previewTemplate({battalionIds:p.battalionIds,supportIds:p.supportIds}).ok)return 'badComposition';
+      if(latestTemplates(w,c).length>=MAX_CUSTOM_TEMPLATES ||
+        w.customTemplates.filter(x=>x.country===c).length>=MAX_CUSTOM_REVISIONS ||
+        w.nextCustomTemplateId>=Number.MAX_SAFE_INTEGER)return 'limitExceeded';
+      return null;
+    },
+    apply(w,p,issuer){
+      w.customTemplates.push({country:actorCountry(w,issuer)!,templateId:w.nextCustomTemplateId++,
+        revision:1,name:p.name as string,catalogVersion:BATTALION_CATALOG_VERSION,
+        battalionIds:[...(p.battalionIds as string[])],supportIds:[...(p.supportIds as string[])]});
+    },
+  });
+  registerCommand('reviseTemplate', {
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if(!Number.isSafeInteger(p.templateId)||!Number.isSafeInteger(p.expectedRevision)||!validTemplateName(p.name))return 'badParams';
+      const t=latestTemplate(w,c,p.templateId as number);
+      if(!t)return 'notYourTemplate';
+      if(t.revision!==p.expectedRevision)return 'staleRevision';
+      if(t.revision>=Number.MAX_SAFE_INTEGER||w.customTemplates.filter(x=>x.country===c).length>=MAX_CUSTOM_REVISIONS)return 'limitExceeded';
+      if(!previewTemplate({battalionIds:p.battalionIds,supportIds:p.supportIds}).ok)return 'badComposition';
+      return null;
+    },
+    apply(w,p,issuer){
+      const t=latestTemplate(w,actorCountry(w,issuer)!,p.templateId as number)!;
+      w.customTemplates.push({country:t.country,templateId:t.templateId,revision:t.revision+1,
+        name:p.name as string,catalogVersion:BATTALION_CATALOG_VERSION,
+        battalionIds:[...(p.battalionIds as string[])],supportIds:[...(p.supportIds as string[])]});
+    },
+  });
+  registerCommand('deleteTemplate', {
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      const id=p.templateId as number;
+      if(!Number.isSafeInteger(id)||!Number.isSafeInteger(p.expectedRevision))return 'badParams';
+      const t=latestTemplate(w,c,id);
+      if(!t)return 'notYourTemplate';
+      if(t.revision!==p.expectedRevision)return 'staleRevision';
+      // The training/refit integration uses numeric custom ID references; reject before extension.
+      if(w.trainingQueue.some(o=>(o as {customTemplateId?:number}).customTemplateId===id) ||
+         w.units.some(u=>(u as {customTemplateId?:number}).customTemplateId===id))return 'templateInUse';
+      return null;
+    },
+    apply(w,p,issuer){
+      const c=actorCountry(w,issuer)!;
+      w.customTemplates=w.customTemplates.filter(t=>t.country!==c||t.templateId!==p.templateId);
     },
   });
 

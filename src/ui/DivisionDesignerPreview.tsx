@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { validTemplateName, type CustomTemplateRevision } from '../engine/military/customTemplates';
 import { BUILTIN_BATTALIONS, MAX_BATTALIONS, type TemplatePreview } from '../engine/military/templateStats';
 import { engineClient } from './engineClient';
 import { t } from './i18n';
@@ -6,12 +7,23 @@ import { t } from './i18n';
 type Lang = 'ja' | 'en';
 const initial = () => Array<string>(10).fill('infantry-v1');
 
-export function DivisionDesignerPreview({ lang }: { lang: Lang }) {
+export function DivisionDesignerPreview({ lang, templates, playerCountry, pending }: { lang: Lang; templates: CustomTemplateRevision[]; playerCountry: number; pending: number }) {
   const [open, setOpen] = useState(false);
   const [battalions, setBattalions] = useState<string[]>(initial);
   const [supports, setSupports] = useState<string[]>([]);
   const [preview, setPreview] = useState<TemplatePreview | null>(null);
   const [failed, setFailed] = useState(false);
+  const [templateName, setTemplateName] = useState('');
+  const [editId, setEditId] = useState<number | null>(null);
+  const latest = [...templates.filter(t => t.country === playerCountry)].sort((a,b) => a.templateId-b.templateId || b.revision-a.revision).filter((t, i, all) => i === 0 || t.templateId !== all[i-1].templateId);
+  const editing = latest.find(t=>t.templateId === editId);
+  const resetEditor = () => { setEditId(null); setTemplateName(''); update(initial()); setSupports([]); };
+  const save = () => {
+    if (pending || !preview?.ok || !validTemplateName(templateName)) return;
+    const composition = { battalionIds: battalions.slice(), supportIds: supports.slice(), name: templateName };
+    if(editing) engineClient.command('reviseTemplate', { ...composition, templateId: editing.templateId, expectedRevision: editing.revision });
+    else engineClient.command('createTemplate', composition);
+  };
   useEffect(() => {
     if (!open) return;
     let active = true;
@@ -50,6 +62,25 @@ export function DivisionDesignerPreview({ lang }: { lang: Lang }) {
     {open && <div data-testid="division-designer">
       <h4 style={{ marginTop: 10 }}>{t(lang, 'designer.title')}</h4>
       <p className="muted">{t(lang, 'designer.notice')}</p>
+      <div className="panel-section" data-testid="saved-templates">
+        <label>{lang==='ja'?'保存済み編成':'Saved templates'} <select data-testid="saved-template-select" value={editing?.templateId ?? ''} onChange={e=>{
+          const template=latest.find(t=>t.templateId===Number(e.target.value));
+          if(!template){resetEditor();return;}
+          setEditId(template.templateId);setTemplateName(template.name);setPreview(null);
+          setBattalions(template.battalionIds.slice());setSupports(template.supportIds.slice());
+        }}><option value="">{lang==='ja'?'新規編成':'New template'}</option>
+          {latest.map(x=><option key={x.templateId} value={x.templateId}>{x.name} · #{x.templateId} v{x.revision}</option>)}
+        </select></label>
+        <label>{lang==='ja'?'編成名':'Template name'} <input data-testid="custom-template-name" value={templateName} maxLength={64} placeholder={lang==='ja'?'編成名':'Template name'} onChange={e=>setTemplateName(e.target.value)}/></label>
+        <div className="row">
+          <button type="button" data-testid="save-custom-template" disabled={pending>0||!preview?.ok||!validTemplateName(templateName)} onClick={save}>{editing?(lang==='ja'?'改訂を保存':'Save revision'):(lang==='ja'?'新規編成を保存':'Save new template')}</button>
+          <button type="button" data-testid="new-custom-template" onClick={resetEditor}>{lang==='ja'?'新規に戻す':'Start new'}</button>
+          {editing&&<button type="button" data-testid="delete-custom-template" disabled={pending>0} onClick={()=>{
+            engineClient.command('deleteTemplate',{templateId:editing.templateId,expectedRevision:editing.revision});resetEditor();
+          }}>{lang==='ja'?'編成を削除':'Delete template'}</button>}
+        </div>
+        <small>{lang==='ja'?'改訂すると過去の版は保持されます。現時点では独自編成の訓練・配備は未対応です。':'Revisions preserve history. Training and deployment of custom templates are not yet available.'}</small>
+      </div>
       <b>{t(lang, 'designer.battalions')} ({battalions.length}/{MAX_BATTALIONS})</b>
       {BUILTIN_BATTALIONS.filter(d => d.category === 'battalion').map(d => {
         const count = battalions.filter(id => id === d.id).length;

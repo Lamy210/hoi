@@ -248,6 +248,8 @@ export interface WorldState {
   nextArmyId: number;
   nextArmyGroupId: number;
   trainingQueue: import('../military/templates').TrainingOrder[];
+  customTemplates: import('../military/customTemplates').CustomTemplateRevision[];
+  nextCustomTemplateId: number;
   fronts: Front[];
   commanders: Commander[];
   productionShare: number[]; // 国ごとの火砲配分率 0..0.5
