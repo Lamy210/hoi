@@ -85,6 +85,7 @@ export interface UiUnit {
   loc: number;
   moving: boolean;
   target: number; // 移動先（移動中のみ有効）
+  route: number[]; // 現在州から残りの実経路
   org: number;
   strength: number; // manpower/maxManpower
   infEquipment: number;
@@ -260,6 +261,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       loc: u.loc,
       moving: u.path.length > 0,
       target: u.path.length > 0 ? u.path[u.path.length - 1] : -1,
+      route: u.path.length > 0 ? [u.loc, ...u.path.slice(u.segIdx + 1)] : [],
       org: Math.round(u.org * 10) / 10,
       strength: u.maxManpower > 0 ? Math.round((u.manpower / u.maxManpower) * 1000) / 1000 : 0,
       infEquipment: Math.round(u.infEquipment),

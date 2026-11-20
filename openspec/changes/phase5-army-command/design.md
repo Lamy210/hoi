@@ -32,3 +32,5 @@ Operation{id,owner,armyId?,kind:frontline|offensive|fallback|garrison|rally,stat
 
 ## 保存・性能
 想定順のschemaはv7（docs/20の予約表、実装時確定）。旧frontIdを作戦へ変換し旧unit/commander IDを維持。旧移動中のsegProgressを保持。新しいmanualHold、waypoints、operationRevision、階層・命令をハッシュ/保存。部隊消滅時参照解除、国消滅で作戦停止。UI選択は保存不要。部隊index・経路キャッシュは支配/通行権/海峡変化で失効。1024師団選択表示の描画負荷も測定するが1コマンド上限256を維持。
+## 先行修正: 師団所在・一括移動UI
+playable-map-controlsで自国師団カウンター、一覧・複数選択、明示目的州指示、残経路描画を先行実装する。永続Army/Group/Operation、矩形選択、移動中の経路変更・停止・手動holdは未実装で本Changeのタスクを完了扱いにしない。現段階では移動・戦闘・包囲中の手動移動は拒否し、再指示によるセグメント巻戻しを防ぐ。右クリックや移動モードは現行tick境界を維持する。軍団・作戦実装時にこの制限を置換する。

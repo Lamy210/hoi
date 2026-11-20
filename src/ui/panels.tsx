@@ -57,8 +57,8 @@ export function ContextPanel() {
   const lang = st.lang;
   const snap = st.snap!;
   const meta = st.meta!;
-  const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
+  const selProv = selUnit?.loc ?? st.selection.prov;
   const player = snap.countries[snap.playerCountry];
 
   if (selProv === null && !selUnit) {
@@ -185,13 +185,14 @@ export function ContextPanel() {
     return (
       <div className="panel-section" data-testid="unit-panel">
         <h4>{t(lang, 'panel.unit')} #{u.id} — {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}</h4>
+        <div className="kv"><span className="k">{t(lang, 'units.location')}</span><span data-testid="unit-location">{lang === 'ja' ? meta.provNameJa[u.loc] : meta.provNameEn[u.loc]} ({meta.provIds[u.loc]})</span></div>
         <div className="kv"><span className="k">{t(lang, 'panel.org')}</span><span data-testid="unit-org">{Math.round(u.org)} / 100</span></div>
         <div className="kv"><span className="k">{t(lang, 'panel.strength')}</span><span>{Math.round(u.strength * 100)}%</span></div>
         <div className="kv"><span className="k">{t(lang, 'game.equipment')}</span><span>{u.infEquipment}/{u.maxInfEquipment} + {u.artEquipment}/{u.maxArtEquipment}</span></div>
         <div className="kv"><span className="k">{t(lang, 'panel.supplyEff')}</span><span>{Math.round(u.supply * 100)}%</span></div>
         {u.inBattle && <div className="kv"><span className="k">state</span><span>{t(lang, 'panel.inBattle')}</span></div>}
         {u.encircled && <div className="kv"><span className="k">state</span><span style={{ color: '#e08b84' }}>{t(lang, 'panel.encircled')}</span></div>}
-        {u.moving && <div className="kv"><span className="k">{t(lang, 'panel.moving')}</span><span>{t(lang, 'misc.movingTo', { target: targetName ?? '' })}</span></div>}
+        {u.moving && <div className="kv" data-testid="unit-moving"><span className="k">{t(lang, 'panel.moving')}</span><span>{t(lang, 'misc.movingTo', { target: targetName ?? '' })}</span></div>}
         <div className="kv"><span className="k">{t(lang, 'cmdr.assign')}</span>
           <select
             data-testid="cmdr-select"
