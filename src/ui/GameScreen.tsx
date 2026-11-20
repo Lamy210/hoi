@@ -5,6 +5,7 @@ import { appStore } from './store';
 import { t } from './i18n';
 import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
+import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
 import type { MapDataSource, MapRenderer } from './maprender/types';
@@ -380,6 +381,7 @@ export function GameScreen() {
           <section className="panel-section unit-roster" data-testid="unit-roster">
             <button data-testid="toggle-unit-roster" aria-expanded={rosterOpen} onClick={() => setRosterOpen(!rosterOpen)}>{t(lang, 'units.roster')} ({ownUnits.length}) {rosterOpen ? '▴' : '▾'}</button>
             {rosterOpen && <>
+              <ArmyManagement key={snap.playerCountry + ':' + meta.packId} snap={snap} lang={lang} selectedIds={selectedIds} pending={st.pendingCommands} onSelect={ids => selectUnits(ids)} />
               <div className="muted">{t(lang, 'units.hint')}</div>
               <div className="unit-roster-list">
                 {ownUnits.map(u => <div className="unit-roster-entry" key={u.id}>
@@ -389,8 +391,10 @@ export function GameScreen() {
                   <button data-testid={'unit-roster-' + u.id} data-unit-id={u.id} data-location={meta.provIds[u.loc]} aria-pressed={selectedIds.includes(u.id)}
                     onClick={() => selectUnits([u.id])}>
                     #{u.id} {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}<br />
+                    {u.armyId !== null && <span>{snap.armies.find(a=>a.id===u.armyId)?.name} · </span>}
                     {nameOf(u.loc)} ({meta.provIds[u.loc]}) — {u.inBattle ? t(lang, 'panel.inBattle') : u.encircled ? t(lang, 'panel.encircled') : u.moving ? t(lang, 'misc.movingTo', { target: nameOf(u.target) }) : t(lang, 'units.idle')}
                   </button>
+                  <details className="unit-resources-details"><summary>{lang === 'ja' ? '装備・補給' : 'Equipment & supply'}</summary><DivisionResources unit={u} lang={lang}/></details>
                 </div>)}
                 {!ownUnits.length && <span className="muted">{t(lang, 'units.none')}</span>}
               </div>
