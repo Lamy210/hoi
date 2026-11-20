@@ -2,7 +2,7 @@
 // 移動速度: speedKm = 60 + 28×infra、供給修正 ×(0.5+0.5×supplyEff)。
 // 通行権（phase4-diplomacy-treaties）: access条約または同盟の相手領は通過可。
 import { bakedDistanceKm } from '../core/num';
-import { atWar, type WorldState } from '../core/state';
+import { atWar, type Unit, type WorldState } from '../core/state';
 import { getEdge } from '../map/adjacency';
 import { weatherMoveMod } from './weather';
 import { activeTreatyBetween, isAllied } from '../diplomacy/treaties';
@@ -137,4 +137,27 @@ export function tickMovement(w: WorldState): void {
       }
     }
   }
+}
+
+
+/** A route edit preserves an already-started segment. No new persistent state is needed. */
+export interface MovementEdit {
+  path: number[];
+  segIdx: number;
+  segProgress: number;
+  segDays: number;
+}
+export function planMovementEdit(w: WorldState,u: Unit,target: number|null): MovementEdit|null {
+  const started=u.path.length>0&&u.segProgress>0&&u.segIdx<u.path.length-1;
+  const from=started?u.path[u.segIdx+1]:u.loc;
+  if (target===null) {
+    return started?{path:[u.loc,from],segIdx:0,segProgress:u.segProgress,segDays:u.segDays}:{path:[],segIdx:0,segProgress:0,segDays:0};
+  }
+  // Redirect is peaceful travel only. A started hostile approach must first finish or be blocked by access rules.
+  if (atWar(w,u.owner,w.prov.controller[from])||atWar(w,u.owner,w.prov.controller[target])) return null;
+  const suffix=findPath(w,from,target,u.owner,false);
+  if(!suffix)return null;
+  if(started)return {path:[u.loc,...suffix],segIdx:0,segProgress:u.segProgress,segDays:u.segDays};
+  if(suffix.length===1)return {path:[],segIdx:0,segProgress:0,segDays:0};
+  return {path:suffix,segIdx:0,segProgress:0,segDays:segmentDays(w,suffix[0],suffix[1])};
 }
