@@ -3,6 +3,7 @@
 import { encode, decode } from '@msgpack/msgpack';
 import { divisionTemplate, MAX_TRAINING } from '../military/templates';
 import { commandIssuerKey, validSequence, legacyWatermarks } from '../core/sequence';
+import { previewTemplate } from '../military/templateStats';
 import { validateCustomTemplates } from '../military/customTemplates';
 import { validateHierarchy } from '../military/armies';
 import { hashWorld } from '../core/hash';
@@ -12,7 +13,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 10;
+export const SAVE_SCHEMA_VERSION = 11;
 
 export interface SaveHeader {
   v: number;
@@ -175,7 +176,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 10 && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -240,6 +241,13 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     for (const u of s.units as any[]) {
       if (!Number.isSafeInteger(u.id) || u.id < 1 || u.id >= next || ids.has(u.id)) violations.push('invalid unit id');
       ids.add(u.id);
+      if (u.customTemplateId!==undefined||u.customRevision!==undefined) {
+        const rev=(s.customTemplates??[]).find((t: any)=>t&&t.country===u.owner&&t.templateId===u.customTemplateId&&t.revision===u.customRevision);
+        const check=rev?previewTemplate({battalionIds:rev.battalionIds,supportIds:rev.supportIds}):null;
+        if(h.v<11||u.templateId!==undefined||!Number.isSafeInteger(u.customTemplateId)||!Number.isSafeInteger(u.customRevision)||!check?.ok ||
+          u.maxManpower!==check.stats.manpower||u.maxInfEquipment!==check.stats.infantry||u.maxArtEquipment!==check.stats.artillery)
+          violations.push('invalid custom division unit');
+      }
       if (u.templateId !== undefined) {
         const t = divisionTemplate(u.templateId);
         if (!t || u.maxManpower !== t.manpower || u.maxInfEquipment !== t.infantry || u.maxArtEquipment !== t.artillery) violations.push('invalid unit template');
@@ -252,7 +260,12 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     }
     const counts = new Array<number>(ctryCount).fill(0);
     for (const o of s.trainingQueue ?? []) {
-      if (!o || !Number.isSafeInteger(o.id) || o.id < 1 || o.id >= next || ids.has(o.id) || !Number.isInteger(o.country) || o.country < 0 || o.country >= ctryCount || !Number.isInteger(o.province) || o.province < 0 || o.province >= provCount || !divisionTemplate(o.templateId) || !Number.isSafeInteger(o.readyTick) || o.readyTick <= h.tick || o.readyTick > h.tick + 60) { violations.push('invalid training order'); continue; }
+      const custom = o && (o.customTemplateId!==undefined||o.customRevision!==undefined);
+      const rev=custom?(s.customTemplates??[]).find((t:any)=>t&&t.country===o.country&&t.templateId===o.customTemplateId&&t.revision===o.customRevision):null;
+      const check=rev?previewTemplate({battalionIds:rev.battalionIds,supportIds:rev.supportIds}):null;
+      const validTemplate=custom ? (h.v>=11&&o.templateId===undefined&&Number.isSafeInteger(o.customTemplateId)&&Number.isSafeInteger(o.customRevision)&&check?.ok) : !!divisionTemplate(o?.templateId);
+      const daysLimit=custom?180:60;
+      if (!o || !Number.isSafeInteger(o.id) || o.id < 1 || o.id >= next || ids.has(o.id) || !Number.isInteger(o.country) || o.country < 0 || o.country >= ctryCount || !Number.isInteger(o.province) || o.province < 0 || o.province >= provCount || !validTemplate || !Number.isSafeInteger(o.readyTick) || o.readyTick <= h.tick || o.readyTick > h.tick + daysLimit) { violations.push('invalid training order'); continue; }
       ids.add(o.id);
       if (++counts[o.country] > MAX_TRAINING) violations.push('training queue limit');
     }
@@ -410,7 +423,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if(templateErrors.length)return {world:null,violations:templateErrors};
   const hierarchyErrors = validateHierarchy(w);
   if (hierarchyErrors.length) return { world: null, violations: hierarchyErrors };
-  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10);
+  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10, h.v >= 11);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }
