@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -243,6 +243,10 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
     h=mixStr(h,'custom-training-v11');
     for(const o of w.trainingQueue){h=mixFloat(h,o.customTemplateId??0);h=mixFloat(h,o.customRevision??0);}
     for(const u of w.units){h=mixFloat(h,u.customTemplateId??0);h=mixFloat(h,u.customRevision??0);}
+  }
+  if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&includeCustomTemplates&&includeCustomTraining&&includeReinforcementPriority){
+    h=mixStr(h,'army-reinforcement-priority-v12');
+    for(const a of w.armies)h=mixInt(h,a.reinforcementPriority??5);
   }
   return h >>> 0;
 }
