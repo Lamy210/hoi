@@ -431,7 +431,7 @@ export function registerAllCommands(): void {
         if (u.owner !== country) return 'notYourUnit:' + id;
         if (u.destroyed) return 'unitDestroyed:' + id;
         if (u.encircled) return 'unitEncircled:' + id;
-        if ((issuer === 'player' || issuer === 'frontai') && (u.path.length > 0 || w.runtime.activeBattles.has(u.loc))) return 'unitBusy:' + id;
+        if (issuer === 'player' && (u.path.length > 0 || w.runtime.activeBattles.has(u.loc))) return 'unitBusy:' + id;
         if (u.loc !== target) movable++;
       }
       if (movable === 0) return 'alreadyAtTarget';
