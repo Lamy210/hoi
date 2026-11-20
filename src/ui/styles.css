@@ -129,3 +129,18 @@ input, select {
 .division-resources { font-size:12px; display:grid; gap:4px; margin:4px 0; }
 .division-resources progress { display:block; width:100%; height:7px; accent-color:#78a7d1; }
 .division-resources small { opacity:.85; }
+
+/* Common projected front layer, deliberately non-interactive and distinct from live routes. */
+.front-plans { position:absolute; inset:0; width:100%; height:100%; pointer-events:none; }
+.front-plan { color:#e4c67b; opacity:.72; }
+.front-plan.attack { color:#f0a96d; }
+.front-plan.retreat { color:#c3b3eb; }
+.front-plan.highlighted { opacity:1; color:#ffe29a; }
+.front-plan.paused { opacity:.48; color:#c1c5cd; }
+.front-province,.front-target { stroke:currentColor; stroke-width:2; fill:none; stroke-dasharray:4 3; }
+.front-link { stroke:currentColor; stroke-width:4; stroke-linecap:round; }
+.front-arrow { stroke:currentColor; stroke-width:3; stroke-dasharray:6 4; }
+.front-arrowhead { fill:currentColor; }
+.front-label { fill:currentColor; font:bold 12px sans-serif; paint-order:stroke; stroke:#18212d; stroke-width:3px; }
+.front-plan.highlighted .front-province { stroke-width:3; }
+.front-overview { font-size:12px; }
