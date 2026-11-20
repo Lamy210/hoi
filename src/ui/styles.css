@@ -118,3 +118,14 @@ input, select {
 
 .unit-overlay .unit-marker.hostile { background: #813c40; border-color: #e7a4a4; }
 .unit-overlay .unit-marker.battling { box-shadow: 0 0 0 2px #eea655; }
+
+.army-management { border:1px solid #566477; padding:6px; border-radius:5px; margin:5px 0; }
+.army-management h4 { margin:4px 0; }
+.army-bar { display:flex; gap:4px; flex-wrap:wrap; max-height:100px; overflow:auto; }
+.army-management input { min-width:0; max-width:100%; }
+.army-management select { max-width:100%; }
+.unit-roster-entry { flex-wrap:wrap; }
+.unit-resources-details { width:100%; font-size:12px; }
+.division-resources { font-size:12px; display:grid; gap:4px; margin:4px 0; }
+.division-resources progress { display:block; width:100%; height:7px; accent-color:#78a7d1; }
+.division-resources small { opacity:.85; }

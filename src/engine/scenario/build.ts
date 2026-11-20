@@ -102,6 +102,7 @@ export function buildWorld(pack: Pack, opts: BuildOptions): WorldState {
     treaties: [],
     wars: [],
     units: [],
+    armies: [], armyGroups: [], nextArmyId: 1, nextArmyGroupId: 1,
     trainingQueue: [],
     fronts: [],
     commanders: [],

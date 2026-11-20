@@ -48,6 +48,8 @@ describe('師団募集・配備', () => {
     const old = decode(e.serialize()) as any;
     old.header.v = 4;
     old.header.integrity = hashWorld(e.world, true);
+    delete old.stores.armies; delete old.stores.armyGroups;
+    delete old.stores.counters.nextArmyId; delete old.stores.counters.nextArmyGroupId;
     delete old.stores.commandWatermarks;
     delete old.stores.pendingCommands;
     delete old.stores.trainingQueue;

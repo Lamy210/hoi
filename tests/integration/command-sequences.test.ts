@@ -62,6 +62,8 @@ describe('persistent command sequences', () => {
     const old = decode(e.serialize()) as any;
     old.header.v = version;
     old.header.integrity = hashWorld(w, true);
+    delete old.stores.armies; delete old.stores.armyGroups;
+    delete old.stores.counters.nextArmyId; delete old.stores.counters.nextArmyGroupId;
     delete old.stores.commandWatermarks;
     delete old.stores.pendingCommands;
     if (version === 4) {

@@ -1,5 +1,6 @@
 // コマンドレジストリ — 全コマンドの検証と適用（game-core仕様）。
 // UI（issuer='player'）とAI（issuer='ai:<id>'）は同一の検証を通る。
+import { MAX_ARMIES, MAX_GROUPS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES, validName, validColor } from './military/armies';
 import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
 import { addAlert, atWar, type Cmd, type TreatyType, type WorldState } from './core/state';
@@ -506,6 +507,70 @@ export function registerAllCommands(): void {
         u.segDays = segmentDays(w, u.loc, target);
       }
     },
+  });
+
+  registerCommand('createArmy', {
+    validate(w,p,issuer) {
+      const c = actorCountry(w,issuer);
+      if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
+      if (!validName(p.name) || !validColor(p.color)) return 'badParams';
+      if (w.armies.filter(a => a.owner === c).length >= MAX_ARMIES || w.nextArmyId >= Number.MAX_SAFE_INTEGER) return 'limitExceeded';
+      return null;
+    },
+    apply(w,p,issuer) { w.armies.push({id:w.nextArmyId++,owner:actorCountry(w,issuer)!,name:p.name as string,color:p.color as string,groupId:null}); },
+  });
+  registerCommand('createArmyGroup', {
+    validate(w,p,issuer) {
+      const c = actorCountry(w,issuer);
+      if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
+      if (!validName(p.name) || !validColor(p.color)) return 'badParams';
+      if (w.armyGroups.filter(a => a.owner === c).length >= MAX_GROUPS || w.nextArmyGroupId >= Number.MAX_SAFE_INTEGER) return 'limitExceeded';
+      return null;
+    },
+    apply(w,p,issuer) { w.armyGroups.push({id:w.nextArmyGroupId++,owner:actorCountry(w,issuer)!,name:p.name as string,color:p.color as string}); },
+  });
+  registerCommand('assignArmy', {
+    validate(w,p,issuer) {
+      const c = actorCountry(w,issuer), ids = p.unitIds;
+      if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
+      if (!Array.isArray(ids) || !ids.length || ids.length > 256 || new Set(ids).size !== ids.length) return 'badParams';
+      if (p.armyId !== null && !w.armies.some(a => a.id === p.armyId && a.owner === c)) return 'notYourArmy';
+      for (const id of ids) if (!w.units.some(u => u.id === id && !u.destroyed && u.owner === c)) return 'notYourUnit';
+      const count = w.units.filter(u => !u.destroyed && u.armyId === p.armyId && !ids.includes(u.id)).length;
+      if (p.armyId !== null && count + ids.length > MAX_ARMY_UNITS) return 'limitExceeded';
+      return null;
+    },
+    apply(w,p) { const ids = new Set(p.unitIds as number[]); for (const u of w.units) if (ids.has(u.id)) u.armyId = p.armyId as number | null; },
+  });
+  registerCommand('assignArmyGroup', {
+    validate(w,p,issuer) {
+      const c = actorCountry(w,issuer), ids = p.armyIds;
+      if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
+      if (!Array.isArray(ids) || !ids.length || ids.length > MAX_ARMIES || new Set(ids).size !== ids.length) return 'badParams';
+      if (p.groupId !== null && !w.armyGroups.some(g => g.id === p.groupId && g.owner === c)) return 'notYourArmy';
+      for (const id of ids) if (!w.armies.some(a => a.id === id && a.owner === c)) return 'notYourArmy';
+      if (p.groupId !== null && w.armies.filter(a => a.groupId === p.groupId && !ids.includes(a.id)).length + ids.length > MAX_GROUP_ARMIES) return 'limitExceeded';
+      return null;
+    },
+    apply(w,p) { const ids = new Set(p.armyIds as number[]); for (const a of w.armies) if (ids.has(a.id)) a.groupId = p.groupId as number | null; },
+  });
+  registerCommand('deleteArmy', {
+    validate(w,p,issuer) {
+      const c = actorCountry(w,issuer);
+      if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
+      if (!w.armies.some(a => a.id === p.id && a.owner === c)) return 'notYourArmy';
+      return w.units.some(u => u.armyId === p.id) ? 'armyNotEmpty' : null;
+    },
+    apply(w,p) { w.armies = w.armies.filter(a => a.id !== p.id); },
+  });
+  registerCommand('deleteArmyGroup', {
+    validate(w,p,issuer) {
+      const c = actorCountry(w,issuer);
+      if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
+      if (!w.armyGroups.some(a => a.id === p.id && a.owner === c)) return 'notYourArmy';
+      return w.armies.some(a => a.groupId === p.id) ? 'armyNotEmpty' : null;
+    },
+    apply(w,p) { w.armyGroups = w.armyGroups.filter(a => a.id !== p.id); },
   });
 
   registerCommand('declareWar', {

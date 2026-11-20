@@ -5,6 +5,7 @@ import { appStore } from './store';
 import { t } from './i18n';
 import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
+import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
 import type { MapDataSource, MapRenderer } from './maprender/types';
@@ -41,6 +42,8 @@ export function GameScreen() {
   const [attackMode, setAttackMode] = useState(false);
   const [destination, setDestination] = useState('');
   const [rosterOpen, setRosterOpen] = useState(true);
+  const [rosterQuery, setRosterQuery] = useState('');
+  const [rosterFilter, setRosterFilter] = useState('all');
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -234,6 +237,16 @@ export function GameScreen() {
   const gameSnap = snap;
   const ownUnits = snap.units.filter(u => u.owner === snap.playerCountry);
   const chosen = ownUnits.filter(u => selectedIds.includes(u.id));
+  const visibleUnits = ownUnits.filter(u => {
+    const a = snap.armies.find(a => a.id === u.armyId);
+    const text = [String(u.id), meta.provIds[u.loc], meta.provNameJa[u.loc], meta.provNameEn[u.loc], a?.name ?? ''].join(' ').toLowerCase();
+    if (!text.includes(rosterQuery.trim().toLowerCase())) return false;
+    if (rosterFilter === 'unassigned') return u.armyId === null;
+    if (rosterFilter === 'lowSupply') return u.supply < 0.5;
+    if (rosterFilter === 'deficit') return u.manpower < u.maxManpower || u.infEquipment < u.maxInfEquipment || u.artEquipment < u.maxArtEquipment;
+    if (rosterFilter === 'selected') return selectedIds.includes(u.id);
+    return true;
+  });
   const canMove = chosen.length > 0 && chosen.length <= 256 && chosen.every(u => !u.moving && !u.encircled && !u.inBattle) && st.pendingCommands === 0;
   const attackTargets = chosen.length && canMove ? chosen[0].attackTargets.filter(p => chosen.every(u => u.attackTargets.includes(p))) : [];
   const nameOf = (p: number) => lang === 'ja' ? gameMeta.provNameJa[p] : gameMeta.provNameEn[p];
@@ -380,19 +393,29 @@ export function GameScreen() {
           <section className="panel-section unit-roster" data-testid="unit-roster">
             <button data-testid="toggle-unit-roster" aria-expanded={rosterOpen} onClick={() => setRosterOpen(!rosterOpen)}>{t(lang, 'units.roster')} ({ownUnits.length}) {rosterOpen ? '▴' : '▾'}</button>
             {rosterOpen && <>
+              <ArmyManagement key={snap.playerCountry + ':' + meta.packId} snap={snap} lang={lang} selectedIds={selectedIds} pending={st.pendingCommands} onSelect={ids => selectUnits(ids)} />
               <div className="muted">{t(lang, 'units.hint')}</div>
+              <div className="move-controls">
+                <input data-testid="roster-query" aria-label={lang==='ja'?'師団・州・軍団の検索':'Search divisions'} placeholder={lang==='ja'?'師団ID・州・軍団名':'ID, province, army'} value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)}/>
+                <select data-testid="roster-filter" aria-label={lang==='ja'?'師団の絞り込み':'Division filter'} value={rosterFilter} onChange={e=>setRosterFilter(e.target.value)}>
+                  <option value="all">{lang==='ja'?'全師団':'All'}</option><option value="selected">{lang==='ja'?'選択中':'Selected'}</option><option value="unassigned">{lang==='ja'?'軍団未所属':'Unassigned'}</option><option value="lowSupply">{lang==='ja'?'補給50%未満':'Supply below 50%'}</option><option value="deficit">{lang==='ja'?'人員・装備不足':'Manpower/equipment deficit'}</option>
+                </select>
+                <span data-testid="roster-count">{visibleUnits.length} / {ownUnits.length}</span>
+              </div>
               <div className="unit-roster-list">
-                {ownUnits.map(u => <div className="unit-roster-entry" key={u.id}>
+                {visibleUnits.map(u => <div className="unit-roster-entry" key={u.id}>
                   <input type="checkbox" aria-label={t(lang, 'units.select') + ' #' + u.id} data-testid={'unit-check-' + u.id}
                     checked={selectedIds.includes(u.id)} disabled={!selectedIds.includes(u.id) && chosen.length >= 256}
                     onChange={e => selectUnits(e.target.checked ? [...selectedIds, u.id] : selectedIds.filter(id => id !== u.id), false)} />
                   <button data-testid={'unit-roster-' + u.id} data-unit-id={u.id} data-location={meta.provIds[u.loc]} aria-pressed={selectedIds.includes(u.id)}
                     onClick={() => selectUnits([u.id])}>
                     #{u.id} {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}<br />
+                    {u.armyId !== null && <span>{snap.armies.find(a=>a.id===u.armyId)?.name} · </span>}
                     {nameOf(u.loc)} ({meta.provIds[u.loc]}) — {u.inBattle ? t(lang, 'panel.inBattle') : u.encircled ? t(lang, 'panel.encircled') : u.moving ? t(lang, 'misc.movingTo', { target: nameOf(u.target) }) : t(lang, 'units.idle')}
                   </button>
+                  <details className="unit-resources-details"><summary>{lang === 'ja' ? '装備・補給' : 'Equipment & supply'}</summary><DivisionResources unit={u} lang={lang}/></details>
                 </div>)}
-                {!ownUnits.length && <span className="muted">{t(lang, 'units.none')}</span>}
+                {!visibleUnits.length && <span className="muted">{ownUnits.length ? (lang==='ja'?'該当師団なし':'No matching divisions') : t(lang, 'units.none')}</span>}
               </div>
               <div className="move-controls">
                 <span data-testid="selected-unit-count">{t(lang, 'units.selected', { count: chosen.length })}</span>

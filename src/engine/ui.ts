@@ -79,6 +79,11 @@ export interface UiCommander {
 }
 
 export interface UiUnit {
+  armyId: number | null;
+  manpower: number;
+  maxManpower: number;
+  supplyBase: number;
+  supplyCapacityFactor: number;
   templateId?: DivisionTemplateId;
   id: number;
   owner: number;
@@ -138,6 +143,8 @@ export interface UiSnapshot {
   season: string;
   countries: UiCountry[];
   units: UiUnit[];
+  armies: import('./military/armies').Army[];
+  armyGroups: import('./military/armies').ArmyGroup[];
   wars: UiWar[];
   battles: number[];
   occupation: { province: number; candidate: number; days: number }[];
@@ -260,6 +267,9 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     .map((u) => ({
       id: u.id,
       templateId: u.templateId,
+      armyId: u.armyId ?? null,
+      manpower: u.manpower, maxManpower: u.maxManpower,
+      supplyBase: w.runtime.supplyEff[u.loc], supplyCapacityFactor: w.runtime.unitSupplyFactor.get(u.id) ?? 1,
       owner: u.owner,
       loc: u.loc,
       moving: u.path.length > 0,
@@ -269,13 +279,13 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
         u.org <= 0 || w.prov.controller[u.loc] !== u.owner ? [] :
         w.adj.targets.slice(w.adj.offsets[u.loc], w.adj.offsets[u.loc + 1]).filter((p, i) =>
           !w.adj.strait[w.adj.offsets[u.loc] + i] && atWar(w, u.owner, w.prov.controller[p])),
-      org: Math.round(u.org * 10) / 10,
+      org: u.org,
       strength: u.maxManpower > 0 ? Math.round((u.manpower / u.maxManpower) * 1000) / 1000 : 0,
-      infEquipment: Math.round(u.infEquipment),
+      infEquipment: u.infEquipment,
       maxInfEquipment: u.maxInfEquipment,
-      artEquipment: Math.round(u.artEquipment),
+      artEquipment: u.artEquipment,
       maxArtEquipment: u.maxArtEquipment,
-      supply: Math.round(effectiveSupply(w, u) * 1000) / 1000,
+      supply: effectiveSupply(w, u),
       frontId: u.frontId,
       commanderId: u.commanderId,
       encircled: u.encircled,
@@ -340,6 +350,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     season: seasonOfMonth(civilFromDays(w.epochDays + w.tick).m),
     countries,
     units,
+    armies: w.armies.map(a => ({...a})), armyGroups: w.armyGroups.map(g => ({...g})),
     wars,
     battles: [...w.runtime.activeBattles].sort((a,b) => a-b),
     occupation: w.occupancyTimer.flatMap((days, province) => days > 0 ? [{province, candidate: w.occupierCandidate[province], days}] : []),
