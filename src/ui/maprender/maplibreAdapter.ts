@@ -146,6 +146,7 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
   return {
     whenReady: () => ready,
     setUnitOverlay: units.set,
+    setFrontOverlay: units.setFronts,
     setColors(next: string[], dirty: Set<number>) {
       colors = next;
       if (dirty.size === 0) return;
