@@ -190,6 +190,7 @@ export function ContextPanel() {
       <div className="panel-section" data-testid="unit-panel">
         <h4>{t(lang, 'panel.unit')} #{u.id} — {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}</h4>
         <DivisionResources unit={u} lang={lang} context/>
+        {u.moving && u.nextProvince>=0 && <div data-testid="unit-segment-progress" className="kv"><span>{lang==='ja'?'次の到着州':'Next province'}: {lang==='ja'?meta.provNameJa[u.nextProvince]:meta.provNameEn[u.nextProvince]}</span><span>{u.segmentDays>0?Math.min(100,Math.floor(100*u.segmentProgress/u.segmentDays)):0}%</span></div>}
         <div className="kv"><span className="k">{t(lang, 'units.location')}</span><span data-testid="unit-location">{lang === 'ja' ? meta.provNameJa[u.loc] : meta.provNameEn[u.loc]} ({meta.provIds[u.loc]})</span></div>
         <div className="kv"><span className="k">{t(lang, 'panel.org')}</span><span data-testid="unit-org">{Math.round(u.org)} / 100</span></div>
         <div className="kv"><span className="k">{t(lang, 'panel.strength')}</span><span>{Math.round(u.strength * 100)}%</span></div>
