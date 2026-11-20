@@ -17,3 +17,5 @@
 - [ ] 0.4 目的: 戦線・作戦目標の地図表示。対象: engine/ui.ts, maprender/frontView.ts, unitOverlay.ts, canvasAdapter.ts, maplibreAdapter.ts, GameScreen.tsx。作業: 自国戦線の射影と選択・表示切替。テスト: A20〜A22。期待値: 無効州・敵対終了を除外、停止中は矢印非表示、地図投影を維持。完了条件: 最新CIと通常UI検証。MapLibre実機と境界編集は後続。
 
 - [ ] 0.5 目的: 軍団・軍集団への排他的指揮官配置。対象: military/armies.ts, commanders.ts, commands.ts, core/hash.ts, save/serialize.ts, combat.ts, ArmyManagement.tsx, panels.tsx。作業: 配置・解除・移籍・解放・v9・UI。テスト: A23〜A25。期待値: 役職重複なし、他国拒否、上位職による新規補正なし、旧保存互換。完了条件: 最新CI合格、通常UI検証。上位能力実装は後続。
+
+- [ ] 0.6 目的: 軍団別の人員・装備補充優先度の先行実装。対象: military/armies.ts, systems/reinforcement.ts, combat.ts, commands.ts, core/hash.ts, save/serialize.ts, ui/ArmyManagement.tsx。テスト: A26〜A28、保存v11移行、在庫不足の優先順、戦闘/移動中の除外。完了条件: CI成功・通常UI操作合格。軍集団優先度/手動生産配分は後続。
