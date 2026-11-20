@@ -111,6 +111,8 @@ export function ContextPanel() {
     return (
       <div className="panel-section" data-testid="province-panel">
         <h4>{lang === 'ja' ? meta.provNameJa[prov] : meta.provNameEn[prov]}（{meta.provIds[prov]}）</h4>
+        {snap.battles.includes(prov) && <div role="status" data-testid="province-battle">⚔ {t(lang, 'panel.inBattle')}</div>}
+        {snap.occupation.filter(o => o.province === prov).map(o => <div className="kv" data-testid="occupation-progress" key={o.province}><span>{t(lang, 'units.occupation')}</span><span>{o.days} / 14</span></div>)}
         <div className="kv"><span className="k">{t(lang, 'panel.owner')}</span><span><span className="color-dot" style={{ background: ownerC.color }} />{lang === 'ja' ? ownerC.nameJa : ownerC.nameEn}</span></div>
         <div className="kv">
           <span className="k">{t(lang, 'panel.controller')}</span>
@@ -192,6 +194,7 @@ export function ContextPanel() {
         <div className="kv"><span className="k">{t(lang, 'panel.supplyEff')}</span><span>{Math.round(u.supply * 100)}%</span></div>
         {u.inBattle && <div className="kv"><span className="k">state</span><span>{t(lang, 'panel.inBattle')}</span></div>}
         {u.encircled && <div className="kv"><span className="k">state</span><span style={{ color: '#e08b84' }}>{t(lang, 'panel.encircled')}</span></div>}
+        {u.moving && snap.countries[u.owner].atWar.includes(snap.controller[u.target]) && <div data-testid="unit-attacking">⚔ {t(lang, 'units.attacking')}</div>}
         {u.moving && <div className="kv" data-testid="unit-moving"><span className="k">{t(lang, 'panel.moving')}</span><span>{t(lang, 'misc.movingTo', { target: targetName ?? '' })}</span></div>}
         <div className="kv"><span className="k">{t(lang, 'cmdr.assign')}</span>
           <select
