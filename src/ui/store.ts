@@ -9,6 +9,7 @@ export type PanelId = 'overview' | 'wars' | 'aiLog' | 'saveLoad' | 'settings' | 
 export interface Selection {
   prov: number | null;
   unitId: number | null;
+  unitIds?: number[];
   country: number | null;
 }
 
