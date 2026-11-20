@@ -428,7 +428,7 @@ export function GameScreen() {
                     onChange={e => selectUnits(e.target.checked ? [...selectedIds, u.id] : selectedIds.filter(id => id !== u.id), false)} />
                   <button data-testid={'unit-roster-' + u.id} data-unit-id={u.id} data-location={meta.provIds[u.loc]} aria-pressed={selectedIds.includes(u.id)}
                     onClick={() => selectUnits([u.id])}>
-                    #{u.id} {lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn}<br />
+                    #{u.id} {u.customTemplateId!==undefined ? (snap.customTemplates.find(t=>t.country===u.owner&&t.templateId===u.customTemplateId&&t.revision===u.customRevision)?.name ?? (lang==='ja'?'独自師団':'Custom division')) : (lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn)}<br />
                     {u.armyId !== null && <span>{snap.armies.find(a=>a.id===u.armyId)?.name} · </span>}
                     {u.frontId>=0&&<span>{lang==='ja'?'戦線':'Front'} #{u.frontId} · </span>}{u.manualHold&&<span>{lang==='ja'?'手動優先':'Manual hold'} · </span>}
                     {nameOf(u.loc)} ({meta.provIds[u.loc]}) — {u.inBattle ? t(lang, 'panel.inBattle') : u.encircled ? t(lang, 'panel.encircled') : u.moving ? t(lang, 'misc.movingTo', { target: nameOf(u.target) }) : t(lang, 'units.idle')}
