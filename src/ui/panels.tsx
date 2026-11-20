@@ -3,7 +3,7 @@ import { customTemplateStats } from '../engine/military/customTemplates';
 import { OCCUPATION_DAYS } from '../engine/systems/combat';
 import { DivisionResources } from './ArmyManagement';
 import { DivisionDesignerPreview } from './DivisionDesignerPreview';
-import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from '../engine/military/templates';
+import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING } from '../engine/military/templates';
 import { useEffect, useState } from 'react';
 import { useApp } from './App';
 import { appStore, fmtNumber } from './store';
