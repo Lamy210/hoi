@@ -861,13 +861,13 @@ export function RecruitmentPanel() {
         const progress=o.status==='queued'?0:o.status==='ready'?d.days:d.days-remaining;
         const state=o.status==='queued'?(lang==='ja'?'在庫待ち':'Awaiting stock'):o.status==='ready'?(lang==='ja'?'配備待ち':'Ready to deploy'):(lang==='ja'?'訓練中':'Training');
         return <div className="panel-section" key={o.id} data-testid={'training-' + o.id}>
-          <div className="kv"><span>{lang === 'ja' ? d.nameJa : d.nameEn} #{o.id} — {nameOf(o.province)}</span><span data-testid={'training-state-'+o.id}>{state} · {remaining}/{d.days}</span></div>
+          <div className="kv"><span>{lang === 'ja' ? d.nameJa : d.nameEn} #{o.id} — {nameOf(o.province)}</span><span data-testid={'queue-state-'+o.id}>{state} · {remaining}/{d.days}</span></div>
           <progress max={d.days} value={progress} style={{ width: '100%' }} />
           {o.status!==undefined&&<div className="row">
-            <label>{lang==='ja'?'優先度':'Priority'} <select data-testid={'training-priority-'+o.id} disabled={st.pendingCommands>0} value={o.priority??5} onChange={e=>engineClient.command('setTrainingPriority',{orderId:o.id,priority:Number(e.target.value)})}>
+            <label>{lang==='ja'?'優先度':'Priority'} <select data-testid={'queue-priority-'+o.id} disabled={st.pendingCommands>0} value={o.priority??5} onChange={e=>engineClient.command('setTrainingPriority',{orderId:o.id,priority:Number(e.target.value)})}>
               {Array.from({length:10},(_,n)=><option key={n} value={n}>{n}</option>)}
             </select></label>
-            <label>{lang==='ja'?'配備州':'Deployment province'} <select data-testid={'training-province-'+o.id} disabled={st.pendingCommands>0} value={o.province} onChange={e=>engineClient.command('setDeploymentProvince',{orderId:o.id,province:Number(e.target.value)})}>
+            <label>{lang==='ja'?'配備州':'Deployment province'} <select data-testid={'queue-province-'+o.id} disabled={st.pendingCommands>0} value={o.province} onChange={e=>engineClient.command('setDeploymentProvince',{orderId:o.id,province:Number(e.target.value)})}>
               {!owned.includes(o.province)&&<option value={o.province} disabled>{nameOf(o.province)} ({lang==='ja'?'非支配':'Not controlled'})</option>}
               {owned.map(p=><option key={p} value={p}>{nameOf(p)}</option>)}
             </select></label>
