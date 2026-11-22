@@ -114,7 +114,7 @@ export interface TechDef {
   mods: Record<string, number>;
 }
 
-/** 装備モデルカタログ。v15日次生産では二財在庫へ集約。型番別倉庫・配備は後続。 */
+/** 装備モデルカタログ。生産・国家倉庫・師団保有と戦闘品質の派生計算に使用。 */
 export interface EquipmentModelDef {
   id: string;
   category: 'infantry' | 'artillery';
@@ -122,7 +122,7 @@ export interface EquipmentModelDef {
   unlockTechId?: string;
   nameJa: string;
   nameEn: string;
-  /** 将来の個別装備性能計算用のバランスパラメータ。現行の戦闘/生産には未適用。 */
+  /** バランス用のモデル別戦闘係数。装備配備後のみ実戦闘に適用。 */
   attackFactor: number;
   defenseFactor: number;
   outputFactor: number;

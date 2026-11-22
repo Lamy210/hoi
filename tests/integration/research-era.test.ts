@@ -38,15 +38,23 @@ describe('dated technology research', () => {
     expect(future!.progress).toBeGreaterThan(0);
   });
 
-  it('applies researched infantry and artillery improvements to the combat trace', async () => {
+  it('weapon unlock research alone does not instantly upgrade old equipment, but doctrine still applies', async () => {
     const engine = await createTestEngine();
     const w = engine.world, c = w.playerCountry;
     const unit = w.units.find(u => u.owner === c)!;
     const base = unitPowerFactors(w,unit,unit.loc,'attack');
     expect(base.find(f => f.label === 'technology')).toBeUndefined();
-    w.research[c].done.push('small-arms-standard','artillery-guidance');
+    expect(base.find(f => f.label === 'equipmentModel')).toBeUndefined();
+    w.research[c].done.push('small-arms-standard','small-arms-modular',
+      'small-arms-smart','small-arms-next','artillery-guidance','artillery-precision');
     expect(techMods(w,c,'infantryAttack')).toBeGreaterThan(0);
-    const upgraded = unitPowerFactors(w,unit,unit.loc,'attack');
-    expect(upgraded.find(f => f.label === 'technology')!.value).toBeGreaterThan(1);
+    // Weapon research only unlocks manufacturing; existing unclassified
+    // divisions do not mysteriously receive the newly researched guns.
+    const unchanged = unitPowerFactors(w,unit,unit.loc,'attack');
+    expect(unchanged.find(f => f.label === 'technology')).toBeUndefined();
+    expect(unchanged.find(f => f.label === 'equipmentModel')).toBeUndefined();
+    w.research[c].done.push('doctrine-maneuver');
+    const doctrine = unitPowerFactors(w,unit,unit.loc,'attack');
+    expect(doctrine.find(f => f.label === 'technology')!.value).toBeCloseTo(1.03);
   });
 });
