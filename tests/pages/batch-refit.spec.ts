@@ -6,6 +6,7 @@ test('複数師団を選択して一括改編し、資源差分と編成を確�
   await page.getByTestId('btn-to-country').click();
   await page.getByTestId('country-JPN').click();
   await page.getByTestId('btn-start').click();
+  await page.getByTestId('roster-mode-list').click();
   await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
   await page.getByTestId('btn-recruit').click();
   await page.getByTestId('open-division-designer').click();

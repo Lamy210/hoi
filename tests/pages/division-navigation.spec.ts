@@ -8,6 +8,7 @@ async function startJapan(page: import('@playwright/test').Page) {
   await page.getByTestId('btn-to-country').click();
   await page.getByTestId('country-JPN').click();
   await page.getByTestId('btn-start').click();
+  await page.getByTestId('roster-mode-list').click();
   await expect(page.getByTestId('map-zoom-in')).toBeEnabled({ timeout: 30000 });
 }
 

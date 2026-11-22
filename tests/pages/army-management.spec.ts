@@ -5,6 +5,7 @@ test('通常UIで軍団・軍集団を作成し師団を編入、集計・所在
   await page.getByTestId('btn-to-country').click();
   await page.getByTestId('country-JPN').click();
   await page.getByTestId('btn-start').click();
+  await page.getByTestId('roster-mode-list').click();
   await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
   const roster=page.getByTestId('unit-roster');
   const ids=await roster.locator('[data-unit-id]').evaluateAll(rows=>rows.map(r=>r.getAttribute('data-unit-id')!));

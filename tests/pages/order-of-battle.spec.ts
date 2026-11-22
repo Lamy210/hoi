@@ -1,0 +1,32 @@
+import {test,expect} from '@playwright/test';
+
+test('指揮系統から師団を選択し軍団へ編入すると階層が更新される',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await expect(page.getByTestId('roster-mode-tree')).toHaveAttribute('aria-pressed','true');
+  const hierarchy=page.getByTestId('order-of-battle');
+  const first=hierarchy.locator('[data-testid^="oob-unit-"]').first();
+  const id=(await first.getAttribute('data-testid'))!.replace('oob-unit-','');
+  await first.click();
+  await expect(first).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('selected-unit-count')).toContainText('1');
+  await page.getByTestId('toggle-army-editor').click();
+  await page.getByTestId('army-name').fill('第一軍団');
+  await page.getByTestId('create-army').click();
+  await page.getByTestId('apply-pending').click();
+  await page.getByTestId('army-target').selectOption('1');
+  await page.getByTestId('assign-army').click();
+  await page.getByTestId('apply-pending').click();
+  const army=page.getByTestId('oob-army-1');
+  await expect(army).toContainText('第一軍団');
+  await expect(army.getByTestId('oob-unit-'+id)).toBeVisible();
+  await page.getByTestId('oob-search').fill('non-existent-location');
+  await expect(page.getByTestId('oob-visible-count')).toContainText('0 /');
+  await page.getByTestId('oob-search').fill('');
+  await page.getByTestId('roster-mode-list').click();
+  await expect(page.getByTestId('unit-roster-'+id)).toBeVisible();
+});

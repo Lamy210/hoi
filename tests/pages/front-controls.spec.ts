@@ -6,6 +6,7 @@ test('通常UIで複数師団の戦線割当・停止・再開・解除',async({
   await page.getByTestId('btn-to-country').click();
   await page.getByTestId('country-KOR').click();
   await page.getByTestId('btn-start').click();
+  await page.getByTestId('roster-mode-list').click();
   await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
   await page.getByTestId('btn-province-search').click();
   await page.getByTestId('province-search').fill('KP-07');

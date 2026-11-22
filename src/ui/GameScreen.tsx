@@ -6,6 +6,7 @@ import { t } from './i18n';
 import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
+import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
 import type { MapDataSource, MapRenderer } from './maprender/types';
@@ -43,6 +44,7 @@ export function GameScreen() {
   const [attackMode, setAttackMode] = useState(false);
   const [destination, setDestination] = useState('');
   const [rosterOpen, setRosterOpen] = useState(true);
+  const [rosterView, setRosterView] = useState<'tree'|'list'>('tree');
   const [frontVisibility,setFrontVisibility]=useState<FrontVisibility>('all');
   const [rosterQuery, setRosterQuery] = useState('');
   const [rosterFilter, setRosterFilter] = useState('all');
@@ -413,6 +415,15 @@ export function GameScreen() {
                 })}
                 <small>{lang==='ja'?'丸印＝戦線州、短線＝陸上隣接、菱形＝目標州、矢印＝作戦目標の概略（実移動経路ではありません）。':'Circle: front province; bar: land adjacency; diamond: target; arrow: schematic objective, not a movement route.'}</small>
               </details>}
+              <div className="roster-view-toggle" role="group" aria-label={lang==='ja'?'師団表示方式':'Division roster view'}>
+                <button type="button" data-testid="roster-mode-tree" aria-pressed={rosterView==='tree'}
+                  onClick={()=>setRosterView('tree')}>{lang==='ja'?'指揮系統':'Hierarchy'}</button>
+                <button type="button" data-testid="roster-mode-list" aria-pressed={rosterView==='list'}
+                  onClick={()=>setRosterView('list')}>{lang==='ja'?'詳細一覧':'Detailed list'}</button>
+              </div>
+              {rosterView==='tree'&&<OrderOfBattleExplorer snap={snap} meta={meta} lang={lang}
+                selectedIds={selectedIds} onSelect={ids=>selectUnits(ids)} />}
+              {rosterView==='list'&&<>
               <div className="muted">{t(lang, 'units.hint')}</div>
               <div className="move-controls">
                 <input data-testid="roster-query" aria-label={lang==='ja'?'師団・州・軍団の検索':'Search divisions'} placeholder={lang==='ja'?'師団ID・州・軍団名':'ID, province, army'} value={rosterQuery} onChange={e=>setRosterQuery(e.target.value)}/>
@@ -437,6 +448,7 @@ export function GameScreen() {
                 </div>)}
                 {!visibleUnits.length && <span className="muted">{ownUnits.length ? (lang==='ja'?'該当師団なし':'No matching divisions') : t(lang, 'units.none')}</span>}
               </div>
+              </>}
               <div className="move-controls">
                 <span data-testid="selected-unit-count">{t(lang, 'units.selected', { count: chosen.length })}</span>
                 <button data-testid="move-selected" disabled={!canRedirect} aria-pressed={moveMode} onClick={() => { setAttackMode(false); setDestination(''); setMoveMode(!moveMode); }}>{moveMode?t(lang,'units.cancelMove'):hasMoving?(lang==='ja'?'移動先変更':'Redirect'):t(lang,'units.move')}</button>
