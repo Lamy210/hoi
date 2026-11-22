@@ -9,6 +9,7 @@ type Props = { snap: UiSnapshot; lang: Lang; selectedIds: number[]; pending: num
 
 import { summarizeDivisions } from '../engine/military/armySummary';
 import { customTemplateStats } from '../engine/military/customTemplates';
+import { calculateRefitResources, MAX_BATCH_REFIT } from '../engine/military/refit';
 
 export function DivisionResources({unit:u,lang,context=false}: {unit:UiUnit;lang:Lang;context?:boolean}) {
   const ja = lang === 'ja';
@@ -66,15 +67,17 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const refitTemplate=latestTemplates.find(t=>String(t.templateId)+':'+t.revision===quickTemplate);
   const refitStats=refitTemplate?customTemplateStats(refitTemplate):null;
   const player=snap.countries[country];
-  const refitDelta=refitTarget&&refitStats?[
-    Math.max(0,refitStats.manpower-refitTarget.maxManpower),
-    Math.max(0,refitStats.infantry-refitTarget.maxInfEquipment),
-    Math.max(0,refitStats.artillery-refitTarget.maxArtEquipment)
-  ]:null;
-  const refitAllowed=!!refitTarget&&!!refitTemplate&&!!refitDelta&&canCommand&&
-    !refitTarget.moving&&!refitTarget.inBattle&&!refitTarget.encircled&&
-    snap.controller[refitTarget.loc]===country &&
-    player.manpowerPool>=refitDelta[0]&&player.infEquipmentStock>=refitDelta[1]&&player.artEquipmentStock>=refitDelta[2];
+  const refitAmounts=refitStats&&selected.length?calculateRefitResources(selected,refitStats):null;
+  const stock=[player.manpowerPool,player.infEquipmentStock,player.artEquipmentStock];
+  const isEligible=selected.length>0&&selected.length<=MAX_BATCH_REFIT&&selected.every(u=>
+    !u.moving&&!u.inBattle&&!u.encircled&&snap.controller[u.loc]===country);
+  const refitAllowed=!!refitTemplate&&!!refitAmounts&&canCommand&&isEligible&&
+    refitAmounts.net.every((cost,index)=>stock[index]>=cost);
+  const fmtResources=(nums: readonly number[])=>nums.map(fmt).join(' / ');
+  const refitReason = !refitTemplate ? label('改編先を選択してください','Select a saved template') :
+    selected.length>MAX_BATCH_REFIT ? label('一度に100師団まで','Up to 100 divisions per order') :
+    !isEligible ? label('移動中・戦闘中・包囲中・敵支配州にいる師団は改編不可','Moving, battling, encircled or occupied divisions cannot refit') :
+    refitAmounts?.net.some((n,i)=>stock[i]<n) ? label('必要資源が不足','Insufficient resources') : '';
   const create=(kind:'createArmy'|'createArmyGroup')=>{
     const nextName=name.trim();
     if (!canCommand || !nextName) return;
@@ -96,10 +99,15 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
           <option value="">{label('自由編成を選択','Select saved template')}</option>
           {latestTemplates.map(t=><option key={t.templateId} value={String(t.templateId)+':'+t.revision}>{t.name} · v{t.revision}</option>)}
         </select>
-        <button data-testid="army-quick-refit" className="primary" disabled={!refitAllowed} onClick={()=>{if(refitTarget&&refitTemplate)engineClient.command('refitUnit',{unitId:refitTarget.id,templateId:refitTemplate.templateId,revision:refitTemplate.revision});}}>{label('選択師団を改編','Refit selected division')}</button>
+        <button data-testid="army-quick-refit" className="primary" disabled={selected.length!==1||!refitAllowed} onClick={()=>{if(refitTarget&&refitTemplate)engineClient.command('refitUnit',{unitId:refitTarget.id,templateId:refitTemplate.templateId,revision:refitTemplate.revision});}}>{label('1師団を改編','Refit one')}</button>
+        <button data-testid="army-batch-refit" className="primary" disabled={selected.length<2||!refitAllowed} onClick={()=>{if(refitTemplate)engineClient.command('refitUnits',{unitIds:selected.map(u=>u.id),templateId:refitTemplate.templateId,revision:refitTemplate.revision});}}>{label('選択師団を一括改編','Batch refit')}</button>
       </div>
-      {refitDelta&&<small>{label('必要な追加資源（人員 / 小火器 / 火砲）','Additional resources (manpower / rifles / artillery)')}: {refitDelta.map(fmt).join(' / ')}</small>}
-      {selected.length!==1&&<small>{label('師団を1個選択すると、その場で編成を変更できます。','Select one division to refit without opening recruitment.')}</small>}
+      {refitAmounts&&<div className="army-refit-preview" data-testid="army-batch-preview">
+        <small>{label('追加必要量（人員 / 歩兵装備 / 火砲）','Total purchases (manpower / infantry / artillery)')}: {fmtResources(refitAmounts.purchase)}</small>
+        <small>{label('返却量','Refund')}: {fmtResources(refitAmounts.refund)}</small>
+        <small>{label('差引消費（負数＝返却）','Net spend (negative = return)')}: {fmtResources(refitAmounts.net)}</small>
+      </div>}
+      <small data-testid="army-batch-reason">{refitReason || label('命令の適用直前に再検証し、全件成功・全件拒否します。','Validated at command execution, all-or-nothing.')}</small>
     </div>
     <button data-testid="toggle-army-editor" aria-expanded={editing} onClick={()=>setEditing(!editing)}>{label(editing?'編成編集を閉じる':'編成を編集',editing?'Close editor':'Edit formations')}</button>
     {editing && <>

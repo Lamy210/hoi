@@ -15,6 +15,7 @@ import { autoFrontProvinces, frontOf } from './military/fronts';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
 import { MAX_ART_SHARE } from './systems/production';
+import { applyBatchRefit, planBatchRefit } from './military/refit';
 import { LAW_PP_COST } from './systems/politics';
 import { techDefs, MAX_ACTIVE_RESEARCH } from './systems/research';
 import { COST_INFRA, COST_MILFACTORY, MAX_CONCURRENT, constructionDays } from './systems/construction';
@@ -152,41 +153,31 @@ export function registerAllCommands(): void {
         battalionIds:[...(p.battalionIds as string[])],supportIds:[...(p.supportIds as string[])]});
     },
   });
+  // refitUnit は旧UI/リプレイ互換。refitUnits は事前集計後の全件原子的な変更。
   registerCommand('refitUnit', {
     validate(w,p,issuer) {
-      const country=actorCountry(w,issuer),unit=w.units.find(u=>u.id===p.unitId&&!u.destroyed);
-      if(country===null||!w.countries.alive[country]||issuer==='frontai')return 'badIssuer';
-      if(!unit||unit.owner!==country)return 'notYourUnit';
-      if(!Number.isSafeInteger(p.templateId)||!Number.isSafeInteger(p.revision))return 'badParams';
-      const rev=w.customTemplates.find(t=>t.country===country&&t.templateId===p.templateId&&t.revision===p.revision);
-      if(!rev)return 'notYourTemplate';
-      if(unit.path.length||unit.encircled||w.runtime.activeBattles.has(unit.loc))return 'unitBusy';
-      if(w.prov.controller[unit.loc]!==country)return 'notControlledByYou';
-      const target=customTemplateStats(rev);
-      if(w.countries.manpowerPool[country]<Math.max(0,target.manpower-unit.maxManpower))return 'insufficientManpower';
-      if(w.countries.infEquipmentStock[country]<Math.max(0,target.infantry-unit.maxInfEquipment))return 'insufficientEquipment';
-      if(w.countries.artEquipmentStock[country]<Math.max(0,target.artillery-unit.maxArtEquipment))return 'insufficientArtillery';
-      return null;
+      const country = actorCountry(w,issuer);
+      if (country === null || !w.countries.alive[country] || issuer === 'frontai') return 'badIssuer';
+      return planBatchRefit(w,country,[p.unitId],p.templateId,p.revision).reason;
     },
-    apply(w,p,issuer){
-      const country=actorCountry(w,issuer)!,u=w.units.find(u=>u.id===p.unitId)!;
-      const rev=w.customTemplates.find(t=>t.country===country&&t.templateId===p.templateId&&t.revision===p.revision)!;
-      const t=customTemplateStats(rev);
-      const change=(oldHeld:number,oldMax:number,newMax:number,pool:number[])=>{
-        const retained=Math.min(oldHeld,newMax);
-        const refund=Math.max(0,oldHeld-newMax);
-        const purchase=Math.max(0,newMax-oldMax);
-        pool[country]+=refund-purchase;
-        return retained+purchase;
-      };
-      u.manpower=change(u.manpower,u.maxManpower,t.manpower,w.countries.manpowerPool);
-      u.infEquipment=change(u.infEquipment,u.maxInfEquipment,t.infantry,w.countries.infEquipmentStock);
-      u.artEquipment=change(u.artEquipment,u.maxArtEquipment,t.artillery,w.countries.artEquipmentStock);
-      u.maxManpower=t.manpower;u.maxInfEquipment=t.infantry;u.maxArtEquipment=t.artillery;
-      u.org=Math.min(u.org,Math.min(100,t.org))*0.5;
-      u.customTemplateId=rev.templateId;u.customRevision=rev.revision;
-      delete u.templateId;
-      // Position, experience, army/front membership, commander and route are preserved.
+    apply(w,p,issuer) {
+      const country = actorCountry(w,issuer)!;
+      const result = planBatchRefit(w,country,[p.unitId],p.templateId,p.revision);
+      if (!result.plan) throw new Error('validated single refit plan no longer valid');
+      applyBatchRefit(w,country,result.plan);
+    },
+  });
+  registerCommand('refitUnits', {
+    validate(w,p,issuer) {
+      const country = actorCountry(w,issuer);
+      if (country === null || !w.countries.alive[country] || issuer === 'frontai') return 'badIssuer';
+      return planBatchRefit(w,country,p.unitIds,p.templateId,p.revision).reason;
+    },
+    apply(w,p,issuer) {
+      const country = actorCountry(w,issuer)!;
+      const result = planBatchRefit(w,country,p.unitIds,p.templateId,p.revision);
+      if (!result.plan) throw new Error('validated batch refit plan no longer valid');
+      applyBatchRefit(w,country,result.plan);
     },
   });
 
