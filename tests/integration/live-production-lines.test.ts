@@ -73,7 +73,7 @@ describe('opt-in model-aware two-goods production (v15)',()=>{
     expect(hashWorld(e.world)).toBe(initialHash);
     const legacy=decode(valid) as any;
     legacy.header.v=14;
-    delete legacy.stores.productionMode;delete legacy.stores.modelProduction;
+    delete legacy.stores.productionMode;delete legacy.stores.modelProduction;delete legacy.stores.modelStock;
     legacy.header.integrity=hashWorld(w,false,true,true,true,true,true,true,true,true,false);
     legacy.payloadChecksum=savePayloadChecksum(legacy.header,legacy.stores);
     const restored=deserializeWorld(encode(legacy),pack);

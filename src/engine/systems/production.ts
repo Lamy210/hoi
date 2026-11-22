@@ -1,5 +1,5 @@
 // 生産システム v3 — 旧二財配分率または明示的に有効化したモデル別ラインで実生産。
-// 型番別倉庫・師団型番別配備は未実装。生成物は二財の実在庫へ集約。
+// v17では型番別「国家倉庫内」数量を二財在庫の内訳として追跡。部隊装備は未分類。
 // 財市場・価格はPhase 3（economy-system）。配分率 artShare ∈ [0, 0.5]。
 import type { WorldState } from '../core/state';
 import { registerSystem } from '../core/scheduler';
@@ -9,6 +9,7 @@ import { equipmentModels } from '../military/equipmentCatalog';
 import { allocateProductionLines, efficiencyAfterDay, modelDailyOutput, type AllocatedLine } from './equipmentLinePlanner';
 import { countryProductionLines, modelUnlocked } from './productionLineState';
 import { recordModelProduction } from './modelProductionLedger';
+import { adjustWarehouse, creditModelWarehouse } from './modelWarehouse';
 
 export const EQUIPMENT_PER_FACTORY_DAY = 2; // 歩兵装備（配分1.0時）
 export const ART_PER_FACTORY_DAY = 1.2; // 火砲（配分1.0時）
@@ -77,12 +78,13 @@ export function registerProductionSystem(): void {
           else if(line.category==='artillery')tot.artillery+=line.estimatedDailyOutput;
           return tot;
         },{infantry:0,artillery:0}) : dailyEquipmentOutput(w,c);
-        w.countries.infEquipmentStock[c] += output.infantry;
-        w.countries.artEquipmentStock[c] += output.artillery;
+        adjustWarehouse(w,c,'infantry',output.infantry);
+        adjustWarehouse(w,c,'artillery',output.artillery);
         if(lines){
-          // Ledger is cumulative production history, not a second warehouse.
-          // Legacy, trade, training, losses and refunds never credit it.
+          // Cumulative manufacturing history and remaining typed warehouse stock
+          // are separate ledgers. Model stock is a subset of the two-goods totals.
           recordModelProduction(w,c,lines);
+          for(const line of lines)creditModelWarehouse(w,c,line.modelId,line.estimatedDailyOutput);
           for(const allocated of lines){
             if(allocated.allocatedFactories===0||!allocated.unlocked)continue;
             const original=w.productionLines.find(l=>l.id===allocated.id)!;

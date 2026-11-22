@@ -107,6 +107,28 @@ export function ProductionLinePlanner({snap,lang,pending}:{snap:UiSnapshot,lang:
         lang={lang} pending={pending} done={done}/>)}
       {!country.productionLines.length&&<p className="muted">{ja?'生産計画なし':'No planned lines'}</p>}
     </div>
+    <section data-testid="model-warehouse-inventory" className="production-model-history">
+      <h4>{ja?'型番別の国家倉庫残数':'Identifiable models in national warehouses'}</h4>
+      <p className="muted">{ja
+        ? '以下は歩兵装備・火砲の総備蓄に含まれる内訳です。追加の在庫ではありません。既存セーブや部隊からの返還など型番が不明な装備は「未分類」に含めます。'
+        : 'These items are subsets of total infantry/artillery stockpiles, NOT extra equipment. Legacy saves and returned unit equipment are unclassified.'}</p>
+      {country.modelStock.map(record=>{
+        const model=models.find(m=>m.id===record.modelId);
+        return <div className="kv" key={record.modelId} data-testid={'model-stock-'+record.modelId}>
+          <span>{model?(ja?model.nameJa:model.nameEn):record.modelId}</span>
+          <b>{record.quantity.toFixed(2)}</b>
+        </div>;
+      })}
+      {(['infantry','artillery'] as const).map(category=>{
+        const typed=country.modelStock.filter(record=>models.some(m=>m.id===record.modelId&&m.category===category))
+          .reduce((total,record)=>total+record.quantity,0);
+        const total=category==='infantry'?country.infEquipmentStock:country.artEquipmentStock;
+        return <div className="kv" key={category} data-testid={'model-stock-unclassified-'+category}>
+          <span>{ja?'未分類':'Unclassified'} — {category==='infantry'?(ja?'歩兵装備':'Infantry'):(ja?'火砲':'Artillery')}</span>
+          <b>{Math.max(0,total-typed).toFixed(2)}</b>
+        </div>;
+      })}
+    </section>
     <section data-testid="model-production-history" className="production-model-history">
       <h4>{ja?'型番別の累計製造実績':'Lifetime manufacturing by model'}</h4>
       <p className="muted">{ja

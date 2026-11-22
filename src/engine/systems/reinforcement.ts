@@ -1,4 +1,5 @@
 import {effectiveSupply,type Unit,type WorldState} from '../core/state';
+import {adjustWarehouse} from './modelWarehouse';
 
 export const DEFAULT_REINFORCEMENT_PRIORITY = 5;
 
@@ -16,8 +17,8 @@ export function reinforceIdleUnits(w:WorldState,battleLocations:ReadonlySet<numb
     const mpAdd=Math.min(Math.max(0,u.maxManpower-u.manpower),40*speed,w.countries.manpowerPool[c]);
     if(mpAdd>0){w.countries.manpowerPool[c]-=mpAdd;u.manpower+=mpAdd;}
     const infAdd=Math.min(Math.max(0,u.maxInfEquipment-u.infEquipment),25*speed,w.countries.infEquipmentStock[c]);
-    if(infAdd>0){w.countries.infEquipmentStock[c]-=infAdd;u.infEquipment+=infAdd;}
+    if(infAdd>0){adjustWarehouse(w,c,'infantry',-infAdd);u.infEquipment+=infAdd;}
     const artAdd=Math.min(Math.max(0,u.maxArtEquipment-u.artEquipment),5*speed,w.countries.artEquipmentStock[c]);
-    if(artAdd>0){w.countries.artEquipmentStock[c]-=artAdd;u.artEquipment+=artAdd;}
+    if(artAdd>0){adjustWarehouse(w,c,'artillery',-artAdd);u.artEquipment+=artAdd;}
   }
 }

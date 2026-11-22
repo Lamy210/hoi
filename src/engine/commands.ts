@@ -18,6 +18,7 @@ import { MAX_ART_SHARE } from './systems/production';
 import { equipmentModels } from './military/equipmentCatalog';
 import { MAX_EQUIPMENT_LINES, MAX_REQUESTED_FACTORIES, efficiencyAfterSwitch } from './systems/equipmentLinePlanner';
 import { countryProductionLines, modelUnlocked } from './systems/productionLineState';
+import { adjustWarehouse } from './systems/modelWarehouse';
 import { applyBatchRefit, planBatchRefit } from './military/refit';
 import { LAW_PP_COST } from './systems/politics';
 import { techDefs, MAX_ACTIVE_RESEARCH } from './systems/research';
@@ -83,8 +84,8 @@ export function registerAllCommands(): void {
       const country = p.country as number;
       const prov = p.province as number;
       w.countries.manpowerPool[country] -= UNIT_MANPOWER_COST;
-      w.countries.infEquipmentStock[country] -= UNIT_INF_EQUIPMENT_COST;
-      w.countries.artEquipmentStock[country] -= UNIT_ART_EQUIPMENT_COST;
+      adjustWarehouse(w,country,'infantry',-UNIT_INF_EQUIPMENT_COST);
+      adjustWarehouse(w,country,'artillery',-UNIT_ART_EQUIPMENT_COST);
       const unit = {
         id: w.nextUnitId++,
         owner: country,
@@ -222,8 +223,8 @@ export function registerAllCommands(): void {
       const c = actorCountry(w, issuer)!;
       const t = divisionTemplate(p.templateId)!;
       w.countries.manpowerPool[c] -= t.manpower;
-      w.countries.infEquipmentStock[c] -= t.infantry;
-      w.countries.artEquipmentStock[c] -= t.artillery;
+      adjustWarehouse(w,c,'infantry',-t.infantry);
+      adjustWarehouse(w,c,'artillery',-t.artillery);
       w.trainingQueue.push({ id: w.nextUnitId++, country: c, province: p.province as number, templateId: t.id, readyTick: w.tick + t.days });
     },
   });
@@ -245,8 +246,8 @@ export function registerAllCommands(): void {
     apply(w,p,issuer){
       const c=actorCountry(w,issuer)!,t=trainingSpec(w,{country:c,customTemplateId:p.templateId as number,customRevision:p.revision as number})!;
       w.countries.manpowerPool[c]-=t.manpower;
-      w.countries.infEquipmentStock[c]-=t.infantry;
-      w.countries.artEquipmentStock[c]-=t.artillery;
+      adjustWarehouse(w,c,'infantry',-t.infantry);
+      adjustWarehouse(w,c,'artillery',-t.artillery);
       w.trainingQueue.push({id:w.nextUnitId++,country:c,province:p.province as number,
         customTemplateId:p.templateId as number,customRevision:p.revision as number,readyTick:w.tick+t.days});
     },

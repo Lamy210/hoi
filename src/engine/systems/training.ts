@@ -2,6 +2,7 @@ import {addAlert,type WorldState,type Unit} from '../core/state';
 import {registerSystem} from '../core/scheduler';
 import {autoAssignCommander} from '../military/commanders';
 import {trainingSpec} from '../military/customTemplates';
+import {adjustWarehouse} from './modelWarehouse';
 import type {TrainingOrder} from '../military/templates';
 
 /** Queued orders have not consumed resources; active/ready orders have full reservations. */
@@ -9,8 +10,8 @@ export function refundTraining(w:WorldState,order:TrainingOrder):void {
   if(!w.countries.alive[order.country]||order.status==='queued')return;
   const t=trainingSpec(w,order)!;
   w.countries.manpowerPool[order.country]+=t.manpower;
-  w.countries.infEquipmentStock[order.country]+=t.infantry;
-  w.countries.artEquipmentStock[order.country]+=t.artillery;
+  adjustWarehouse(w,order.country,'infantry',t.infantry);
+  adjustWarehouse(w,order.country,'artillery',t.artillery);
 }
 
 /** One-time deployment, called only after the order is ready and province is owned. */
@@ -58,8 +59,8 @@ export function tickTraining(w:WorldState):void {
        w.countries.infEquipmentStock[c]>=t.infantry &&
        w.countries.artEquipmentStock[c]>=t.artillery){
       w.countries.manpowerPool[c]-=t.manpower;
-      w.countries.infEquipmentStock[c]-=t.infantry;
-      w.countries.artEquipmentStock[c]-=t.artillery;
+      adjustWarehouse(w,c,'infantry',-t.infantry);
+      adjustWarehouse(w,c,'artillery',-t.artillery);
       order.status='training';
       order.readyTick=w.tick+t.days;
     }
