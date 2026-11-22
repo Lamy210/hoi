@@ -8,6 +8,7 @@ import { lawOutputFactor } from './politics';
 import { equipmentModels } from '../military/equipmentCatalog';
 import { allocateProductionLines, efficiencyAfterDay, modelDailyOutput, type AllocatedLine } from './equipmentLinePlanner';
 import { countryProductionLines, modelUnlocked } from './productionLineState';
+import { recordModelProduction } from './modelProductionLedger';
 
 export const EQUIPMENT_PER_FACTORY_DAY = 2; // 歩兵装備（配分1.0時）
 export const ART_PER_FACTORY_DAY = 1.2; // 火砲（配分1.0時）
@@ -69,14 +70,21 @@ export function registerProductionSystem(): void {
     fn: (w) => {
       for (let c = 0; c < w.countries.count; c++) {
         if (!w.countries.alive[c]) continue;
-        const output = dailyEquipmentOutput(w, c);
+        const lines=w.productionMode[c]==='lines' ? forecastProductionLines(w,c) : null;
+        // Sum in the original line order, same as the public dailyEquipmentOutput().
+        const output=lines ? lines.reduce((tot,line)=>{
+          if(line.category==='infantry')tot.infantry+=line.estimatedDailyOutput;
+          else if(line.category==='artillery')tot.artillery+=line.estimatedDailyOutput;
+          return tot;
+        },{infantry:0,artillery:0}) : dailyEquipmentOutput(w,c);
         w.countries.infEquipmentStock[c] += output.infantry;
         w.countries.artEquipmentStock[c] += output.artillery;
-        if(w.productionMode[c]==='lines'){
-          const lines=allocateProductionLines(countryProductionLines(w,c),w.countries.milFactories[c]).lines;
+        if(lines){
+          // Ledger is cumulative production history, not a second warehouse.
+          // Legacy, trade, training, losses and refunds never credit it.
+          recordModelProduction(w,c,lines);
           for(const allocated of lines){
-            const model=equipmentModels().find(m=>m.id===allocated.modelId);
-            if(allocated.allocatedFactories===0||!model||!modelUnlocked(w,c,model))continue;
+            if(allocated.allocatedFactories===0||!allocated.unlocked)continue;
             const original=w.productionLines.find(l=>l.id===allocated.id)!;
             original.efficiency=efficiencyAfterDay(original.efficiency,allocated.allocatedFactories);
           }
