@@ -8,6 +8,7 @@ import { activeWarBetween, atWar, effectiveSupply } from './core/state';
 import { refreshWeather, seasonOfMonth } from './systems/weather';
 import { computeScores } from './systems/score';
 import { techDefs } from './systems/research';
+import { equipmentModels } from './military/equipmentCatalog';
 import { contributionOf } from './diplomacy/peace';
 import { warScoreFor } from './military/war';
 import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMultiplier } from './military/unitComposition';
@@ -172,6 +173,7 @@ export interface UiSnapshot {
   fronts: UiFront[];
   commanders: UiCommander[];
   techs: UiTechDef[];
+  equipmentModels: import('./scenario/types').EquipmentModelDef[];
   claims: { country: number; province: number }[];
   treaties: UiTreaty[]; // phase4-diplomacy-treaties（proposed含む全条約）
   relations: { a: number; b: number; v: number }[]; // phase4-diplomacy-treaties（UI表示用）
@@ -393,6 +395,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     fronts,
     commanders,
     techs: techs.map((t) => ({ id: t.id, cat: t.cat, req: t.req.slice(), days: t.days, year: t.year, nameJa: t.nameJa, nameEn: t.nameEn, mods: { ...t.mods } })),
+    equipmentModels: equipmentModels().map(m => ({ ...m })),
     claims: w.claims.slice(),
     treaties,
     relations: w.relations.map((r) => ({ a: r.a, b: r.b, v: Math.round(r.v) })),

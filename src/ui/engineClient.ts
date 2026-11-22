@@ -38,7 +38,7 @@ async function fetchJsonStatic<T>(url: string): Promise<T> {
 
 async function loadPackViaImport(): Promise<Pack> {
   // file://モード: バンドルへ静的取り込み（動的importでコード分割）
-  const [manifest, provinces, countries, edges, meta, sources, events, techs] = await Promise.all([
+  const [manifest, provinces, countries, edges, meta, sources, events, techs, equipmentModels] = await Promise.all([
     import('../../public/packs/modern-eastasia/manifest.json'),
     import('../../public/packs/modern-eastasia/provinces.json'),
     import('../../public/packs/modern-eastasia/countries.json'),
@@ -47,6 +47,7 @@ async function loadPackViaImport(): Promise<Pack> {
     import('../../public/packs/modern-eastasia/SOURCES.json'),
     import('../../public/packs/modern-eastasia/events.json'),
     import('../../public/packs/modern-eastasia/techs.json'),
+    import('../../public/packs/modern-eastasia/equipment-models.json'),
   ]);
   return {
     baseUrl: PACK_BASE,
@@ -59,6 +60,7 @@ async function loadPackViaImport(): Promise<Pack> {
     sources: sources.default as unknown as Pack['sources'],
     events: events.default as unknown as Pack['events'],
     techs: techs.default as unknown as Pack['techs'],
+    equipmentModels: equipmentModels.default as unknown as Pack['equipmentModels'],
   };
 }
 

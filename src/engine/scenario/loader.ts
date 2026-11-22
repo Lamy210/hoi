@@ -3,7 +3,7 @@
 
 import { fnv1a32 } from '../core/rng';
 import { TERRAIN } from '../core/state';
-import type { EventDef, Pack, PackChecksums, PackCountry, PackEdge, PackManifest, PackProvince, PackSources, TechDef } from './types';
+import type { EventDef, Pack, PackChecksums, PackCountry, PackEdge, PackManifest, PackProvince, PackSources, TechDef, EquipmentModelDef } from './types';
 
 export class PackValidationError extends Error {
   violations: string[];
@@ -78,7 +78,7 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
   const verify = opts.verifyChecksums !== false && cryptoAvailable;
   const required = ['manifest.json', 'provinces.json', 'countries.json', 'adjacency.json',
     'meta.json', 'SOURCES.json', 'geometry-lod1.json', 'geometry-lod2.json', 'decoration.json'];
-  const optional = ['events.json', 'techs.json'];
+  const optional = ['events.json', 'techs.json', 'equipment-models.json'];
   let sums: PackChecksums = {};
   const payloads = new Map<string, string>();
   if (verify) {
@@ -136,8 +136,9 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
   const sources = await read<PackSources>('SOURCES.json');
   const events = await readOptional<EventDef>('events.json');
   const techs = await readOptional<TechDef>('techs.json');
+  const equipmentModels = await readOptional<EquipmentModelDef>('equipment-models.json');
 
-  if (![provinces, countries, edges, events, techs].every(Array.isArray)) {
+  if (![provinces, countries, edges, events, techs, equipmentModels].every(Array.isArray)) {
     throw new PackValidationError(['invalid pack array structure']);
   }
 
@@ -219,6 +220,26 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
       if (!techIds.has(req)) violations.push('tech ' + t.id + ': unknown prerequisite ' + req);
     }
   }
+  // 装備モデルID/年式/研究解禁の整合。数値は将来の型式別在庫で利用する。
+  const equipmentIds = new Set<string>();
+  for (const model of equipmentModels) {
+    if (!model || typeof model.id !== 'string' || !/^[a-z0-9-]{1,64}$/.test(model.id) ||
+      equipmentIds.has(model.id)) {
+      violations.push('equipment model invalid/duplicated id: ' + String(model?.id));
+      continue;
+    }
+    equipmentIds.add(model.id);
+    if (!['infantry','artillery'].includes(model.category)) violations.push('equipment model ' + model.id + ': invalid category');
+    if (!Number.isInteger(model.year) || model.year < 1800 || model.year > 2200) violations.push('equipment model ' + model.id + ': invalid year');
+    for (const label of [model.nameJa,model.nameEn]) {
+      if (typeof label !== 'string' || !label.trim() || label.length > 120) violations.push('equipment model ' + model.id + ': invalid label');
+    }
+    for (const key of ['attackFactor','defenseFactor','outputFactor'] as const) {
+      if (!Number.isFinite(model[key]) || model[key] <= 0 || model[key] > 4) violations.push('equipment model ' + model.id + ': invalid ' + key);
+    }
+    if (model.unlockTechId !== undefined && !techIds.has(model.unlockTechId))
+      violations.push('equipment model ' + model.id + ': unknown unlock technology ' + model.unlockTechId);
+  }
   // 循環検出（DFS・exportして単体テスト可能に）
   detectTechCycles(techs, violations);
 
@@ -248,7 +269,7 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
 
   if (violations.length > 0) throw new PackValidationError(violations);
 
-  return { baseUrl: base, manifest, provinces, countries, edges, relations: meta.relations, viewBbox: meta.viewBbox, sources, events, techs,
+  return { baseUrl: base, manifest, provinces, countries, edges, relations: meta.relations, viewBbox: meta.viewBbox, sources, events, techs, equipmentModels,
     ...(verify ? { verifiedChecksums: sums } : {}) };
 }
 
