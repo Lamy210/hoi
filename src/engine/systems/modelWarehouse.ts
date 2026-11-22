@@ -17,7 +17,7 @@ export type WarehouseCategory = EquipmentModelDef['category'];
 const sortedModelId=(a:string,b:string)=>a<b?-1:a>b?1:0;
 const EPS=1e-7;
 
-function stock(w:WorldState,c:number,category:WarehouseCategory):number[] {
+function stock(w:WorldState,category:WarehouseCategory):number[] {
   return category==='infantry'?w.countries.infEquipmentStock:w.countries.artEquipmentStock;
 }
 function categoryOf(modelId:string):WarehouseCategory {
@@ -37,7 +37,7 @@ export function typedWarehouseTotal(w:WorldState,c:number,category:WarehouseCate
   return activeRows(w,c,category).reduce((sum,row)=>sum+row.quantity,0);
 }
 export function unclassifiedWarehouse(w:WorldState,c:number,category:WarehouseCategory):number {
-  return Math.max(0,stock(w,c,category)[c]-typedWarehouseTotal(w,c,category));
+  return Math.max(0,stock(w,category)[c]-typedWarehouseTotal(w,c,category));
 }
 
 /** Credits model metadata for goods ALREADY added to the legacy aggregate stock. */
@@ -48,7 +48,7 @@ export function creditModelWarehouse(w:WorldState,c:number,modelId:string,amount
     throw new RangeError('invalid model warehouse credit');
   if(amount===0)return;
   const old=typedWarehouseTotal(w,c,category);
-  const aggregate=stock(w,c,category)[c];
+  const aggregate=stock(w,category)[c];
   if(old+amount>aggregate+EPS*Math.max(1,Math.abs(aggregate)))
     throw new RangeError('model warehouse exceeds aggregate');
   const found=w.modelStock.find(r=>r.country===c&&r.modelId===modelId);
@@ -69,7 +69,7 @@ export function adjustWarehouse(w:WorldState,c:number,category:WarehouseCategory
   ModelWarehouseRecord[] {
   assertCountry(w,c);
   if(!Number.isFinite(delta))throw new RangeError('invalid warehouse delta');
-  const pool=stock(w,c,category);
+  const pool=stock(w,category);
   const transferred:ModelWarehouseRecord[]=[];
   if(delta<0){
     const availableUntyped=unclassifiedWarehouse(w,c,category);
