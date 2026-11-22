@@ -114,7 +114,7 @@ export interface TechDef {
   mods: Record<string, number>;
 }
 
-/** 装備モデルの型番カタログ。単位別備蓄・生産は後続Changeで実装する。 */
+/** 装備モデルカタログ。v15日次生産では二財在庫へ集約。型番別倉庫・配備は後続。 */
 export interface EquipmentModelDef {
   id: string;
   category: 'infantry' | 'artillery';

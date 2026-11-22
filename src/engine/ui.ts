@@ -28,7 +28,7 @@ export interface UiCountry {
   artEquipmentStock: number;
   productionShare: number;
   productionMode: 'legacy'|'lines';
-  /** Planning-only, not yet included in actual stock production. */
+  /** Live in the lines production mode; per-model warehouses still not implemented. */
   productionLines: (AllocatedLine & {unlocked:boolean})[];
   dailyEquipment: { infantry: number; artillery: number };
   training: TrainingOrder[];
