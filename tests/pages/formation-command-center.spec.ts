@@ -28,6 +28,13 @@ test('軍集団指揮画面で2師団を集計し自動作戦の保留と再開�
   await page.getByTestId('group-select-1').click();
   await expect(page.getByTestId('formation-focused-name')).toContainText('北方軍集団');
   await expect(page.getByTestId('formation-count')).toHaveText('2');
+  await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
+  await expect(page.getByTestId('formation-command-preview')).toContainText('保留');
+  await page.getByTestId('formation-target-scope').selectOption('selected');
+  await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
+  await page.getByTestId('formation-target-scope').selectOption('withoutFront');
+  await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
+  await page.getByTestId('formation-target-scope').selectOption('all');
   await expect(page.getByTestId('formation-operational-summary')).toContainText('平均補給');
   await expect(page.getByTestId('formation-equipment-deficit')).toContainText('歩兵装備');
   await expect(page.getByTestId('formation-front-select')).toBeEnabled();
