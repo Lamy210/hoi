@@ -271,3 +271,20 @@ input, select {
   .quick-unit-buttons { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px; }
   .quick-unit-buttons button { font-size: 11px; }
 }
+
+/* HOI-style formation operations. Pure snapshot data; no additional simulation state. */
+.formation-command-center { margin:8px 0; padding:10px; border:1px solid #577791; border-radius:8px; background:#142539; display:grid; gap:8px; }
+.formation-command-center-header { display:flex; flex-wrap:wrap; justify-content:space-between; gap:6px; align-items:baseline; }
+.formation-command-center-header small, .formation-command-center-leader small { color:#b7cada; }
+.formation-command-center-title { display:flex; align-items:center; gap:8px; }
+.formation-command-center-title small { color:#b7cada; }
+.formation-command-center-leader { display:grid; gap:2px; font-size:12px; }
+.formation-command-center-metrics { display:grid; grid-template-columns:repeat(auto-fit,minmax(90px,1fr)); gap:6px; }
+.formation-command-center-metrics>div { background:#23374b; border:1px solid #40566c; border-radius:5px; display:grid; gap:3px; padding:7px; }
+.formation-command-center-metrics small { color:#bfd2e1; }
+.formation-command-center-metrics b { font-size:17px; font-variant-numeric:tabular-nums; }
+.formation-command-center-deficits { border-left:3px solid #e3b76b; padding:5px 8px; background:#2b3441; }
+.formation-command-center-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
+.formation-command-center-actions select { flex:1; min-width:155px; max-width:100%; }
+.formation-command-center-actions button { min-height:30px; }
+@media (max-width:700px) { .formation-command-center-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
