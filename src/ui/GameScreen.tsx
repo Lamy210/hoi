@@ -511,7 +511,7 @@ export function GameScreen() {
           {lang==='ja'?'ドラッグで師団を囲む · Ctrl/⌘/Shift:追加 · Alt:除外 · 最大256師団':
             'Drag around divisions · Ctrl/⌘/Shift: add · Alt: remove · max 256'}
         </div>}
-        {mapError && <div className="status-toast" role="alert">{mapError}</div>
+        {mapError && <div className="status-toast" role="alert">{mapError}</div>}
         {hoverProv !== null && hoverPos && (
           <div
             style={{
