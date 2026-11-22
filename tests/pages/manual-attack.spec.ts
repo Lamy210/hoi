@@ -8,6 +8,7 @@ test('通常UIで交戦前後の攻撃可否と戦闘への進行を確認する
   await page.getByTestId('btn-to-country').click();
   await page.getByTestId('country-KOR').click();
   await page.getByTestId('btn-start').click();
+  await page.getByTestId('roster-mode-list').click();
   await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
   const unit = page.getByTestId('unit-roster').locator('[data-location="KR-41"]').first();
   const id = await unit.getAttribute('data-unit-id');

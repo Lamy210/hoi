@@ -6,6 +6,7 @@ test('師団の移動先変更から停止・待機を通常UIで指示できる
   await page.getByTestId('btn-to-country').click();
   await page.getByTestId('country-JPN').click();
   await page.getByTestId('btn-start').click();
+  await page.getByTestId('roster-mode-list').click();
   await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
   const row=page.getByTestId('unit-roster').locator('[data-location="JP-27"]').first();
   const id=await row.getAttribute('data-unit-id');
