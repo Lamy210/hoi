@@ -1,7 +1,7 @@
 // コマンドレジストリ — 全コマンドの検証と適用（game-core仕様）。
 // UI（issuer='player'）とAI（issuer='ai:<id>'）は同一の検証を通る。
 import { BATTALION_CATALOG_VERSION, previewTemplate } from './military/templateStats';
-import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName, trainingSpec, customTemplateStats } from './military/customTemplates';
+import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName, trainingSpec } from './military/customTemplates';
 import { MAX_ARMIES, MAX_GROUPS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES, validName, validColor } from './military/armies';
 import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
