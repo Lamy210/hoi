@@ -114,8 +114,23 @@ export interface TechDef {
   mods: Record<string, number>;
 }
 
+/** 装備モデルの型番カタログ。単位別備蓄・生産は後続Changeで実装する。 */
+export interface EquipmentModelDef {
+  id: string;
+  category: 'infantry' | 'artillery';
+  year: number;
+  unlockTechId?: string;
+  nameJa: string;
+  nameEn: string;
+  /** 将来の個別装備性能計算用のバランスパラメータ。現行の戦闘/生産には未適用。 */
+  attackFactor: number;
+  defenseFactor: number;
+  outputFactor: number;
+}
+
 export interface Pack {
-  verifiedChecksums?: PackChecksums; // 検証時の固定マニフェスト（描画アセットの再取得にも使用）
+  verifiedChecksums?: PackChecksums;
+  equipmentModels?: EquipmentModelDef[]; // 検証時の固定マニフェスト（描画アセットの再取得にも使用）
   techs: TechDef[];
   events: EventDef[];
   baseUrl: string;

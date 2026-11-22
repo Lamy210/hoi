@@ -41,6 +41,7 @@ export function ResearchTree({ snap, lang, pending }: { snap: UiSnapshot; lang: 
   const categories = [...new Set(snap.techs.map(t => t.cat))];
   const name = (tech: UiTechDef) => (ja ? tech.nameJa : tech.nameEn) || tech.id;
   const done = new Set(player.research.done);
+  const equipmentModels = snap.equipmentModels ?? [];
   const progressOf = (id: string) => player.research.active.find(a => a.id === id);
   const penaltyOf = (t: UiTechDef) => t.year && t.year > currentYear ? Math.min(4, 1 + (t.year - currentYear) * 0.35) : 1;
   const visible = snap.techs.filter(t => (category === 'all' || t.cat === category) &&
@@ -73,7 +74,7 @@ export function ResearchTree({ snap, lang, pending }: { snap: UiSnapshot; lang: 
       </div>
       <input aria-label={ja ? '技術検索' : 'Search technology'} placeholder={ja ? '技術名・ID・年' : 'Name, ID or year'} value={filter} onChange={e => setFilter(e.target.value)} data-testid="research-search" />
     </div>
-    <p className="muted">{ja ? '左から右へ前提研究が進みます。早すぎる年代の技術は研究速度にペナルティを受け、予定年に近づくと軽減します。' : 'Prerequisites flow left to right. Future technology suffers a research-speed penalty that decreases over time.'}</p>
+    <p className="muted">{ja ? '左から右へ前提研究が進みます。早すぎる年代の技術は研究速度にペナルティを受け、予定年に近づくと軽減します。モデル設計の解禁は表示のみで、型番別の生産と補充は未対応です。' : 'Prerequisites flow left to right. Future technology suffers a research-speed penalty that decreases over time. Model designs are catalog-only: per-model production and reinforcement are not yet implemented.'}</p>
     {categoriesVisible.length === 0 && <p>{ja ? '該当する技術はありません' : 'No matching technologies'}</p>}
     {categoriesVisible.map(cat => {
       const subset = visible.filter(t => t.cat === cat);
@@ -93,6 +94,12 @@ export function ResearchTree({ snap, lang, pending }: { snap: UiSnapshot; lang: 
                     <b>{name(t)}</b><span>{t.year || '—'}</span>
                   </div>
                   <small className="research-prereqs">{t.req.length ? '↳ ' + t.req.map(r => name(snap.techs.find(x => x.id === r) || { id: r, cat: '', days: 1, req: [], mods: {} })).join(' / ') : (ja ? '基礎技術' : 'Root technology')}</small>
+                  {equipmentModels.filter(m=>m.unlockTechId===t.id).map(m=>
+                    <div key={m.id} className="research-model-unlock" data-testid={'research-unlock-'+m.id}>
+                      <span>{ja ? '装備モデル設計' : 'Equipment model design'}: {ja ? m.nameJa : m.nameEn} ({m.year})</span>
+                      <small>{completed ? (ja ? '研究済み・製造は後続実装' : 'Researched; production pending') : (ja ? '研究後にモデル設計が解禁' : 'Model design unlocks on research')}</small>
+                    </div>
+                  )}
                   <div className="research-effects">
                     {Object.entries(t.mods).map(([k, v]) => <span key={k}>{MOD_NAMES[k]?.[ja ? 0 : 1] || k} {v >= 0 ? '+' : ''}{Math.round(v * 100)}%</span>)}
                   </div>

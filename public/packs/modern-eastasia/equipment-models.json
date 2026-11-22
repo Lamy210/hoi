@@ -1,0 +1,110 @@
+[
+  {
+    "id": "infantry-rifle-1990",
+    "category": "infantry",
+    "year": 1990,
+    "nameJa": "1990\u5e74\u4ee3\u6b69\u5175\u5c0f\u9283",
+    "nameEn": "1990s infantry rifle",
+    "attackFactor": 1,
+    "defenseFactor": 1,
+    "outputFactor": 1
+  },
+  {
+    "id": "infantry-rifle-2010",
+    "category": "infantry",
+    "year": 2010,
+    "unlockTechId": "small-arms-modular",
+    "nameJa": "\u30e2\u30b8\u30e5\u30e9\u30fc\u5f0f\u5c0f\u9283",
+    "nameEn": "Modular service rifle",
+    "attackFactor": 1.04,
+    "defenseFactor": 1.01,
+    "outputFactor": 0.94
+  },
+  {
+    "id": "infantry-rifle-2028",
+    "category": "infantry",
+    "year": 2028,
+    "unlockTechId": "small-arms-smart",
+    "nameJa": "\u5149\u5b66\u7167\u6e96\u5c0f\u9283",
+    "nameEn": "Advanced optics rifle",
+    "attackFactor": 1.1,
+    "defenseFactor": 1.03,
+    "outputFactor": 0.85
+  },
+  {
+    "id": "infantry-rifle-2035",
+    "category": "infantry",
+    "year": 2035,
+    "unlockTechId": "small-arms-next",
+    "nameJa": "\u6b21\u4e16\u4ee3\u5c0f\u9283",
+    "nameEn": "Next-generation rifle",
+    "attackFactor": 1.16,
+    "defenseFactor": 1.06,
+    "outputFactor": 0.76
+  },
+  {
+    "id": "infantry-armor-2010",
+    "category": "infantry",
+    "year": 2010,
+    "unlockTechId": "infantry-protection",
+    "nameJa": "\u8fd1\u4ee3\u6b69\u5175\u9632\u8b77\u88c5\u5099",
+    "nameEn": "Modern infantry protective kit",
+    "attackFactor": 1,
+    "defenseFactor": 1.08,
+    "outputFactor": 0.9
+  },
+  {
+    "id": "infantry-armor-2031",
+    "category": "infantry",
+    "year": 2031,
+    "unlockTechId": "infantry-protection-next",
+    "nameJa": "\u6b21\u4e16\u4ee3\u9632\u8b77\u88c5\u5099",
+    "nameEn": "Future infantry protective kit",
+    "attackFactor": 1,
+    "defenseFactor": 1.14,
+    "outputFactor": 0.75
+  },
+  {
+    "id": "artillery-towed-2000",
+    "category": "artillery",
+    "year": 2000,
+    "nameJa": "\u727d\u5f15\u91ce\u6226\u7832",
+    "nameEn": "Towed field artillery",
+    "attackFactor": 1,
+    "defenseFactor": 1,
+    "outputFactor": 1
+  },
+  {
+    "id": "artillery-control-2015",
+    "category": "artillery",
+    "year": 2015,
+    "unlockTechId": "artillery-guidance",
+    "nameJa": "\u5c04\u6483\u7ba1\u5236\u578b\u91ce\u6226\u7832",
+    "nameEn": "Fire-control artillery",
+    "attackFactor": 1.08,
+    "defenseFactor": 1,
+    "outputFactor": 0.91
+  },
+  {
+    "id": "artillery-precision-2029",
+    "category": "artillery",
+    "year": 2029,
+    "unlockTechId": "artillery-precision",
+    "nameJa": "\u7cbe\u5bc6\u8a98\u5c0e\u91ce\u6226\u7832",
+    "nameEn": "Precision-guided artillery",
+    "attackFactor": 1.2,
+    "defenseFactor": 1.02,
+    "outputFactor": 0.72
+  },
+  {
+    "id": "artillery-digital-2035",
+    "category": "artillery",
+    "year": 2035,
+    "unlockTechId": "electronic-warfare",
+    "nameJa": "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af\u5316\u7832\u5175\u30b7\u30b9\u30c6\u30e0",
+    "nameEn": "Networked artillery system",
+    "attackFactor": 1.13,
+    "defenseFactor": 1.05,
+    "outputFactor": 0.82
+  }
+]

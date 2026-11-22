@@ -13,6 +13,7 @@ import { ORG_REGEN_BASE, unitCombatTrace, type PowerContrib } from './systems/co
 import { SUPPLY_RADIUS_KM, dijkstraFrom } from './systems/logistics';
 import { registerEventsSystem } from './systems/events';
 import { setTechDefs } from './systems/research';
+import { setEquipmentModels } from './military/equipmentCatalog';
 import { relationContributors } from './diplomacy/treaties';
 import { getRelation } from './core/state';
 import type { Pack } from './scenario/types';
@@ -70,6 +71,7 @@ export function createEngine(pack: Pack, opts: CreateEngineOptions): Engine {
   // パック同梱のイベントと技術（冪等登録）
   registerEventsSystem(pack.events ?? []);
   setTechDefs(pack.techs ?? []);
+  setEquipmentModels(pack.equipmentModels ?? []);
   const world = buildWorld(pack, opts);
   world.epochDays = daysFromCivil(pack.manifest.epoch[0], pack.manifest.epoch[1], pack.manifest.epoch[2]);
 
