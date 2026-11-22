@@ -104,6 +104,7 @@ describe('v11 custom division training',()=>{
   it('loads a v10-shaped save with no custom unit or order references',async()=>{
     const {e,w}=await setup();
     const old=decode(e.serialize()) as any;
+    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId;
     old.header.v=10;
     old.header.integrity=hashWorld(w,false,true,true,true,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);

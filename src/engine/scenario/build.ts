@@ -7,6 +7,7 @@ import { buildAdjacency } from '../map/adjacency';
 import { recomputeSupply } from '../systems/logistics';
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './unitCosts';
 import { generateCommanders } from '../military/commanders';
+import { legacyProductionLineState } from '../systems/productionLineState';
 
 export class WorldBuildError extends Error {
   violations: string[];
@@ -108,6 +109,7 @@ export function buildWorld(pack: Pack, opts: BuildOptions): WorldState {
     fronts: [],
     commanders: [],
     productionShare: pack.countries.map(() => 0.2),
+    ...legacyProductionLineState(pack.countries.map(c=>c.milFactories),pack.countries.map(()=>0.2),pack.equipmentModels??[]),
     firedEvents: [],
     // phase3: 国家・経済運営の初期値
     treasury: pack.countries.map((c) => Math.round(c.population * 0.002)),

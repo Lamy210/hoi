@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -251,6 +251,17 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
   if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&includeCustomTemplates&&includeCustomTraining&&includeReinforcementPriority&&includeQueuedTraining){
     h=mixStr(h,'queued-training-v13');
     for(const o of w.trainingQueue){h=mixStr(h,o.status??'legacy');h=mixInt(h,o.priority??5);h=mixBool(h,o.autoDeploy??true);}
+  }
+  if (!legacy && includeHierarchy && includeFrontControl && includeFormationCommanders &&
+    includeCustomTemplates && includeCustomTraining && includeReinforcementPriority &&
+    includeQueuedTraining && includeProductionPlans) {
+    h=mixStr(h,'production-line-plans-v14');
+    h=mixFloat(h,w.nextProductionLineId);
+    for(const line of w.productionLines){
+      h=mixInt(h,line.id);h=mixInt(h,line.country);h=mixStr(h,line.modelId);
+      h=mixInt(h,line.requestedFactories);h=mixInt(h,line.priority);
+      h=mixFloat(h,line.efficiency);h=mixBool(h,line.active);
+    }
   }
   return h >>> 0;
 }
