@@ -1,0 +1,35 @@
+import {test,expect} from '@playwright/test';
+
+test('研究解禁済み装備の計画ラインを作成・更新・削除し、実生産と区別して表示する',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-production').click();
+  const planner=page.getByTestId('production-line-planner');
+  await expect(planner).toBeVisible();
+  await expect(page.getByTestId('production-plan-warning')).toContainText('従来配分率');
+  const rows=planner.locator('[data-testid^="production-plan-"]');
+  const before=await rows.count();
+  expect(before).toBeGreaterThanOrEqual(2);
+  const first=rows.first();
+  const id=(await first.getAttribute('data-testid'))!.replace('production-plan-','');
+  await page.getByTestId('plan-factories-'+id).fill('3');
+  await page.getByTestId('plan-priority-'+id).selectOption('9');
+  await page.getByTestId('plan-save-'+id).click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('plan-factories-'+id)).toHaveValue('3');
+  await page.getByTestId('new-plan-model').selectOption('artillery-towed-2000');
+  await page.getByTestId('new-plan-factories').fill('2');
+  await page.getByTestId('create-production-plan').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(rows).toHaveCount(before+1);
+  await expect(page.getByTestId('production-plan-warning')).toContainText('生産量と備蓄');
+  const last=rows.last();
+  const createdId=(await last.getAttribute('data-testid'))!.replace('production-plan-','');
+  await page.getByTestId('plan-delete-'+createdId).click();
+  await page.getByTestId('apply-pending').click();
+  await expect(rows).toHaveCount(before);
+});

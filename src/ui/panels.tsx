@@ -4,6 +4,7 @@ import { OCCUPATION_DAYS } from '../engine/systems/combat';
 import { DivisionResources } from './ArmyManagement';
 import { DivisionDesignerPreview } from './DivisionDesignerPreview';
 import { ResearchTree } from './ResearchTree';
+import { ProductionLinePlanner } from './ProductionLinePlanner';
 import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING } from '../engine/military/templates';
 import { useEffect, useState } from 'react';
 import { useApp } from './App';
@@ -875,6 +876,7 @@ export function ProductionPanel() {
       </div>)}
       <label>{t(lang, 'prod.share')} {Math.round(share * 100)}% <input data-testid="production-art-share" type="range" min={0} max={0.5} step={0.05} value={share} onChange={e => setShare(Number(e.target.value))} /></label>
       <button data-testid="apply-production" disabled={st.pendingCommands > 0 || Math.abs(share - p.productionShare) < 0.0001} onClick={() => engineClient.command('setProductionShare', { share })}>{t(lang, 'prod.apply')}</button>
+      <ProductionLinePlanner snap={st.snap!} lang={lang} pending={st.pendingCommands} />
       <div className="row"><button onClick={() => appStore.set({ panel: 'recruit' })}>{t(lang, 'mil.recruit')}</button><button onClick={() => appStore.set({ panel: null })}>{t(lang, 'common.close')}</button></div>
     </div>
   </div>;

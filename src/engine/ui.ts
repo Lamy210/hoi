@@ -9,6 +9,8 @@ import { refreshWeather, seasonOfMonth } from './systems/weather';
 import { computeScores } from './systems/score';
 import { techDefs } from './systems/research';
 import { equipmentModels } from './military/equipmentCatalog';
+import { allocateProductionLines, type AllocatedLine } from './systems/equipmentLinePlanner';
+import { countryProductionLines, modelUnlocked } from './systems/productionLineState';
 import { contributionOf } from './diplomacy/peace';
 import { warScoreFor } from './military/war';
 import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMultiplier } from './military/unitComposition';
@@ -25,6 +27,8 @@ export interface UiCountry {
   infEquipmentStock: number;
   artEquipmentStock: number;
   productionShare: number;
+  /** Planning-only, not yet included in actual stock production. */
+  productionLines: (AllocatedLine & {unlocked:boolean})[];
   dailyEquipment: { infantry: number; artillery: number };
   training: TrainingOrder[];
   milFactories: number;
@@ -240,6 +244,10 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       infEquipmentStock: w.countries.infEquipmentStock[c],
       artEquipmentStock: w.countries.artEquipmentStock[c],
       dailyEquipment: dailyEquipmentOutput(w, c),
+      productionLines: allocateProductionLines(countryProductionLines(w,c),
+        w.countries.alive[c] ? w.countries.milFactories[c] : 0).lines.map(line=>({
+          ...line, unlocked: !!equipmentModels().find(m=>m.id===line.modelId&&modelUnlocked(w,c,m)),
+        })),
       training: w.trainingQueue.filter(o => o.country === c).map(o => ({ ...o })),
       productionShare: Math.round((w.productionShare[c] ?? 0.2) * 1000) / 1000,
       milFactories: w.countries.milFactories[c],
