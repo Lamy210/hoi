@@ -79,6 +79,6 @@ describe('persisted v14 production-line planning',()=>{
     expect(migrated.violations).toEqual([]);
     expect(migrated.world?.productionLines).toEqual(legacyProductionLineState(
       oldWorld.countries.milFactories,oldWorld.productionShare,pack.equipmentModels??[]).productionLines);
-    expect(data.header.v).toBe(17);
+    expect(data.header.v).toBe(18);
   });
 });

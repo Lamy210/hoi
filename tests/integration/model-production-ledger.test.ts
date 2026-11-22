@@ -67,7 +67,7 @@ describe('v16 typed manufacturing history, not inventory',()=>{
     production().fn(w);
     const original=e.serialize();
     const blob=decode(original) as any;
-    expect(blob.header.v).toBe(17);
+    expect(blob.header.v).toBe(18);
     const v15=decode(original) as any;
     v15.header.v=15;
     delete v15.stores.modelProduction;delete v15.stores.modelStock;delete v15.stores.issuedEquipment;
