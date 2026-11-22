@@ -27,3 +27,39 @@ export function formationOperationalSummary(units:readonly UiUnit[]){
   }
   return {...resources,moving,combat,encircled,manualHold,frontAssigned,needsAttention};
 }
+
+/** Operation targeting is a read-only projection of the current snapshot. */
+export type FormationTargetScope = 'all'|'attention'|'withoutFront'|'selected';
+export type FormationOperation = 'hold'|'resume'|'assignFront'|'unassignFront';
+
+export function scopedFormationUnits(
+  units: readonly UiUnit[], scope: FormationTargetScope, selectedIds: readonly number[] = [],
+): UiUnit[] {
+  const chosen = new Set(selectedIds);
+  return units.filter(u => {
+    if (scope === 'selected') return chosen.has(u.id);
+    if (scope === 'withoutFront') return u.frontId < 0;
+    if (scope === 'attention') return u.encircled || u.inBattle || u.supply < 0.5 ||
+      u.manpower < u.maxManpower || u.infEquipment < u.maxInfEquipment ||
+      u.artEquipment < u.maxArtEquipment;
+    return true;
+  }).sort((a,b) => a.id - b.id);
+}
+
+export function formationOperationPreview(
+  units: readonly UiUnit[], operation: FormationOperation, targetFrontId?: number,
+): {ids:number[]; unchanged:number; releasesManualHold:number} {
+  const changed = units.filter(u => {
+    if (operation === 'hold') return !u.manualHold;
+    if (operation === 'resume') return u.manualHold;
+    if (operation === 'unassignFront') return u.frontId >= 0;
+    return targetFrontId !== undefined && (u.frontId !== targetFrontId || u.manualHold);
+  }).sort((a,b) => a.id - b.id);
+  return {
+    ids: changed.map(u => u.id),
+    unchanged: units.length - changed.length,
+    // assignToFront explicitly clears manualHold. Warn before sending the command.
+    releasesManualHold: operation === 'assignFront'
+      ? changed.filter(u => u.manualHold).length : 0,
+  };
+}
