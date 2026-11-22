@@ -186,3 +186,8 @@ input, select {
 .research-tech button { margin-top: auto; }
 .research-tech progress { width: 100%; margin-top: auto; accent-color: #73baf0; }
 @media (max-width: 700px) { .research-tier { flex-basis: 150px; } .research-tech { padding: 7px; } }
+
+/* Atomic batch refit preview. Avoid implying partial application when stock is low. */
+.army-refit-preview { display: flex; flex-direction: column; gap: 3px; padding: 7px; margin: 5px 0; background: #182735; border-radius: 5px; }
+.army-refit-preview small { overflow-wrap: anywhere; }
+.army-quick-action button.primary { min-height: 28px; flex: 1; }
