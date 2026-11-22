@@ -28,6 +28,8 @@ export interface UiCountry {
   productionMode: 'legacy'|'lines';
   /** Lifetime manufactured by model, not current warehouses. */
   modelProduction: import('./systems/modelProductionLedger').ModelProductionRecord[];
+  /** v17: identifiable model stock still held at warehouses (part of two-goods aggregate). */
+  modelStock: import('./systems/modelWarehouse').ModelWarehouseRecord[];
   /** Live in the lines production mode; per-model warehouses still not implemented. */
   productionLines: ProductionLineEstimate[];
   dailyEquipment: { infantry: number; artillery: number };
@@ -250,6 +252,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       productionShare: Math.round((w.productionShare[c] ?? 0.2) * 1000) / 1000,
       productionMode: w.productionMode[c],
       modelProduction: w.modelProduction.filter(r=>r.country===c).map(r=>({...r})),
+      modelStock: w.modelStock.filter(r=>r.country===c).map(r=>({...r})),
       milFactories: w.countries.milFactories[c],
       alive: w.countries.alive[c],
       divisions: w.units.filter((u) => u.owner === c && !u.destroyed).length,
