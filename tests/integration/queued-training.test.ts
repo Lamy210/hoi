@@ -110,7 +110,7 @@ describe('v13 queued training and manual deployment',()=>{
     const {e,w,p,issue}=await fixture();
     expect(issue('startTraining',{templateId:'standard-v1',province:p}).ok).toBe(true);
     const old=decode(e.serialize()) as any;
-    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId;
+    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode;
     old.header.v=12;
     old.header.integrity=hashWorld(w,false,true,true,true,true,true,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);

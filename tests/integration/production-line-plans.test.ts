@@ -70,7 +70,7 @@ describe('persisted v14 production-line planning',()=>{
     expect(deserializeWorld(encode(tampered),pack).violations.length).toBeGreaterThan(0);
     // The pre-v14 payload hash excludes plans; restored state is migrated deterministically.
     const old=copy();old.header.v=13;
-    delete old.stores.productionLines;delete old.stores.counters.nextProductionLineId;
+    delete old.stores.productionLines;delete old.stores.counters.nextProductionLineId;delete old.stores.productionMode;
     const oldWorld=e.world;
     // Historical integrity hash uses the exact v13 gated fields.
     old.header.integrity=hashWorld(oldWorld,false,true,true,true,true,true,true,true,false);
@@ -79,6 +79,6 @@ describe('persisted v14 production-line planning',()=>{
     expect(migrated.violations).toEqual([]);
     expect(migrated.world?.productionLines).toEqual(legacyProductionLineState(
       oldWorld.countries.milFactories,oldWorld.productionShare,pack.equipmentModels??[]).productionLines);
-    expect(data.header.v).toBe(14);
+    expect(data.header.v).toBe(15);
   });
 });

@@ -1,6 +1,5 @@
-// Phase6A persistent production-line planning (v14).
-// These plans are deliberately not an inventory ledger: the legacy two-goods
-// production system remains authoritative until the model-stock migration.
+// Phase6A persistent production-line planning (v14+).
+// V15 can use plans to manufacture two-goods inventory; per-model stock/deployment remains future work.
 import type { WorldState } from '../core/state';
 import type { EquipmentModelDef } from '../scenario/types';
 import { MAX_EQUIPMENT_LINES, MAX_REQUESTED_FACTORIES, validateProductionLines,

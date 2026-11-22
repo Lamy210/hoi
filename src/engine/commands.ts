@@ -400,6 +400,20 @@ export function registerAllCommands(): void {
     },
   });
 
+  registerCommand('setProductionMode', {
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai')return 'badIssuer';
+      if(!w.countries.alive[country])return 'countryDead';
+      if(p.mode!=='legacy'&&p.mode!=='lines')return 'badParams';
+      if(p.mode==='lines'&&!equipmentModels().length)return 'noEquipmentCatalog';
+      return null;
+    },
+    apply(w,p,issuer){
+      w.productionMode[actorCountry(w,issuer)!]=p.mode as 'legacy'|'lines';
+    },
+  });
+
   registerCommand('setProductionShare', {
     validate(w, p, issuer) {
       const share = p.share as number;

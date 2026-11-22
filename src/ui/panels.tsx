@@ -869,13 +869,31 @@ export function ProductionPanel() {
       <PendingOrders />
       <div className="kv"><span>{t(lang, 'country.factories')}</span><b>{p.milFactories}</b></div>
       {([['prod.infStock', p.infEquipmentStock, p.dailyEquipment.infantry, 1 - p.productionShare], ['prod.artStock', p.artEquipmentStock, p.dailyEquipment.artillery, p.productionShare]] as const).map(([key, stock, output, ratio]) => <div key={key} className="panel-section" data-testid={'line-' + key}>
-        <h4>{t(lang, key)}</h4><div className="kv"><span>{t(lang, 'prod.allocation')}</span><b>{(ratio * 100).toFixed(0)}%</b></div>
+        <h4>{t(lang, key)}</h4><div className="kv"><span>{t(lang, 'prod.allocation')}</span><b>{p.productionMode==='legacy'?(ratio * 100).toFixed(0)+'%':(lang==='ja'?'ラインによる配分':'Line allocation')}</b></div>
         <progress max={1} value={ratio} style={{ width: '100%' }} />
         <div className="kv"><span>{t(lang, 'prod.dailyOutput')}</span><b>{output.toFixed(2)}</b></div>
         <div className="kv"><span>{t(lang, 'prod.stockpile')}</span><b>{fmtNumber(lang, Math.floor(stock))}</b></div>
       </div>)}
-      <label>{t(lang, 'prod.share')} {Math.round(share * 100)}% <input data-testid="production-art-share" type="range" min={0} max={0.5} step={0.05} value={share} onChange={e => setShare(Number(e.target.value))} /></label>
-      <button data-testid="apply-production" disabled={st.pendingCommands > 0 || Math.abs(share - p.productionShare) < 0.0001} onClick={() => engineClient.command('setProductionShare', { share })}>{t(lang, 'prod.apply')}</button>
+      <label>{t(lang, 'prod.share')} {Math.round(share * 100)}% {p.productionMode==='lines'&&(lang==='ja'?'（旧方式：現在無効）':'(Legacy: inactive)')} <input data-testid="production-art-share" type="range" min={0} max={0.5} step={0.05} value={share} disabled={p.productionMode==='lines'} onChange={e => setShare(Number(e.target.value))} /></label>
+      <button data-testid="apply-production" disabled={p.productionMode==='lines'||st.pendingCommands > 0 || Math.abs(share - p.productionShare) < 0.0001} onClick={() => engineClient.command('setProductionShare', { share })}>{t(lang, 'prod.apply')}</button>
+      <section className="panel-section production-mode" data-testid="production-mode">
+        <h4>{lang==='ja'?'装備の実生産方式':'Live production source'}</h4>
+        <p className="muted">{lang==='ja'
+          ? '生産ライン方式では、工場割当・モデルの製造倍率・効率を用いて翌日から歩兵装備と火砲を生産します。型番別在庫・師団への型番別配備は未実装です。'
+          : 'Line mode produces real infantry/artillery goods using factory allocation, model output and efficiency from the next day. Per-model stockpiles and division assignments are not implemented.'}</p>
+        <div className="row">
+          <button type="button" data-testid="mode-legacy" aria-pressed={p.productionMode==='legacy'}
+            disabled={st.pendingCommands>0||p.productionMode==='legacy'}
+            onClick={()=>engineClient.command('setProductionMode',{mode:'legacy'})}>
+            {lang==='ja'?'旧配分率（実生産）':'Legacy output'}
+          </button>
+          <button type="button" data-testid="mode-lines" aria-pressed={p.productionMode==='lines'}
+            disabled={st.pendingCommands>0||p.productionMode==='lines'||st.snap!.equipmentModels.length===0}
+            onClick={()=>engineClient.command('setProductionMode',{mode:'lines'})}>
+            {lang==='ja'?'生産ライン（実生産）':'Live production lines'}
+          </button>
+        </div>
+      </section>
       <ProductionLinePlanner snap={st.snap!} lang={lang} pending={st.pendingCommands} />
       <div className="row"><button onClick={() => appStore.set({ panel: 'recruit' })}>{t(lang, 'mil.recruit')}</button><button onClick={() => appStore.set({ panel: null })}>{t(lang, 'common.close')}</button></div>
     </div>

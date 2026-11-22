@@ -61,7 +61,7 @@ describe('persistent command sequences', () => {
     w.runtime.aiSeq[0] = 500;
     const old = decode(e.serialize()) as any;
     delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
-    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId;
+    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode;
     old.header.v = version;
     old.header.integrity = hashWorld(w, true);
     delete old.stores.armies; delete old.stores.armyGroups;

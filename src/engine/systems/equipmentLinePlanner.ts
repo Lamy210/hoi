@@ -1,5 +1,5 @@
 // Phase 6A: deterministic, side-effect-free production-line calculations.
-// This is NOT yet wired to production, inventory, recruitment, combat or save state.
+// Used for opted-in v15 live production; per-model warehouses and unit assignment are pending.
 import type { EquipmentModelDef } from '../scenario/types';
 
 export const MAX_EQUIPMENT_LINES = 128;

@@ -1,0 +1,21 @@
+import {test,expect} from '@playwright/test';
+test('生産画面でモデル連動の実生産へ切り替えて旧方式へ戻す',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-production').click();
+  await expect(page.getByTestId('mode-legacy')).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('production-plan-warning')).toContainText('従来配分率');
+  await page.getByTestId('mode-lines').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('mode-lines')).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('production-plan-warning')).toContainText('実際に生産');
+  await expect(page.getByTestId('production-art-share')).toBeDisabled();
+  await page.getByTestId('mode-legacy').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('mode-legacy')).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('production-art-share')).toBeEnabled();
+});
