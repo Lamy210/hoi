@@ -107,6 +107,10 @@ export interface TechDef {
   cat: string;
   req: string[];
   days: number;
+  /** Optional for legacy scenario packs; 0 ahead-of-time penalty if absent. */
+  year?: number;
+  nameJa?: string;
+  nameEn?: string;
   mods: Record<string, number>;
 }
 

@@ -3,6 +3,7 @@ import { customTemplateStats } from '../engine/military/customTemplates';
 import { OCCUPATION_DAYS } from '../engine/systems/combat';
 import { DivisionResources } from './ArmyManagement';
 import { DivisionDesignerPreview } from './DivisionDesignerPreview';
+import { ResearchTree } from './ResearchTree';
 import { DIVISION_TEMPLATES, divisionTemplate, MAX_TRAINING } from '../engine/military/templates';
 import { useEffect, useState } from 'react';
 import { useApp } from './App';
@@ -401,35 +402,7 @@ export function BudgetPanel({ initialTab = 'budget' }: { initialTab?: 'budget' |
             ))}
           </div>
         )}
-        {tab === 'research' && (
-          <div data-testid="research-tab">
-            <div className="kv"><span className="k">{t(lang, 'research.done')}</span><span data-testid="research-done">{player.research.done.length} / {snap.techs.length}</span></div>
-            {player.research.active.map((a) => (
-              <div key={a.id} className="kv"><span className="k">{a.id}</span><span>{Math.round((a.progress / a.days) * 100)}%</span></div>
-            ))}
-            {snap.techs.map((tech) => {
-              const isDone = player.research.done.includes(tech.id);
-              const isActive = player.research.active.some((a) => a.id === tech.id);
-              const prereqOk = tech.req.every((r) => player.research.done.includes(r));
-              return (
-                <div key={tech.id} className="kv">
-                  <span className="k">{tech.id}（{tech.cat}）</span>
-                  <span>
-                    {isDone ? '✔' : isActive ? Math.round((player.research.active.find((a) => a.id === tech.id)!.progress / tech.days) * 100) + '%' : (
-                      <button
-                        data-testid={'research-' + tech.id}
-                        disabled={!prereqOk || player.research.active.length >= 2}
-                        onClick={() => engineClient.command('startResearch', { techId: tech.id })}
-                      >
-                        {t(lang, 'research.start')}
-                      </button>
-                    )}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
+        {tab === 'research' && <ResearchTree snap={snap} lang={lang} pending={st.pendingCommands} />}
         {tab === 'construction' && (
           <div data-testid="construction-tab">
             <div className="muted">{t(lang, 'construction.note')}</div>

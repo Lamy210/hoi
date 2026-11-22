@@ -205,8 +205,11 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
     if (!t.id || techIds.has(t.id)) violations.push('tech id missing/duplicated: ' + t.id);
     techIds.add(t.id);
     if (!Number.isFinite(t.days) || t.days <= 0) violations.push('tech ' + t.id + ': invalid days');
+    if (t.year !== undefined && (!Number.isInteger(t.year) || t.year < 1800 || t.year > 2200)) violations.push('tech ' + t.id + ': invalid year');
+    for (const label of [t.nameJa, t.nameEn]) if (label !== undefined && (typeof label !== 'string' || label.length > 120)) violations.push('tech ' + t.id + ': invalid label');
     for (const key of Object.keys(t.mods ?? {})) {
-      if (!['factoryOutput', 'orgRegen', 'supplyRadius', 'researchRate', 'living'].includes(key)) {
+      if (!Number.isFinite(t.mods[key])) violations.push('tech ' + t.id + ': nonfinite modifier ' + key);
+      if (!['factoryOutput', 'orgRegen', 'supplyRadius', 'researchRate', 'living', 'infantryAttack', 'infantryDefense', 'artilleryAttack'].includes(key)) {
         violations.push('tech ' + t.id + ': unknown mod key ' + key);
       }
     }

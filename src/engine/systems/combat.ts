@@ -77,7 +77,12 @@ export function unitPowerFactors(
   side: 'attack' | 'defend',
 ): PowerContrib[] {
   const eff = effectiveSupply(w, u);
-  return unitPowerFactorsPure(u, w.prov.terrain[provIdx], eff, side, weatherAttackMod(w, provIdx), commanderMod(w, u, side),unitComposition(w,u));
+  const factors = unitPowerFactorsPure(u, w.prov.terrain[provIdx], eff, side, weatherAttackMod(w, provIdx), commanderMod(w, u, side), unitComposition(w, u));
+  const primary = techMods(w, u.owner, side === 'attack' ? 'infantryAttack' : 'infantryDefense');
+  const artillery = side === 'attack' && u.maxArtEquipment > 0
+    ? techMods(w, u.owner, 'artilleryAttack') * Math.max(0, Math.min(1, u.artEquipment / u.maxArtEquipment)) : 0;
+  if (primary + artillery !== 0) factors.push({ label: 'technology', value: Math.max(0.1, 1 + primary + artillery), formula: '1+infantryTech+artilleryTech×fill' });
+  return factors;
 }
 
 function factorProduct(cs: PowerContrib[]): number {

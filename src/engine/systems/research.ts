@@ -2,10 +2,11 @@
 // 研究力 = (GDP/100000＋milFactories×0.02)×(0.5＋識字率×0.5)×(0.6＋安定度×0.4)×教育倍率。
 import type { WorldState } from '../core/state';
 import { registerSystem } from '../core/scheduler';
+import { civilFromDays } from '../clock/date';
 import type { Pack, TechDef } from '../scenario/types';
 
 export const MAX_ACTIVE_RESEARCH = 2;
-export const TECH_MOD_KEYS = ['factoryOutput', 'orgRegen', 'supplyRadius', 'researchRate', 'living'] as const;
+export const TECH_MOD_KEYS = ['factoryOutput', 'orgRegen', 'supplyRadius', 'researchRate', 'living', 'infantryAttack', 'infantryDefense', 'artilleryAttack'] as const;
 export type TechModKey = (typeof TECH_MOD_KEYS)[number];
 
 let packTechs: TechDef[] = [];
@@ -31,6 +32,12 @@ export function techMods(w: WorldState, country: number, key: TechModKey): numbe
   return total;
 }
 
+/** Research ahead of its historical year is slower, but never blocked. Pure and date-driven. */
+export function researchEraPenalty(currentYear: number, techYear?: number): number {
+  if (techYear === undefined || techYear <= currentYear) return 1;
+  return Math.min(4, 1 + (techYear - currentYear) * 0.35);
+}
+
 export function researchPointsPerDay(w: WorldState, c: number): number {
   const base = w.gdp[c] / 100000 + w.countries.milFactories[c] * 0.02;
   const literacy = 0.5 + w.literacy[c] * 0.5;
@@ -44,6 +51,7 @@ export function registerResearchSystem(): void {
     name: 'research',
     cadence: 'daily',
     fn: (w) => {
+      const currentYear = civilFromDays(w.epochDays + w.tick).y;
       for (let c = 0; c < w.countries.count; c++) {
         if (!w.countries.alive[c]) continue;
         const st = w.research[c];
@@ -51,7 +59,7 @@ export function registerResearchSystem(): void {
         for (const act of st.active) {
           const def = packTechs.find((t) => t.id === act.id);
           if (!def) continue;
-          act.progress += rp;
+          act.progress += rp / researchEraPenalty(currentYear, def.year);
           if (act.progress >= def.days) {
             st.done.push(act.id);
           }
