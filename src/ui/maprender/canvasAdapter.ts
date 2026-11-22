@@ -315,6 +315,11 @@ export function createCanvasRenderer(
       draw();
     },
     pickAt,
+    projectProvince(prov: number) {
+      if (!readyForInput || !Number.isInteger(prov) || prov<0 || prov>=ds.provIds.length) return null;
+      const [x,y]=toPixel(ds.provLabelX[prov],ds.provLabelY[prov]);
+      return {x,y};
+    },
     rebuildAll(next: string[]) {
       colors = next;
       draw();
