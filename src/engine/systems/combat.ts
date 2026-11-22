@@ -12,6 +12,7 @@ import { reinforceIdleUnits } from './reinforcement';
 import { weatherAttackMod, weatherOrgMod } from './weather';
 import { commanderMod, commanderTrait, releaseCommander } from '../military/commanders';
 import { techMods } from './research';
+import {issuedModelCombatFactor,operationalCombatTechBonus} from '../military/equipmentCombat';
 import { checkAnnexation } from '../military/war';
 import { addContribution, CONTRIB_CAPITAL, CONTRIB_OCCUPATION } from '../diplomacy/peace';
 
@@ -79,10 +80,20 @@ export function unitPowerFactors(
 ): PowerContrib[] {
   const eff = effectiveSupply(w, u);
   const factors = unitPowerFactorsPure(u, w.prov.terrain[provIdx], eff, side, weatherAttackMod(w, provIdx), commanderMod(w, u, side), unitComposition(w, u));
-  const primary = techMods(w, u.owner, side === 'attack' ? 'infantryAttack' : 'infantryDefense');
-  const artillery = side === 'attack' && u.maxArtEquipment > 0
-    ? techMods(w, u.owner, 'artilleryAttack') * Math.max(0, Math.min(1, u.artEquipment / u.maxArtEquipment)) : 0;
-  if (primary + artillery !== 0) factors.push({ label: 'technology', value: Math.max(0.1, 1 + primary + artillery), formula: '1+infantryTech+artilleryTech×fill' });
+  const primary=operationalCombatTechBonus(w,u.owner,
+    side==='attack'?'infantryAttack':'infantryDefense');
+  const artillery=side==='attack'&&u.maxArtEquipment>0
+    ? operationalCombatTechBonus(w,u.owner,'artilleryAttack')*
+      Math.max(0,Math.min(1,u.artEquipment/u.maxArtEquipment)) : 0;
+  if(primary+artillery!==0)factors.push({
+    label:'technology',value:Math.max(0.1,1+primary+artillery),
+    formula:'1+operationalTech+artillerySupport×fill',
+  });
+  const equipmentModel=issuedModelCombatFactor(w,u,side);
+  if(equipmentModel!==1)factors.push({
+    label:'equipmentModel',value:equipmentModel,
+    formula:'identified model quality weighted by held equipment (unclassified=1)',
+  });
   return factors;
 }
 
