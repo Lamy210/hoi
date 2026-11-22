@@ -4,6 +4,7 @@ import type { Unit, WorldState } from '../core/state';
 import { customTemplateStats, type CustomTemplateRevision } from './customTemplates';
 import type { TemplateStats } from './templateStats';
 import { adjustWarehouse } from '../systems/modelWarehouse';
+import { trimUnitEquipment } from '../systems/issuedEquipment';
 
 export const MAX_BATCH_REFIT = 100;
 export type ResourceAmounts = [manpower: number, infantry: number, artillery: number];
@@ -73,6 +74,10 @@ export function applyBatchRefit(w: WorldState, country: number, plan: RefitBatch
     const oldMax: ResourceAmounts = [u.maxManpower, u.maxInfEquipment, u.maxArtEquipment];
     const next = capacity.map((v, i) => Math.min(held[i], v) + Math.max(0, v - oldMax[i])) as ResourceAmounts;
     [u.manpower, u.infEquipment, u.artEquipment] = next;
+    // Equipment exchanged or returned during refit loses type identity until
+    // the dedicated model-aware refit allocation phase. Never overstate holdings.
+    trimUnitEquipment(w,u.id,'infantry',u.infEquipment);
+    trimUnitEquipment(w,u.id,'artillery',u.artEquipment);
     [u.maxManpower, u.maxInfEquipment, u.maxArtEquipment] = capacity;
     u.org = Math.min(u.org, Math.min(100, stats.org)) * 0.5;
     u.customTemplateId = revision.templateId;

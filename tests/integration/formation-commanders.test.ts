@@ -83,7 +83,7 @@ describe('exclusive formation commanders',()=>{
     expect(issue('assignCommander',{unitId:u.id,commanderId:cmdr.id}).ok).toBe(true);
     const old=decode(e.serialize()) as any;
     delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
-    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction; delete old.stores.modelStock;
+    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction; delete old.stores.modelStock; delete old.stores.issuedEquipment;
     old.header.v=8;old.header.integrity=hashWorld(w,false,true,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);
     expect(e.loadFrom(encode(old)).ok).toBe(true);

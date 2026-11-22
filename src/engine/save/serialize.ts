@@ -9,6 +9,7 @@ import { validateHierarchy } from '../military/armies';
 import { legacyProductionLineState, validateProductionLineState } from '../systems/productionLineState';
 import { validateModelProductionLedger } from '../systems/modelProductionLedger';
 import { validateModelWarehouse } from '../systems/modelWarehouse';
+import { validateIssuedEquipment } from '../systems/issuedEquipment';
 import { hashWorld } from '../core/hash';
 import type { WorldState } from '../core/state';
 import { buildAdjacency } from '../map/adjacency';
@@ -16,7 +17,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 17;
+export const SAVE_SCHEMA_VERSION = 18;
 
 export interface SaveHeader {
   v: number;
@@ -86,6 +87,7 @@ function packStores(w: WorldState): Record<string, unknown> {
     productionMode: w.productionMode,
     modelProduction: w.modelProduction,
     modelStock: w.modelStock,
+    issuedEquipment: w.issuedEquipment,
     firedEvents: w.firedEvents,
     treasury: w.treasury,
     householdPool: w.householdPool,
@@ -184,7 +186,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 16 && h.v !== 15 && h.v !== 14 && h.v !== 13 && h.v !== 12 && h.v !== 11 && h.v !== 10 && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 17 && h.v !== 16 && h.v !== 15 && h.v !== 14 && h.v !== 13 && h.v !== 12 && h.v !== 11 && h.v !== 10 && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -258,6 +260,10 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   } else if(s.modelStock!==undefined){
     return {world:null,violations:['legacy save contains v17 warehouse']};
   }
+  if(h.v>=18 && !Array.isArray(s.issuedEquipment))
+    return {world:null,violations:['missing v18 issued equipment ledger']};
+  if(h.v<18&&s.issuedEquipment!==undefined)
+    return {world:null,violations:['legacy save contains v18 issued equipment']};
   const owner: number[] = s.prov.owner;
   const controller: number[] = s.prov.controller;
   if (!Array.isArray(owner) || owner.length !== provCount) violations.push('owner array size mismatch');
@@ -402,6 +408,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     productionMode: h.v>=15 ? s.productionMode : pack.countries.map(()=>'legacy' as const),
     modelProduction: h.v>=16 ? s.modelProduction : [],
     modelStock: h.v>=17 ? s.modelStock : [],
+    issuedEquipment: h.v>=18 ? s.issuedEquipment : [],
     ...(h.v >= 14 ? {productionLines:s.productionLines,nextProductionLineId:s.counters.nextProductionLineId} :
       legacyProductionLineState(s.countries.milFactories ?? pack.countries.map(c=>c.milFactories),
         s.productionShare ?? pack.countries.map(()=>0.2),pack.equipmentModels??[])),
@@ -461,13 +468,15 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   recomputeSupply(w);
   if(h.v<9&&[...w.armies,...w.armyGroups].some(f=>f.commanderId!==undefined))return {world:null,violations:['legacy save contains v9 formation commanders']};
   if(h.v<12&&w.armies.some(a=>a.reinforcementPriority!==undefined))return {world:null,violations:['legacy save contains v12 reinforcement priority']};
+  const issuedErrors=validateIssuedEquipment(w,pack.equipmentModels??[]);
+  if(issuedErrors.length)return {world:null,violations:issuedErrors};
   const lineErrors=validateProductionLineState(w,pack.equipmentModels??[],w.countries.count);
   if(lineErrors.length)return {world:null,violations:lineErrors};
   const templateErrors=validateCustomTemplates(w);
   if(templateErrors.length)return {world:null,violations:templateErrors};
   const hierarchyErrors = validateHierarchy(w);
   if (hierarchyErrors.length) return { world: null, violations: hierarchyErrors };
-  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10, h.v >= 11, h.v >= 12, h.v >= 13, h.v >= 14, h.v >= 15, h.v >= 16, h.v >= 17);
+  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10, h.v >= 11, h.v >= 12, h.v >= 13, h.v >= 14, h.v >= 15, h.v >= 16, h.v >= 17, h.v >= 18);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }

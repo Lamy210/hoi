@@ -25,6 +25,14 @@ export function DivisionResources({unit:u,lang,context=false}: {unit:UiUnit;lang
       <progress aria-label={label} max={1} value={required>0 ? Math.min(1,Math.max(0,actual/required)):1}/>
       <small>{ja?'不足':'Deficit'}: {format(Math.max(0,required-actual))}</small>
     </div>)}
+    <div data-testid={'issued-models-'+u.id} className="division-issued-models">
+      <b>{ja?'師団保有の装備型番':'Identified equipment held by division'}</b>
+      <small className="muted">{ja?'以下は装備保有数の内訳です。未分類の装備もあります。':'These are subsets of unit equipment, not extra items. Other equipment is unclassified.'}</small>
+      {u.issuedModels.length?u.issuedModels.map(item=>
+        <div className="kv" key={item.modelId} data-testid={'issued-model-'+u.id+'-'+item.modelId}>
+          <span>{item.modelId}</span><span>{format(item.quantity)}</span>
+        </div>):<small>{ja?'型番の記録なし':'No identified models'}</small>}
+    </div>
     <div className="kv"><span>{ja?'組織率':'Organization'}</span><span>{format(u.org)} / {format(u.orgCap)}</span></div>
     <progress aria-label={ja?'組織率':'Organization'} max={u.orgCap} value={u.org}/>
     <div className="kv"><span>{ja?'戦闘幅':'Combat width'}</span><span>{format(u.combatWidth)}</span></div>

@@ -2,16 +2,20 @@ import {addAlert,type WorldState,type Unit} from '../core/state';
 import {registerSystem} from '../core/scheduler';
 import {autoAssignCommander} from '../military/commanders';
 import {trainingSpec} from '../military/customTemplates';
-import {adjustWarehouse} from './modelWarehouse';
+import {adjustWarehouse,creditModelWarehouse} from './modelWarehouse';
+import {attributeEquipment,deployAttributedEquipment,releaseEquipmentAttribution} from './issuedEquipment';
 import type {TrainingOrder} from '../military/templates';
 
 /** Queued orders have not consumed resources; active/ready orders have full reservations. */
 export function refundTraining(w:WorldState,order:TrainingOrder):void {
+  const typed=releaseEquipmentAttribution(w,'training',order.id);
   if(!w.countries.alive[order.country]||order.status==='queued')return;
   const t=trainingSpec(w,order)!;
   w.countries.manpowerPool[order.country]+=t.manpower;
   adjustWarehouse(w,order.country,'infantry',t.infantry);
   adjustWarehouse(w,order.country,'artillery',t.artillery);
+  // Refunds restore the exact reserved model identity, not newly manufactured goods.
+  for(const row of typed)creditModelWarehouse(w,order.country,row.modelId,row.quantity);
 }
 
 /** One-time deployment, called only after the order is ready and province is owned. */
@@ -26,6 +30,7 @@ export function deployTrainingOrder(w:WorldState,order:TrainingOrder):void {
     org:50,exp:0,frontId:-1,commanderId:-1,encircled:false,destroyed:false,
   };
   w.units.push(unit);
+  deployAttributedEquipment(w,order.id);
   autoAssignCommander(w,unit);
   addAlert(w,{kind:'unitCreated',priority:2,msgKey:'alert.unitCreated',
     params:{where:w.prov.nameJa[p]||w.prov.nameEn[p]},actor:c,province:p});
@@ -59,8 +64,9 @@ export function tickTraining(w:WorldState):void {
        w.countries.infEquipmentStock[c]>=t.infantry &&
        w.countries.artEquipmentStock[c]>=t.artillery){
       w.countries.manpowerPool[c]-=t.manpower;
-      adjustWarehouse(w,c,'infantry',-t.infantry);
-      adjustWarehouse(w,c,'artillery',-t.artillery);
+      const inf=adjustWarehouse(w,c,'infantry',-t.infantry);
+      const art=adjustWarehouse(w,c,'artillery',-t.artillery);
+      attributeEquipment(w,'training',order.id,[...inf,...art]);
       order.status='training';
       order.readyTick=w.tick+t.days;
     }

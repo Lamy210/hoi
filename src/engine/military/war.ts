@@ -1,4 +1,5 @@
 // 戦争状態の生成・終結と戦争スコア（military/diplomacy仕様）。
+import {releaseEquipmentAttribution} from '../systems/issuedEquipment';
 // 講和は「現状ライン＋領土要求リスト」（講和会議UIはphase4-peace-conference）。
 import type { War, WorldState } from '../core/state';
 import { annulTreatiesBetween, annulTreatiesOf } from '../diplomacy/treaties';
@@ -99,7 +100,10 @@ export function checkAnnexation(w: WorldState): number[] {
     w.countries.alive[c] = false;
     annulTreatiesOf(w, c);
     for (const u of w.units) {
-      if (u.owner === c) u.destroyed = true;
+      if (u.owner === c) {
+        u.destroyed = true;
+        releaseEquipmentAttribution(w,'unit',u.id);
+      }
     }
     for (const war of w.wars) {
       if (war.status !== 'ended' && (war.aggressor === c || war.defender === c)) {

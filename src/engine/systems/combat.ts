@@ -1,6 +1,7 @@
 // 戦闘システム — プロヴィンス単位バトル・日次解決・撤退・包囲・占領（combat-system仕様）。
 // 全ての係数はトレース可能（trace.tsのunitCombatTraceで再計算）。決定論ロールはPCG32派生ストリーム。
 import { divisionTemplate } from '../military/templates';
+import {releaseEquipmentAttribution,trimUnitEquipment} from './issuedEquipment';
 import { selectCombatFront, unitComposition, unitOrgCap } from '../military/unitComposition';
 import type { TemplateStats } from '../military/templateStats';
 import { deriveStream } from '../core/rng';
@@ -158,6 +159,8 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
     u.manpower = Math.max(0, u.manpower - dmg * 8);
     u.infEquipment = Math.max(0, u.infEquipment - dmg * 6);
     u.artEquipment = Math.max(0, u.artEquipment - dmg * 1.2);
+    trimUnitEquipment(w,u.id,'infantry',u.infEquipment);
+    trimUnitEquipment(w,u.id,'artillery',u.artEquipment);
     u.exp = Math.min(5, u.exp + 0.005);
     bumpCommanderExp(w, u, 0.01);
   }
@@ -167,6 +170,8 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
     u.manpower = Math.max(0, u.manpower - dmg * 8);
     u.infEquipment = Math.max(0, u.infEquipment - dmg * 6);
     u.artEquipment = Math.max(0, u.artEquipment - dmg * 1.2);
+    trimUnitEquipment(w,u.id,'infantry',u.infEquipment);
+    trimUnitEquipment(w,u.id,'artillery',u.artEquipment);
     u.exp = Math.min(5, u.exp + 0.005);
     bumpCommanderExp(w, u, 0.01);
   }
@@ -303,6 +308,7 @@ function tickAttrition(w: WorldState, battles: Map<number, Sides>): void {
     if (w.units[i].destroyed) {
       const u=w.units[i];
       if(u.commanderId>=0&&w.commanders.some(c=>c.id===u.commanderId&&c.assignedUnit===u.id))releaseCommander(w,u.commanderId);
+      releaseEquipmentAttribution(w,'unit',u.id);
       w.units.splice(i, 1);
     }
   }

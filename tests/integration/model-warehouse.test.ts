@@ -54,7 +54,7 @@ describe('v17 model warehouse is a subset of the aggregate two-goods stock',()=>
     expect(w.countries.infEquipmentStock[c]).toBe(30);
   });
 
-  it('deploy and cancel training consume typed warehouse goods but refunds return unclassified',async()=>{
+  it('deploy and cancel training restore the original typed models before new unit issuance',async()=>{
     const e=await createTestEngine(),w=e.world,c=w.playerCountry,p=w.countries.capital[c];
     w.countries.manpowerPool[c]=100_000;
     w.countries.infEquipmentStock[c]=1_000;
@@ -69,8 +69,8 @@ describe('v17 model warehouse is a subset of the aggregate two-goods stock',()=>
     expect(command(w,'cancelTraining',{id:orderId},2).ok).toBe(true);
     expect(w.countries.infEquipmentStock[c]).toBe(1_000);
     expect(w.countries.artEquipmentStock[c]).toBe(200);
-    expect(w.modelStock.filter(r=>r.country===c)).toEqual([]);
-    expect(unclassifiedWarehouse(w,c,'infantry')).toBe(1_000);
+    expect(w.modelStock.find(r=>r.country===c&&r.modelId===rifle)?.quantity).toBe(1_000);
+    expect(unclassifiedWarehouse(w,c,'infantry')).toBe(0);
     expect(command(w,'createUnit',{country:c,province:p},3).ok).toBe(true);
     expect(w.countries.infEquipmentStock[c]).toBe(0);
     expect(w.countries.artEquipmentStock[c]).toBe(0);
@@ -90,7 +90,7 @@ describe('v17 model warehouse is a subset of the aggregate two-goods stock',()=>
       expect(hashWorld(restored.world),'tick '+w.tick).toBe(hashWorld(w));
     }
     const v16=decode(encoded) as any;
-    v16.header.v=16;delete v16.stores.modelStock;
+    v16.header.v=16;delete v16.stores.modelStock;delete v16.stores.issuedEquipment;
     const old=await createTestEngine();
     expect(old.loadFrom(encoded).ok).toBe(true);
     // Historical hash excludes the v17 warehouse (all other v16 fields included).
@@ -113,7 +113,7 @@ describe('v17 model warehouse is a subset of the aggregate two-goods stock',()=>
       blob.payloadChecksum=savePayloadChecksum(blob.header,blob.stores);
       return deserializeWorld(encode(blob),pack).violations;
     };
-    expect(good.header.v).toBe(17);
+    expect(good.header.v).toBe(18);
     expect(tamper(b=>{b.stores.modelStock[0].quantity=-1})).toContain('invalid v17 warehouse quantity');
     expect(tamper(b=>{b.stores.modelStock[0].modelId='invalid'})).toContain('invalid v17 warehouse model');
     expect(tamper(b=>{b.stores.modelStock.push({...b.stores.modelStock[0]})}))
