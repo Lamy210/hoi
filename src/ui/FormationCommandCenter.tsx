@@ -1,4 +1,4 @@
-import {useEffect,useState} from 'react';
+import {useState} from 'react';
 import type {UiSnapshot} from '../engine/ui';
 import type {FormationScope,FormationTargetScope} from '../engine/military/formationOverview';
 import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview} from '../engine/military/formationOverview';
@@ -11,7 +11,7 @@ type Props={snap:UiSnapshot;lang:Lang;focus:FormationScope|null;pending:number;
 export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSelect}:Props){
   const [chosenFront,setChosenFront]=useState('');
   const [targetScope,setTargetScope]=useState<FormationTargetScope>('all');
-  const [confirmRelease,setConfirmRelease]=useState(false);
+  const [acknowledgedSignature,setAcknowledgedSignature]=useState<string|null>(null);
   const ja=lang==='ja';
   const label=(j:string,e:string)=>ja?j:e;
   const fmt=(n:number)=>n.toLocaleString(ja?'ja-JP':'en-US',{maximumFractionDigits:1});
@@ -32,10 +32,11 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const resume=formationOperationPreview(scoped,'resume');
   const assign=formationOperationPreview(scoped,'assignFront',front?.id);
   const unassign=formationOperationPreview(scoped,'unassignFront');
+  const releasingIds=scoped.filter(u=>u.manualHold&&assign.ids.includes(u.id)).map(u=>u.id);
   const targetSignature=focus?.kind+':'+focus?.id+':'+chosenFront+':'+targetScope+
-    ':'+assign.ids.join(',')+':'+assign.releasesManualHold;
-  // An earlier acknowledgement must never apply to a different unit/front selection.
-  useEffect(()=>setConfirmRelease(false),[targetSignature]);
+    ':'+assign.ids.join(',')+':'+releasingIds.join(',');
+  // The acknowledgement is scoped to the exact division IDs and their hold state.
+  const confirmedRelease=acknowledgedSignature===targetSignature;
   const send=(type:string,p:Record<string,unknown>,targetIds:readonly number[])=>{
     if(enabled&&targetIds.length>0&&targetIds.length<=256)engineClient.command(type,p);
   };
@@ -102,7 +103,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           </option>)}
         </select>
         <button data-testid="formation-assign-front"
-          disabled={!enabled||!front||!assign.ids.length||(assign.releasesManualHold>0&&!confirmRelease)}
+          disabled={!enabled||!front||!assign.ids.length||(assign.releasesManualHold>0&&!confirmedRelease)}
           onClick={()=>front&&send('assignToFront',{units:assign.ids,frontId:front.id},assign.ids)}>
           {label('戦線へ割当・変更','Assign / change front')} ({assign.ids.length})
         </button>
@@ -119,7 +120,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
       </small>
       {front&&assign.releasesManualHold>0&&<label className="formation-command-warning" data-testid="formation-release-warning">
         <input type="checkbox" data-testid="formation-confirm-release"
-          checked={confirmRelease} onChange={e=>setConfirmRelease(e.target.checked)}/>
+          checked={confirmedRelease} onChange={e=>setAcknowledgedSignature(e.target.checked?targetSignature:null)}/>
         {label(
           'この戦線割当で'+assign.releasesManualHold+'師団の手動固定が解除され、自動作戦が再開します。確認して実行',
           'Assigning this front clears manual hold for '+assign.releasesManualHold+' divisions and resumes automated orders. Confirm to proceed'
