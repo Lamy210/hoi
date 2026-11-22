@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+test('生産ライン別の推定日産を表示し実生産に切り替えても内訳を維持する',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-production').click();
+  const line=page.getByTestId('production-line-planner').locator('article[data-testid^="production-plan-"]').first();
+  const id=(await line.getAttribute('data-testid'))!.replace('production-plan-','');
+  await expect(page.getByTestId('plan-daily-output-'+id)).toContainText('日産見込');
+  await page.getByTestId('mode-lines').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('mode-lines')).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('plan-daily-output-'+id)).toBeVisible();
+  await page.getByTestId('mode-legacy').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('mode-legacy')).toHaveAttribute('aria-pressed','true');
+});

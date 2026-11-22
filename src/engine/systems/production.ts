@@ -6,7 +6,7 @@ import { registerSystem } from '../core/scheduler';
 import { techMods } from './research';
 import { lawOutputFactor } from './politics';
 import { equipmentModels } from '../military/equipmentCatalog';
-import { allocateProductionLines, efficiencyAfterDay, modelDailyOutput } from './equipmentLinePlanner';
+import { allocateProductionLines, efficiencyAfterDay, modelDailyOutput, type AllocatedLine } from './equipmentLinePlanner';
 import { countryProductionLines, modelUnlocked } from './productionLineState';
 
 export const EQUIPMENT_PER_FACTORY_DAY = 2; // 歩兵装備（配分1.0時）
@@ -21,24 +21,39 @@ export function aiEquipmentBonus(w: WorldState, country: number): number {
   return 0;
 }
 
+export interface ProductionLineEstimate extends AllocatedLine {
+  /** When the country is in legacy mode this is only a hypothetical output. */
+  category: 'infantry'|'artillery'|null;
+  unlocked: boolean;
+  estimatedDailyOutput: number;
+}
+
+/** Side-effect-free per-line forecast. Uses the same formula as live production. */
+export function forecastProductionLines(w:WorldState,c:number): ProductionLineEstimate[] {
+  const catalog=new Map(equipmentModels().map(m=>[m.id,m]));
+  const lines=allocateProductionLines(countryProductionLines(w,c),
+    w.countries.alive[c] ? w.countries.milFactories[c] : 0).lines;
+  const multiplier=w.countries.alive[c]
+    ? (1+aiEquipmentBonus(w,c))*lawOutputFactor(w,c)*(1+techMods(w,c,'factoryOutput'))
+    : 0;
+  return lines.map(line=>{
+    const model=catalog.get(line.modelId);
+    const unlocked=!!model&&modelUnlocked(w,c,model);
+    return {...line,category:model?.category??null,unlocked,
+      estimatedDailyOutput:model&&unlocked?modelDailyOutput(line,model,multiplier):0};
+  });
+}
+
 export function dailyEquipmentOutput(w: WorldState, c: number): { infantry: number; artillery: number } {
   if(!w.countries.alive[c])return {infantry:0,artillery:0};
   if(w.productionMode[c]==='lines'){
-    const models=new Map(equipmentModels().map(model=>[model.id,model]));
-    const lines=allocateProductionLines(countryProductionLines(w,c),w.countries.milFactories[c]).lines;
-    const multiplier=(1+aiEquipmentBonus(w,c))*
-      lawOutputFactor(w,c)*(1+techMods(w,c,'factoryOutput'));
     let infantry=0,artillery=0;
-    for(const line of lines){
-      const model=models.get(line.modelId);
-      if(!model||!modelUnlocked(w,c,model))continue;
-      const amount=modelDailyOutput(line,model,multiplier);
-      if(model.category==='infantry')infantry+=amount;
-      else artillery+=amount;
+    for(const line of forecastProductionLines(w,c)){
+      if(line.category==='infantry')infantry+=line.estimatedDailyOutput;
+      if(line.category==='artillery')artillery+=line.estimatedDailyOutput;
     }
     return {infantry,artillery};
   }
-  if (!w.countries.alive[c]) return { infantry: 0, artillery: 0 };
   const share = w.productionShare[c] ?? 0.2;
   const bonus = aiEquipmentBonus(w, c);
   const lawTech = lawOutputFactor(w, c) * (1 + techMods(w, c, 'factoryOutput'));

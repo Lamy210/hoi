@@ -81,10 +81,10 @@ export function ContextPanel() {
             <span>
               <input
                 data-testid="share-slider"
-                type="range" min={0} max={0.5} step={0.05} value={player.productionShare}
+                type="range" min={0} max={0.5} step={0.05} value={player.productionShare} disabled={player.productionMode==='lines'}
                 onChange={(e) => engineClient.command('setProductionShare', { share: Number(e.target.value) })}
               />
-              {Math.round(player.productionShare * 100)}%
+              {Math.round(player.productionShare * 100)}%{player.productionMode==='lines'&&(lang==='ja'?'（現在無効）':' (inactive)')}
             </span>
           </div>
           {player.atWar.length > 0 && (
