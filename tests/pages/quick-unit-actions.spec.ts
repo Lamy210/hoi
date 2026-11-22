@@ -1,0 +1,31 @@
+import {test,expect} from '@playwright/test';
+
+test('指揮系統の師団選択から移動・待機・位置・選択解除をすぐ操作できる',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  const toolbar=page.getByTestId('quick-unit-actions');
+  await expect(toolbar).toHaveCount(0);
+  const first=page.getByTestId('order-of-battle').locator('[data-testid^="oob-unit-"]').first();
+  await first.click();
+  await expect(toolbar).toBeVisible();
+  await expect(page.getByTestId('quick-selected-count')).toContainText('1');
+  await expect(page.getByTestId('quick-move-selected')).toBeEnabled();
+  await expect(page.getByTestId('quick-attack-selected')).toBeDisabled();
+  await page.getByTestId('quick-move-selected').click();
+  await expect(page.getByTestId('quick-move-selected')).toHaveAttribute('aria-pressed','true');
+  await expect(page.getByTestId('move-selected')).toHaveAttribute('aria-pressed','true');
+  await page.getByTestId('quick-move-selected').click();
+  await expect(page.getByTestId('quick-move-selected')).toHaveAttribute('aria-pressed','false');
+  await page.getByTestId('quick-focus-selected').click();
+  await page.getByTestId('quick-halt-selected').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('resume-selected-automation')).toBeEnabled();
+  await page.getByTestId('quick-clear-selection').click();
+  await expect(toolbar).toHaveCount(0);
+  await expect(page.getByTestId('selected-unit-count')).toContainText('0');
+  await expect(page.getByTestId('move-selected')).toBeDisabled();
+});
