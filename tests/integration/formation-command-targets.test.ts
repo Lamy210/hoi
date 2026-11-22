@@ -47,7 +47,7 @@ describe('formation command target selection and change preview',()=>{
     });
     expect(formationOperationPreview(scoped,'assignFront',5).ids)
       .toEqual(formationOperationPreview([...scoped].reverse(),'assignFront',5).ids);
-    expect(formationOperationPreview([{...first,manualHold:false}],'assignFront',5))
+    expect(formationOperationPreview([{...first,frontId:5,manualHold:false}],'assignFront',5))
       .toEqual({ids:[],unchanged:1,releasesManualHold:0});
     expect(hashWorld(w)).toBe(before);
   });
