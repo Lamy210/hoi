@@ -15,7 +15,7 @@ export interface IssuedEquipmentRecord {
   quantity: number;
 }
 const sorted=(a:IssuedEquipmentRecord,b:IssuedEquipmentRecord)=>
-  a.holder.localeCompare(b.holder,'en')||a.holderId-b.holderId||
+  (a.holder<b.holder?-1:a.holder>b.holder?1:0)||a.holderId-b.holderId||
   (a.modelId<b.modelId?-1:a.modelId>b.modelId?1:0);
 const tolerance=(v:number)=>1e-7*Math.max(1,Math.abs(v));
 

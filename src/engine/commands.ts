@@ -19,6 +19,7 @@ import { equipmentModels } from './military/equipmentCatalog';
 import { MAX_EQUIPMENT_LINES, MAX_REQUESTED_FACTORIES, efficiencyAfterSwitch } from './systems/equipmentLinePlanner';
 import { countryProductionLines, modelUnlocked } from './systems/productionLineState';
 import { adjustWarehouse } from './systems/modelWarehouse';
+import { attributeEquipment } from './systems/issuedEquipment';
 import { applyBatchRefit, planBatchRefit } from './military/refit';
 import { LAW_PP_COST } from './systems/politics';
 import { techDefs, MAX_ACTIVE_RESEARCH } from './systems/research';
@@ -84,8 +85,8 @@ export function registerAllCommands(): void {
       const country = p.country as number;
       const prov = p.province as number;
       w.countries.manpowerPool[country] -= UNIT_MANPOWER_COST;
-      adjustWarehouse(w,country,'infantry',-UNIT_INF_EQUIPMENT_COST);
-      adjustWarehouse(w,country,'artillery',-UNIT_ART_EQUIPMENT_COST);
+      const infIssued=adjustWarehouse(w,country,'infantry',-UNIT_INF_EQUIPMENT_COST);
+      const artIssued=adjustWarehouse(w,country,'artillery',-UNIT_ART_EQUIPMENT_COST);
       const unit = {
         id: w.nextUnitId++,
         owner: country,
@@ -108,6 +109,7 @@ export function registerAllCommands(): void {
         destroyed: false,
       };
       w.units.push(unit);
+      attributeEquipment(w,'unit',unit.id,[...infIssued,...artIssued]);
       // 空き指揮官の自動割当（最skill者。プレイヤーは後からUIで変更可能）
       autoAssignCommander(w, unit);
       addAlert(w, {
@@ -223,9 +225,11 @@ export function registerAllCommands(): void {
       const c = actorCountry(w, issuer)!;
       const t = divisionTemplate(p.templateId)!;
       w.countries.manpowerPool[c] -= t.manpower;
-      adjustWarehouse(w,c,'infantry',-t.infantry);
-      adjustWarehouse(w,c,'artillery',-t.artillery);
-      w.trainingQueue.push({ id: w.nextUnitId++, country: c, province: p.province as number, templateId: t.id, readyTick: w.tick + t.days });
+      const id=w.nextUnitId++;
+      const inf=adjustWarehouse(w,c,'infantry',-t.infantry);
+      const art=adjustWarehouse(w,c,'artillery',-t.artillery);
+      attributeEquipment(w,'training',id,[...inf,...art]);
+      w.trainingQueue.push({ id, country: c, province: p.province as number, templateId: t.id, readyTick: w.tick + t.days });
     },
   });
   registerCommand('startCustomTraining', {
@@ -246,9 +250,11 @@ export function registerAllCommands(): void {
     apply(w,p,issuer){
       const c=actorCountry(w,issuer)!,t=trainingSpec(w,{country:c,customTemplateId:p.templateId as number,customRevision:p.revision as number})!;
       w.countries.manpowerPool[c]-=t.manpower;
-      adjustWarehouse(w,c,'infantry',-t.infantry);
-      adjustWarehouse(w,c,'artillery',-t.artillery);
-      w.trainingQueue.push({id:w.nextUnitId++,country:c,province:p.province as number,
+      const id=w.nextUnitId++;
+      const inf=adjustWarehouse(w,c,'infantry',-t.infantry);
+      const art=adjustWarehouse(w,c,'artillery',-t.artillery);
+      attributeEquipment(w,'training',id,[...inf,...art]);
+      w.trainingQueue.push({id,country:c,province:p.province as number,
         customTemplateId:p.templateId as number,customRevision:p.revision as number,readyTick:w.tick+t.days});
     },
   });
