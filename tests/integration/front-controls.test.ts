@@ -81,6 +81,7 @@ describe('front assignment and automation',()=>{
     const e=await createTestEngine(),w=e.world;
     const old=decode(e.serialize()) as any;
     delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
+    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId;
     old.header.v=7;old.header.integrity=hashWorld(w,false,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);
     expect(e.loadFrom(encode(old)).ok).toBe(true);
