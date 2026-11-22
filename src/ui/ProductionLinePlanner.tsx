@@ -107,6 +107,20 @@ export function ProductionLinePlanner({snap,lang,pending}:{snap:UiSnapshot,lang:
         lang={lang} pending={pending} done={done}/>)}
       {!country.productionLines.length&&<p className="muted">{ja?'生産計画なし':'No planned lines'}</p>}
     </div>
+    <section data-testid="model-production-history" className="production-model-history">
+      <h4>{ja?'型番別の累計製造実績':'Lifetime manufacturing by model'}</h4>
+      <p className="muted">{ja
+        ? '生産ライン方式で製造した累計数量です。現在の倉庫残数ではありません。旧配分率での生産・貿易・損耗・補充はこの履歴に含まれません。'
+        : 'Cumulative units manufactured in line mode, NOT current inventory. Legacy output, trade, losses and reinforcements are not counted.'}</p>
+      {country.modelProduction.length===0&&<p className="muted">{ja?'記録なし':'No history yet'}</p>}
+      {country.modelProduction.map(record=>{
+        const model=models.find(m=>m.id===record.modelId);
+        return <div className="kv" key={record.modelId} data-testid={'model-production-'+record.modelId}>
+          <span>{model?(ja?model.nameJa:model.nameEn):record.modelId}</span>
+          <b>{record.produced.toFixed(2)}</b>
+        </div>;
+      })}
+    </section>
     <h4>{ja?'計画ラインを追加':'Add a planned line'}</h4>
     <div className="production-plan-form">
       <label>{ja?'装備モデル':'Equipment model'}

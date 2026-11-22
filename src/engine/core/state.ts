@@ -260,6 +260,8 @@ export interface WorldState {
   nextProductionLineId: number;
   /** V15: opt-in live source for two-goods equipment production. */
   productionMode: ('legacy' | 'lines')[];
+  /** v16 cumulative quantities manufactured by model; NOT remaining stock. */
+  modelProduction: import('../systems/modelProductionLedger').ModelProductionRecord[];
   firedEvents: string[]; // 発火済みイベントID
   // ── phase3（国家・経済運営）──
   treasury: number[]; // 国庫

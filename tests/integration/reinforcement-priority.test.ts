@@ -73,7 +73,7 @@ describe('army-scoped reinforcement allocation',()=>{
     const {e,w,issue}=await setup();
     issue('setArmyReinforcementPriority',{armyId:1,priority:9});
     const old=decode(e.serialize()) as any;
-    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode;
+    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction;
     old.header.v=11;old.header.integrity=hashWorld(w,false,true,true,true,true,true,false);
     delete old.stores.armies[0].reinforcementPriority;
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);
