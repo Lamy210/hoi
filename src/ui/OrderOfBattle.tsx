@@ -4,6 +4,7 @@ import type { MouseEvent } from 'react';
 import type { Army, ArmyGroup } from '../engine/military/armies';
 import type { UiSnapshot, UiMeta, UiUnit } from '../engine/ui';
 import { divisionTemplate } from '../engine/military/templates';
+import type {FormationScope} from '../engine/military/formationOverview';
 
 export interface ArmyBranch { army: Army; units: UiUnit[] }
 export interface GroupBranch { group: ArmyGroup; armies: ArmyBranch[] }
@@ -39,8 +40,9 @@ export function unitRequiresAttention(u:UiUnit):boolean {
     u.artEquipment<u.maxArtEquipment;
 }
 
-export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect}:{
+export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect,onFocus}:{
   snap:UiSnapshot;meta:UiMeta;lang:'ja'|'en';selectedIds:number[];onSelect:(ids:number[])=>void;
+  onFocus?:(focus:FormationScope|null)=>void;
 }) {
   const ja=lang==='ja';
   const [query,setQuery]=useState('');
@@ -79,7 +81,7 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect}:{
   const choose=(u:UiUnit,e:MouseEvent)=>{
     const additive=e.metaKey||e.ctrlKey||e.shiftKey;
     const next=additive ? (selectedSet.has(u.id)?selectedIds.filter(id=>id!==u.id):[...selectedIds,u.id]) : [u.id];
-    if(next.length<=256)onSelect(next);
+    if(next.length<=256){onSelect(next);onFocus?.(u.armyId!==null?{kind:'army',id:u.armyId}:null);}
   };
   const renderUnits=(units:readonly UiUnit[])=><div className="oob-unit-list">
     {units.map(u=><button key={u.id} type="button" data-testid={'oob-unit-'+u.id}
@@ -107,7 +109,7 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect}:{
     </summary>
     <div className="oob-subtree">
       <button type="button" className="oob-select" data-testid={'oob-select-army-'+branch.army.id}
-        disabled={!branch.units.length||branch.units.length>256} onClick={()=>selectIds(branch.units)}>
+        disabled={!branch.units.length||branch.units.length>256} onClick={()=>{selectIds(branch.units);onFocus?.({kind:'army',id:branch.army.id});}}>
         {ja?'軍団全体を選択':'Select army'} ({branch.units.length})
       </button>
       {renderUnits(branch.units)}
@@ -140,7 +142,7 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect}:{
           </summary>
           <div className="oob-subtree">
             <button type="button" className="oob-select" data-testid={'oob-select-group-'+group.id}
-              disabled={!units.length||units.length>256} onClick={()=>selectIds(units)}>
+              disabled={!units.length||units.length>256} onClick={()=>{selectIds(units);onFocus?.({kind:'group',id:group.id});}}>
               {ja?'軍集団全体を選択':'Select group'} ({units.length})
             </button>
             {armies.filter(a=>showEmpty||a.units.length).map(renderArmy)}
@@ -155,7 +157,7 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect}:{
         </summary>
         <div className="oob-subtree">
           <button type="button" className="oob-select" data-testid="oob-select-unassigned"
-            disabled={!tree.unassigned.length||tree.unassigned.length>256} onClick={()=>selectIds(tree.unassigned)}>
+            disabled={!tree.unassigned.length||tree.unassigned.length>256} onClick={()=>{selectIds(tree.unassigned);onFocus?.(null);}}>
             {ja?'未編入師団を選択':'Select unassigned'} ({tree.unassigned.length})
           </button>
           {renderUnits(tree.unassigned)}

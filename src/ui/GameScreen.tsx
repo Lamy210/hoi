@@ -7,6 +7,7 @@ import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
+import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
 import type { MapDataSource, MapRenderer } from './maprender/types';
@@ -45,6 +46,7 @@ export function GameScreen() {
   const [destination, setDestination] = useState('');
   const [rosterOpen, setRosterOpen] = useState(true);
   const [rosterView, setRosterView] = useState<'tree'|'list'>('tree');
+  const [focusedFormation,setFocusedFormation]=useState<FormationScope|null>(null);
   const [frontVisibility,setFrontVisibility]=useState<FrontVisibility>('all');
   const [rosterQuery, setRosterQuery] = useState('');
   const [rosterFilter, setRosterFilter] = useState('all');
@@ -448,7 +450,7 @@ export function GameScreen() {
                   : moveMode ? t(lang,'units.destinationHint') :
                     (lang==='ja'?'選択した師団にまとめて命令できます。':'Commands apply to all selected divisions.')}</small>
               </div>}
-              <ArmyManagement key={snap.playerCountry + ':' + meta.packId} snap={snap} lang={lang} selectedIds={selectedIds} pending={st.pendingCommands} onSelect={ids => selectUnits(ids)} />
+              <ArmyManagement key={snap.playerCountry + ':' + meta.packId} snap={snap} lang={lang} selectedIds={selectedIds} pending={st.pendingCommands} onSelect={ids => selectUnits(ids)} focus={focusedFormation} onFocus={setFocusedFormation} />
               {snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy)).length>0&&<details className="front-overview" data-testid="front-overview"><summary>{lang==='ja'?'戦線一覧・地図表示':'Front overview'}</summary>
                 {snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy)).map(f=>{
                   const members=ownUnits.filter(u=>u.frontId===f.id);
@@ -466,7 +468,7 @@ export function GameScreen() {
                   onClick={()=>setRosterView('list')}>{lang==='ja'?'詳細一覧':'Detailed list'}</button>
               </div>
               {rosterView==='tree'&&<OrderOfBattleExplorer snap={snap} meta={meta} lang={lang}
-                selectedIds={selectedIds} onSelect={ids=>selectUnits(ids)} />}
+                selectedIds={selectedIds} onSelect={ids=>selectUnits(ids)} onFocus={setFocusedFormation} />}
               {rosterView==='list'&&<>
               <div className="muted">{t(lang, 'units.hint')}</div>
               <div className="move-controls">
