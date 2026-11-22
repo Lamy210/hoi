@@ -15,6 +15,9 @@ import { autoFrontProvinces, frontOf } from './military/fronts';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
 import { MAX_ART_SHARE } from './systems/production';
+import { equipmentModels } from './military/equipmentCatalog';
+import { MAX_EQUIPMENT_LINES, MAX_REQUESTED_FACTORIES, efficiencyAfterSwitch } from './systems/equipmentLinePlanner';
+import { countryProductionLines, modelUnlocked } from './systems/productionLineState';
 import { applyBatchRefit, planBatchRefit } from './military/refit';
 import { LAW_PP_COST } from './systems/politics';
 import { techDefs, MAX_ACTIVE_RESEARCH } from './systems/research';
@@ -322,6 +325,78 @@ export function registerAllCommands(): void {
       const index = w.trainingQueue.findIndex(o => o.id === p.id);
       refundTraining(w, w.trainingQueue[index]);
       w.trainingQueue.splice(index, 1);
+    },
+  });
+
+  // V14 production plans: commands are journaled and persisted, but do not
+  // modify actual two-goods stock until inventory migration is complete.
+  const validateLineInput=(p:Record<string,unknown>)=>
+    !Number.isInteger(p.factories)||(p.factories as number)<0||
+    (p.factories as number)>MAX_REQUESTED_FACTORIES||
+    !Number.isInteger(p.priority)||(p.priority as number)<0||
+    (p.priority as number)>9 ? 'badParams' : null;
+  registerCommand('createProductionLine',{
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai'||!w.countries.alive[country])return 'badIssuer';
+      const args=validateLineInput(p);if(args)return args;
+      if(countryProductionLines(w,country).length>=MAX_EQUIPMENT_LINES||
+        !Number.isSafeInteger(w.nextProductionLineId)||w.nextProductionLineId>=Number.MAX_SAFE_INTEGER)
+        return 'limitExceeded';
+      const model=equipmentModels().find(m=>m.id===p.modelId);
+      if(!model)return 'unknownModel';
+      return modelUnlocked(w,country,model)?null:'techLocked';
+    },
+    apply(w,p,issuer){
+      const country=actorCountry(w,issuer)!;
+      w.productionLines.push({country,id:w.nextProductionLineId++,modelId:p.modelId as string,
+        requestedFactories:p.factories as number,priority:p.priority as number,
+        efficiency:0.1,active:true});
+    },
+  });
+  registerCommand('updateProductionLine',{
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai'||!w.countries.alive[country])return 'badIssuer';
+      if(!Number.isSafeInteger(p.lineId)||typeof p.active!=='boolean')return 'badParams';
+      const args=validateLineInput(p);if(args)return args;
+      return w.productionLines.some(l=>l.country===country&&l.id===p.lineId)?null:'notYourLine';
+    },
+    apply(w,p,issuer){
+      const line=w.productionLines.find(l=>l.country===actorCountry(w,issuer)&&l.id===p.lineId)!;
+      line.requestedFactories=p.factories as number;
+      line.priority=p.priority as number;
+      line.active=p.active as boolean;
+    },
+  });
+  registerCommand('switchProductionModel',{
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai'||!w.countries.alive[country])return 'badIssuer';
+      if(!Number.isSafeInteger(p.lineId))return 'badParams';
+      const line=w.productionLines.find(l=>l.country===country&&l.id===p.lineId);
+      if(!line)return 'notYourLine';
+      const model=equipmentModels().find(m=>m.id===p.modelId);
+      if(!model)return 'unknownModel';
+      return modelUnlocked(w,country,model)?null:'techLocked';
+    },
+    apply(w,p,issuer){
+      const line=w.productionLines.find(l=>l.country===actorCountry(w,issuer)&&l.id===p.lineId)!;
+      const source=equipmentModels().find(m=>m.id===line.modelId)!;
+      const target=equipmentModels().find(m=>m.id===p.modelId)!;
+      line.efficiency=efficiencyAfterSwitch(source,target,line.efficiency);
+      line.modelId=target.id;
+    },
+  });
+  registerCommand('deleteProductionLine',{
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai'||!w.countries.alive[country])return 'badIssuer';
+      if(!Number.isSafeInteger(p.lineId))return 'badParams';
+      return w.productionLines.some(l=>l.country===country&&l.id===p.lineId)?null:'notYourLine';
+    },
+    apply(w,p,issuer){
+      w.productionLines=w.productionLines.filter(l=>l.id!==p.lineId||l.country!==actorCountry(w,issuer));
     },
   });
 

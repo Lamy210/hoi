@@ -255,6 +255,9 @@ export interface WorldState {
   fronts: Front[];
   commanders: Commander[];
   productionShare: number[]; // 国ごとの火砲配分率 0..0.5
+  /** Phase6A planning-only: legacy productionShare still drives actual stock. */
+  productionLines: import('../systems/equipmentLinePlanner').ProductionLinePlan[];
+  nextProductionLineId: number;
   firedEvents: string[]; // 発火済みイベントID
   // ── phase3（国家・経済運営）──
   treasury: number[]; // 国庫
