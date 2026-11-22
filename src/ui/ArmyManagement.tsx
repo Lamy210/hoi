@@ -52,6 +52,9 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const [groupId,setGroupId]=useState('');
   const [scope,setScope]=useState('selection');
   const [quickTemplate,setQuickTemplate]=useState('');
+  const [exchangeTarget,setExchangeTarget]=useState('');
+  const [exchangeSource,setExchangeSource]=useState('unclassified');
+  const [exchangeAmount,setExchangeAmount]=useState('100');
   const country=snap.playerCountry;
   const armies=snap.armies.filter(a=>a.owner===country);
   const groups=snap.armyGroups.filter(g=>g.owner===country);
@@ -82,6 +85,21 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const refitAllowed=!!refitTemplate&&!!refitAmounts&&canCommand&&isEligible&&
     refitAmounts.net.every((cost,index)=>stock[index]>=cost);
   const fmtResources=(nums: readonly number[])=>nums.map(fmt).join(' / ');
+  const exchangeUnit=selected.length===1?selected[0]:null;
+  const targetModel=snap.equipmentModels.find(model=>model.id===exchangeTarget);
+  const availableTarget=player.modelStock.find(row=>row.modelId===exchangeTarget)?.quantity??0;
+  const category=targetModel?.category;
+  const actualEquipment=exchangeUnit&&category
+    ? (category==='infantry'?exchangeUnit.infEquipment:exchangeUnit.artEquipment):0;
+  const identified=exchangeUnit&&category?exchangeUnit.issuedModels.filter(row=>
+    snap.equipmentModels.some(model=>model.id===row.modelId&&model.category===category)):[];
+  const unclassified=Math.max(0,actualEquipment-identified.reduce((sum,row)=>sum+row.quantity,0));
+  const availableSource=exchangeSource==='unclassified'?unclassified:
+    identified.find(row=>row.modelId===exchangeSource)?.quantity??0;
+  const amount=Number(exchangeAmount);
+  const exchangeAllowed=!!exchangeUnit&&!!targetModel&&isEligible&&canCommand&&
+    Number.isSafeInteger(amount)&&amount>=1&&amount<=100000&&
+    exchangeSource!==exchangeTarget&&availableTarget>=amount&&availableSource+1e-7>=amount;
   const refitReason = !refitTemplate ? label('改編先を選択してください','Select a saved template') :
     selected.length>MAX_BATCH_REFIT ? label('一度に100師団まで','Up to 100 divisions per order') :
     !isEligible ? label('移動中・戦闘中・包囲中・敵支配州にいる師団は改編不可','Moving, battling, encircled or occupied divisions cannot refit') :
@@ -115,6 +133,44 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
         <small>{label('返却量','Refund')}: {fmtResources(refitAmounts.refund)}</small>
         <small>{label('差引消費（負数＝返却）','Net spend (negative = return)')}: {fmtResources(refitAmounts.net)}</small>
       </div>}
+      <fieldset className="army-model-exchange" data-testid="army-model-exchange">
+        <legend>{label('師団の銃器・火砲を交換','Exchange division equipment')}</legend>
+        <small className="muted">{label(
+          '国家倉庫の指定型番と師団の同じ種類の装備を1対1で交換します。総装備数は変わりません。',
+          'One-to-one exchange with a specific warehouse model. Total equipment counts do not change.')}</small>
+        <div className="move-controls">
+          <select data-testid="exchange-model-target" aria-label={label('交換後の装備型番','New equipment model')}
+            value={exchangeTarget} onChange={e=>{setExchangeTarget(e.target.value);setExchangeSource('unclassified');}}>
+            <option value="">{label('倉庫内の装備型番を選択','Select a stocked model')}</option>
+            {player.modelStock.map(row=>{
+              const model=snap.equipmentModels.find(m=>m.id===row.modelId);
+              return <option key={row.modelId} value={row.modelId}>
+                {model?(ja?model.nameJa:model.nameEn):row.modelId} · {fmt(row.quantity)}
+              </option>;
+            })}
+          </select>
+          <select data-testid="exchange-model-source" aria-label={label('交換前の装備型番','Old equipment model')}
+            value={exchangeSource} onChange={e=>setExchangeSource(e.target.value)}
+            disabled={!targetModel||!exchangeUnit}>
+            <option value="unclassified">{label('未分類の装備','Unclassified equipment')} · {fmt(unclassified)}</option>
+            {identified.filter(row=>row.modelId!==exchangeTarget).map(row=>
+              <option key={row.modelId} value={row.modelId}>{row.modelId} · {fmt(row.quantity)}</option>)}
+          </select>
+          <input data-testid="exchange-model-quantity" type="number" min="1" max="100000" step="1"
+            aria-label={label('交換数量','Exchange quantity')} value={exchangeAmount}
+            onChange={e=>setExchangeAmount(e.target.value)}/>
+          <button data-testid="exchange-model-submit" disabled={!exchangeAllowed}
+            onClick={()=>exchangeUnit&&engineClient.command('exchangeUnitEquipment',{
+              unitId:exchangeUnit.id,fromModelId:exchangeSource,toModelId:exchangeTarget,quantity:amount,
+            })}>{label('装備を交換','Exchange equipment')}</button>
+        </div>
+        {exchangeUnit&&targetModel&&<small data-testid="exchange-model-availability">
+          {label('交換元','Source')}: {fmt(availableSource)} ·
+          {label('倉庫の交換先在庫','Target stock')}: {fmt(availableTarget)}
+          {!isEligible&&label('（移動中・戦闘中・包囲中・非支配州では交換不可）',
+            ' (unavailable while moving, battling, encircled or outside controlled provinces)')}
+        </small>}
+      </fieldset>
       <small data-testid="army-batch-reason">{refitReason || label('命令の適用直前に再検証し、全件成功・全件拒否します。','Validated at command execution, all-or-nothing.')}</small>
     </div>
     <button data-testid="toggle-army-editor" aria-expanded={editing} onClick={()=>setEditing(!editing)}>{label(editing?'編成編集を閉じる':'編成を編集',editing?'Close editor':'Edit formations')}</button>
