@@ -66,7 +66,7 @@ describe('multi-army and multi-division formation assignment preview',()=>{
     expect(previewArmyGroupAssignment(w.armies,w.armyGroups,c,[5,5],1).reason).toBe('badSelection');
     expect(previewArmyGroupAssignment(w.armies,w.armyGroups,c,[999],1).reason).toBe('badSelection');
     expect(previewArmyGroupAssignment(w.armies,w.armyGroups,c,[5],999).reason).toBe('noTarget');
-    const owned=w.units.filter(u=>u.owner===c);
+    const owned=w.units.filter(u=>u.owner===c).slice(0,2);
     const enemy=w.units.find(u=>u.owner!==c)!;
     expect(previewDivisionAssignment(w.units,w.armies,c,[owned[0].id,enemy.id],1).reason).toBe('badSelection');
     expect(previewDivisionAssignment(w.units,w.armies,c,[owned[0].id,owned[0].id],1).reason).toBe('badSelection');
