@@ -253,3 +253,21 @@ input, select {
 .production-plan-actions { display:flex; gap:6px; flex-wrap:wrap; }
 .production-plan-actions button { flex:1 1 auto; }
 @media(max-width:700px){.production-planner{padding:7px}.production-plan-form label{flex:1 1 100%}}
+
+
+/* Selected divisions: command strip remains accessible while roster scrolls. */
+.quick-unit-actions {
+  position: sticky; top: 0; z-index: 9; display: grid; gap: 6px;
+  margin: 6px 0; padding: 8px; border: 1px solid #698aa6; border-radius: 6px;
+  background: rgba(24,38,56,0.97); box-shadow: 0 3px 10px rgba(0,0,0,0.3);
+}
+.quick-unit-actions strong { font-size: 12px; }
+.quick-unit-buttons { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: 5px; }
+.quick-unit-buttons button { min-width: 0; padding: 5px 2px; font-size: 12px; }
+.quick-unit-buttons button[aria-pressed="true"] { border-color: #f2c94c; background: #6d5a1e; }
+.quick-unit-actions small { font-size: 11px; line-height: 1.3; }
+@media(max-width:700px){
+  .quick-unit-actions { padding: 5px; }
+  .quick-unit-buttons { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 3px; }
+  .quick-unit-buttons button { font-size: 11px; }
+}

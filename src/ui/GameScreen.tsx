@@ -267,6 +267,29 @@ export function GameScreen() {
     appStore.set({ selection: { prov: first?.loc ?? null, unitId: first?.id ?? null, unitIds: valid.map(u => u.id), country: null }, trace: null });
     if (focus && first) rendererRef.current?.focusProvince(first.loc);
   }
+  function toggleMoveSelection() {
+    setAttackMode(false);
+    setDestination('');
+    setMoveMode(!moveMode);
+  }
+  function toggleAttackSelection() {
+    setMoveMode(false);
+    setDestination('');
+    setAttackMode(!attackMode);
+  }
+  function haltSelection() {
+    if (!canControl) return;
+    engineClient.command('haltUnits',{units:chosen.map(u=>u.id)});
+    setMoveMode(false);
+    setAttackMode(false);
+    setDestination('');
+  }
+  function clearSelection() {
+    setMoveMode(false);
+    setAttackMode(false);
+    setDestination('');
+    selectUnits([],false);
+  }
   function sendAttack(prov: number) {
     if (!canMove || !attackTargets.includes(prov)) {
       appStore.set({ statusMessage: t(lang, 'units.attackInvalid') });
@@ -404,6 +427,27 @@ export function GameScreen() {
           <section className="panel-section unit-roster" data-testid="unit-roster">
             <button data-testid="toggle-unit-roster" aria-expanded={rosterOpen} onClick={() => setRosterOpen(!rosterOpen)}>{t(lang, 'units.roster')} ({ownUnits.length}) {rosterOpen ? '▴' : '▾'}</button>
             {rosterOpen && <>
+              {chosen.length>0&&<div className="quick-unit-actions" data-testid="quick-unit-actions"
+                role="toolbar" aria-label={lang==='ja'?'選択師団の即時操作':'Selected divisions quick actions'}>
+                <strong data-testid="quick-selected-count">{lang==='ja'?'選択':'Selected'} {chosen.length}</strong>
+                <div className="quick-unit-buttons">
+                  <button data-testid="quick-move-selected" disabled={!canRedirect} aria-pressed={moveMode}
+                    onClick={toggleMoveSelection}>{moveMode?(lang==='ja'?'移動取消':'Cancel move'):hasMoving?(lang==='ja'?'移動先変更':'Redirect'):(lang==='ja'?'移動':'Move')}</button>
+                  <button data-testid="quick-attack-selected" className="danger" disabled={!canMove||!attackTargets.length}
+                    aria-pressed={attackMode} onClick={toggleAttackSelection}>{attackMode?(lang==='ja'?'攻撃取消':'Cancel attack'):(lang==='ja'?'攻撃':'Attack')}</button>
+                  <button data-testid="quick-halt-selected" disabled={!canControl}
+                    onClick={haltSelection}>{lang==='ja'?'停止':'Halt'}</button>
+                  <button data-testid="quick-open-fronts" disabled={!chosen.length}
+                    onClick={()=>appStore.set({panel:'fronts'})}>{lang==='ja'?'戦線':'Front'}</button>
+                  <button data-testid="quick-focus-selected"
+                    onClick={()=>rendererRef.current?.focusProvince(chosen[0].loc)}>{lang==='ja'?'位置':'Locate'}</button>
+                  <button data-testid="quick-clear-selection" onClick={clearSelection}>{lang==='ja'?'選択解除':'Clear'}</button>
+                </div>
+                <small className="muted">{attackMode
+                  ? t(lang,'units.attackHint')
+                  : moveMode ? t(lang,'units.destinationHint') :
+                    (lang==='ja'?'選択した師団にまとめて命令できます。':'Commands apply to all selected divisions.')}</small>
+              </div>}
               <ArmyManagement key={snap.playerCountry + ':' + meta.packId} snap={snap} lang={lang} selectedIds={selectedIds} pending={st.pendingCommands} onSelect={ids => selectUnits(ids)} />
               {snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy)).length>0&&<details className="front-overview" data-testid="front-overview"><summary>{lang==='ja'?'戦線一覧・地図表示':'Front overview'}</summary>
                 {snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy)).map(f=>{
@@ -451,11 +495,11 @@ export function GameScreen() {
               </>}
               <div className="move-controls">
                 <span data-testid="selected-unit-count">{t(lang, 'units.selected', { count: chosen.length })}</span>
-                <button data-testid="move-selected" disabled={!canRedirect} aria-pressed={moveMode} onClick={() => { setAttackMode(false); setDestination(''); setMoveMode(!moveMode); }}>{moveMode?t(lang,'units.cancelMove'):hasMoving?(lang==='ja'?'移動先変更':'Redirect'):t(lang,'units.move')}</button>
-                <button data-testid="halt-selected" disabled={!canControl} onClick={()=>{engineClient.command('haltUnits',{units:chosen.map(u=>u.id)});setMoveMode(false);setAttackMode(false);setDestination('');}}>{lang==='ja'?'停止・待機':'Halt / hold'}</button>
+                <button data-testid="move-selected" disabled={!canRedirect} aria-pressed={moveMode} onClick={toggleMoveSelection}>{moveMode?t(lang,'units.cancelMove'):hasMoving?(lang==='ja'?'移動先変更':'Redirect'):t(lang,'units.move')}</button>
+                <button data-testid="halt-selected" disabled={!canControl} onClick={haltSelection}>{lang==='ja'?'停止・待機':'Halt / hold'}</button>
                 <button data-testid="open-selected-fronts" disabled={!chosen.length} onClick={()=>appStore.set({panel:'fronts'})}>{lang==='ja'?'戦線へ割当':'Assign to front'}</button>
                 <button data-testid="resume-selected-automation" disabled={st.pendingCommands>0||!chosen.some(u=>u.manualHold)} onClick={()=>engineClient.command('setManualHold',{units:chosen.map(u=>u.id),hold:false})}>{lang==='ja'?'自動配置に復帰':'Resume automation'}</button>
-                <button data-testid="attack-selected" className="danger" disabled={!canMove || !attackTargets.length} aria-pressed={attackMode} onClick={() => { setMoveMode(false); setDestination(''); setAttackMode(!attackMode); }}>{t(lang, attackMode ? 'units.cancelAttack' : 'units.attack')}</button>
+                <button data-testid="attack-selected" className="danger" disabled={!canMove || !attackTargets.length} aria-pressed={attackMode} onClick={toggleAttackSelection}>{t(lang, attackMode ? 'units.cancelAttack' : 'units.attack')}</button>
                 {chosen.length > 0 && <button data-testid="focus-unit" onClick={() => rendererRef.current?.focusProvince(chosen[0].loc)}>{t(lang, 'units.focus')}</button>}
               </div>
               {attackMode && <div role="status" data-testid="attack-hint">{t(lang, 'units.attackHint')}</div>}
