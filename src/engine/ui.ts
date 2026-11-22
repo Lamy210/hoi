@@ -1,6 +1,6 @@
 // UIスナップショット — Worker→UIの公開状態（差分レンダリングの源）。
 // エンジン状態そのものではなく、UIが必要な値の投影。
-import { dailyEquipmentOutput } from './systems/production';
+import { dailyEquipmentOutput, forecastProductionLines, type ProductionLineEstimate } from './systems/production';
 import type { TrainingOrder, DivisionTemplateId } from './military/templates';
 import type { WorldState } from './core/state';
 import { formatDate, civilFromDays } from './clock/date';
@@ -9,8 +9,6 @@ import { refreshWeather, seasonOfMonth } from './systems/weather';
 import { computeScores } from './systems/score';
 import { techDefs } from './systems/research';
 import { equipmentModels } from './military/equipmentCatalog';
-import { allocateProductionLines, type AllocatedLine } from './systems/equipmentLinePlanner';
-import { countryProductionLines, modelUnlocked } from './systems/productionLineState';
 import { contributionOf } from './diplomacy/peace';
 import { warScoreFor } from './military/war';
 import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMultiplier } from './military/unitComposition';
@@ -29,7 +27,7 @@ export interface UiCountry {
   productionShare: number;
   productionMode: 'legacy'|'lines';
   /** Live in the lines production mode; per-model warehouses still not implemented. */
-  productionLines: (AllocatedLine & {unlocked:boolean})[];
+  productionLines: ProductionLineEstimate[];
   dailyEquipment: { infantry: number; artillery: number };
   training: TrainingOrder[];
   milFactories: number;
@@ -245,10 +243,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       infEquipmentStock: w.countries.infEquipmentStock[c],
       artEquipmentStock: w.countries.artEquipmentStock[c],
       dailyEquipment: dailyEquipmentOutput(w, c),
-      productionLines: allocateProductionLines(countryProductionLines(w,c),
-        w.countries.alive[c] ? w.countries.milFactories[c] : 0).lines.map(line=>({
-          ...line, unlocked: !!equipmentModels().find(m=>m.id===line.modelId&&modelUnlocked(w,c,m)),
-        })),
+      productionLines: forecastProductionLines(w,c),
       training: w.trainingQueue.filter(o => o.country === c).map(o => ({ ...o })),
       productionShare: Math.round((w.productionShare[c] ?? 0.2) * 1000) / 1000,
       productionMode: w.productionMode[c],

@@ -26,6 +26,11 @@ function ProductionLineEditor({line,models,lang,pending,done}:{line:Line,models:
     <header className="production-plan-header">
       <b>#{line.id} {ja?'生産ライン計画':'Production plan'}</b>
       <span>{ja?'現割当':'Allocated'} {line.allocatedFactories} / {ja?'要求':'Requested'} {line.requestedFactories}</span>
+      <span data-testid={'plan-daily-output-'+line.id}>
+        {ja?'日産見込':'Daily output'}: {line.estimatedDailyOutput.toFixed(2)}
+        {line.category==='infantry'?(ja?' 歩兵装備':' infantry'):line.category==='artillery'?(ja?' 火砲':' artillery'):''}
+        {!line.unlocked&&(ja?'（研究未完了）':' (locked)')}
+      </span>
     </header>
     <div className="production-plan-form">
       <label>{ja?'工場要求数':'Requested factories'}
@@ -85,7 +90,7 @@ export function ProductionLinePlanner({snap,lang,pending}:{snap:UiSnapshot,lang:
   const total=country.productionLines.reduce((sum,line)=>sum+line.allocatedFactories,0);
   const capacity=country.alive?country.milFactories:0;
   return <section className="production-planner" data-testid="production-line-planner">
-    <h4>{ja?'将来の装備モデル別生産計画':'Planned equipment production lines'}</h4>
+    <h4>{ja?'装備モデル別の生産ライン':'Equipment model production lines'}</h4>
     <p className="muted" data-testid="production-plan-warning">
       {ja
         ? (country.productionMode==='lines'
@@ -124,7 +129,7 @@ export function ProductionLinePlanner({snap,lang,pending}:{snap:UiSnapshot,lang:
       onClick={()=>engineClient.command('createProductionLine',{modelId:selectedModel,factories:f,priority:p})}>
       {ja?'計画ラインを追加':'Create plan'}
     </button>
-    <small className="muted">{ja?'新規ラインの初期効率は10%。研究済みモデルのみ作成できます。'
+    <small className="muted">{ja?'ラインの日産見込は国の生産補正を含みます。新規ラインの初期効率は10%。研究済みモデルのみ作成できます。'
       :'New plans start at 10% efficiency. Only researched models can be selected.'}</small>
   </section>;
 }
