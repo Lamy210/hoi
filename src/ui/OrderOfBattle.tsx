@@ -47,6 +47,7 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect,onFoc
   const ja=lang==='ja';
   const [query,setQuery]=useState('');
   const [status,setStatus]=useState<'all'|'attention'|'moving'|'selected'>('all');
+  const [rangeAnchor,setRangeAnchor]=useState<number|null>(null);
   const ownUnits=snap.units.filter(u=>u.owner===snap.playerCountry);
   const ownArmies=snap.armies.filter(a=>a.owner===snap.playerCountry);
   const ownGroups=snap.armyGroups.filter(g=>g.owner===snap.playerCountry);
@@ -68,7 +69,7 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect,onFoc
   const visible=ownUnits.filter(matches);
   const tree=buildOrderOfBattle(visible,ownArmies,ownGroups,snap.playerCountry);
   const showEmpty=!filter&&status==='all';
-  const selectIds=(units:readonly UiUnit[])=>{if(units.length>0 && units.length<=256)onSelect(units.map(u=>u.id));};
+  const selectIds=(units:readonly UiUnit[])=>{if(units.length>0 && units.length<=256){onSelect(units.map(u=>u.id));setRangeAnchor(null);}};
   const statusFor=(units:readonly UiUnit[])=>units.filter(unitRequiresAttention).length;
   const location=(u:UiUnit)=>ja?meta.provNameJa[u.loc]:meta.provNameEn[u.loc];
   const template=(u:UiUnit)=>{
@@ -79,15 +80,26 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect,onFoc
     return ja?t?.nameJa??'師団':t?.nameEn??'Division';
   };
   const choose=(u:UiUnit,e:MouseEvent)=>{
-    const additive=e.metaKey||e.ctrlKey||e.shiftKey;
-    const next=additive ? (selectedSet.has(u.id)?selectedIds.filter(id=>id!==u.id):[...selectedIds,u.id]) : [u.id];
-    if(next.length<=256){onSelect(next);onFocus?.(u.armyId!==null?{kind:'army',id:u.armyId}:null);}
+    const additive=e.metaKey||e.ctrlKey;
+    const anchorIndex=rangeAnchor===null?-1:visible.findIndex(v=>v.id===rangeAnchor);
+    const currentIndex=visible.findIndex(v=>v.id===u.id);
+    let next:number[];
+    if(e.shiftKey&&anchorIndex>=0&&currentIndex>=0){
+      const ids=visible.slice(Math.min(anchorIndex,currentIndex),Math.max(anchorIndex,currentIndex)+1).map(v=>v.id);
+      next=[...new Set([...selectedIds,...ids])];
+    }else if(additive){
+      next=selectedSet.has(u.id)?selectedIds.filter(id=>id!==u.id):[...selectedIds,u.id];
+    }else next=[u.id];
+    if(next.length<=256){
+      onSelect(next);onFocus?.(u.armyId!==null?{kind:'army',id:u.armyId}:null);
+      if(!e.shiftKey||anchorIndex<0)setRangeAnchor(u.id);
+    }
   };
   const renderUnits=(units:readonly UiUnit[])=><div className="oob-unit-list">
     {units.map(u=><button key={u.id} type="button" data-testid={'oob-unit-'+u.id}
       className={'oob-unit'+(unitRequiresAttention(u)?' alert':'')} aria-pressed={selectedSet.has(u.id)}
       onClick={e=>choose(u,e)}
-      title={ja?'クリックで選択、Ctrl/Shiftで複数選択':'Click to select, Ctrl/Shift for multiple selection'}>
+      title={ja?'クリックで単一選択、Ctrlで追加・解除、Shiftで範囲選択':'Click: one, Ctrl: toggle, Shift: select range'}>
       <span className="oob-unit-heading"><b>#{u.id} · {template(u)}</b>
         {u.inBattle&&<span>{ja?'交戦':'Battle'}</span>}
         {u.encircled&&<span>{ja?'包囲':'Encircled'}</span>}
@@ -131,7 +143,20 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect,onFoc
         <option value="selected">{ja?'選択中':'Selected'}</option>
       </select>
     </div>
-    <small className="muted">{ja?'軍集団 → 軍団 → 師団。選択した師団へ地図が移動します。':'Army group → army → division. Selection focuses the map.'}</small>
+    <div className="oob-selection-actions" data-testid="oob-selection-actions">
+      <button type="button" data-testid="oob-select-visible" disabled={!visible.length||visible.length>256}
+        onClick={()=>{selectIds(visible);onFocus?.(null);}}>{
+        ja?'表示中の師団をすべて選択':'Select all visible'} ({visible.length})</button>
+      <button type="button" data-testid="oob-add-visible"
+        disabled={!visible.length||new Set([...selectedIds,...visible.map(u=>u.id)]).size>256}
+        onClick={()=>{const ids=[...new Set([...selectedIds,...visible.map(u=>u.id)])];onSelect(ids);setRangeAnchor(null);}}>{
+        ja?'表示中を選択に追加':'Add visible to selection'}</button>
+      <button type="button" data-testid="oob-clear-selection" disabled={!selectedIds.length}
+        onClick={()=>{onSelect([]);setRangeAnchor(null);onFocus?.(null);}}>{
+        ja?'選択解除':'Clear selection'}</button>
+      <small data-testid="oob-selected-count">{ja?'選択中':'Selected'}: {selectedIds.length}/256</small>
+    </div>
+    <small className="muted">{ja?'軍集団 → 軍 → 師団。Ctrlで追加・解除、Shiftで表示中の範囲を追加選択。選択した師団へ地図が移動します。':'Army group → army → division. Ctrl toggles, Shift selects a visible range. Selection focuses the map.'}</small>
     <div className="oob-tree">
       {tree.groups.filter(b=>showEmpty||b.armies.some(a=>a.units.length)).map(({group,armies})=>{
         const units=armies.flatMap(a=>a.units);
