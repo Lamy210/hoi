@@ -90,8 +90,9 @@ export function validateIssuedEquipment(w:WorldState,models:readonly EquipmentMo
       row.quantity<=0||row.quantity>Number.MAX_SAFE_INTEGER){
       errors.push('invalid issued equipment quantity');continue;
     }
-    const holder=row.holder==='unit'?units.get(row.holderId):orders.get(row.holderId);
-    if(!holder||(row.holder==='training'&&orders.get(row.holderId)?.status==='queued')){
+    const holderId=row.holderId as number;
+    const holder=row.holder==='unit'?units.get(holderId):orders.get(holderId);
+    if(!holder||(row.holder==='training'&&orders.get(holderId)?.status==='queued')){
       errors.push('orphan issued equipment holder');continue;
     }
     const key=row.holder+':'+row.holderId+':'+row.modelId;
