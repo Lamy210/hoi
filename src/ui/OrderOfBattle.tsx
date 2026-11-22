@@ -44,7 +44,7 @@ export function OrderOfBattleExplorer({snap,meta,lang,selectedIds,onSelect}:{
 }) {
   const ja=lang==='ja';
   const [query,setQuery]=useState('');
-  const [status,setStatus]=React.useState<'all'|'attention'|'moving'|'selected'>('all');
+  const [status,setStatus]=useState<'all'|'attention'|'moving'|'selected'>('all');
   const ownUnits=snap.units.filter(u=>u.owner===snap.playerCountry);
   const ownArmies=snap.armies.filter(a=>a.owner===snap.playerCountry);
   const ownGroups=snap.armyGroups.filter(g=>g.owner===snap.playerCountry);
