@@ -252,7 +252,9 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
     h=mixStr(h,'queued-training-v13');
     for(const o of w.trainingQueue){h=mixStr(h,o.status??'legacy');h=mixInt(h,o.priority??5);h=mixBool(h,o.autoDeploy??true);}
   }
-  if (!legacy && includeProductionPlans) {
+  if (!legacy && includeHierarchy && includeFrontControl && includeFormationCommanders &&
+    includeCustomTemplates && includeCustomTraining && includeReinforcementPriority &&
+    includeQueuedTraining && includeProductionPlans) {
     h=mixStr(h,'production-line-plans-v14');
     h=mixFloat(h,w.nextProductionLineId);
     for(const line of w.productionLines){
