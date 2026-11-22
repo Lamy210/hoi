@@ -109,6 +109,7 @@ export function buildWorld(pack: Pack, opts: BuildOptions): WorldState {
     fronts: [],
     commanders: [],
     productionShare: pack.countries.map(() => 0.2),
+    productionMode: pack.countries.map(() => 'legacy' as const),
     ...legacyProductionLineState(pack.countries.map(c=>c.milFactories),pack.countries.map(()=>0.2),pack.equipmentModels??[]),
     firedEvents: [],
     // phase3: 国家・経済運営の初期値

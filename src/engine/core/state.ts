@@ -258,6 +258,8 @@ export interface WorldState {
   /** Phase6A planning-only: legacy productionShare still drives actual stock. */
   productionLines: import('../systems/equipmentLinePlanner').ProductionLinePlan[];
   nextProductionLineId: number;
+  /** V15: opt-in live source for two-goods equipment production. */
+  productionMode: ('legacy' | 'lines')[];
   firedEvents: string[]; // 発火済みイベントID
   // ── phase3（国家・経済運営）──
   treasury: number[]; // 国庫

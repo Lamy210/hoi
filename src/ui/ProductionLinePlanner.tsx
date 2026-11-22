@@ -88,8 +88,12 @@ export function ProductionLinePlanner({snap,lang,pending}:{snap:UiSnapshot,lang:
     <h4>{ja?'将来の装備モデル別生産計画':'Planned equipment production lines'}</h4>
     <p className="muted" data-testid="production-plan-warning">
       {ja
-        ? 'この画面は生産計画の保存・検証用です。現時点の実際の歩兵装備・火砲の生産量と備蓄は、上記の従来配分率で決まり、ここでの編集では変化しません。'
-        : 'Planning only: actual infantry and artillery output and stocks still use the legacy production ratio above. Editing these plans does not manufacture equipment.'}
+        ? (country.productionMode==='lines'
+          ? '生産ライン方式が有効です。工場割当・型番の製造倍率・効率を使って翌日から歩兵装備と火砲を実際に生産します。ただし型番別在庫と師団への型番別配備は未実装です。'
+          : '現在は従来配分率による実生産です。歩兵装備・火砲の生産量と備蓄は旧配分率が決めます。以下は生産ライン方式を有効化するまで実在庫に影響しない計画です。')
+        : (country.productionMode==='lines'
+          ? 'Live line-based production: factories, model output and efficiency now affect real infantry/artillery goods. Per-model stocks and unit assignments remain unavailable.'
+          : 'Legacy production active. Plans do not affect real output until you enable line-based production.')}
     </p>
     <div className="kv"><span>{ja?'計画割当工場':'Allocated factories (plans)'}</span>
       <b data-testid="planning-allocation-total">{total} / {capacity}</b></div>
