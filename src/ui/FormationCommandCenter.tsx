@@ -1,14 +1,17 @@
 import {useState} from 'react';
 import type {UiSnapshot} from '../engine/ui';
-import type {FormationScope} from '../engine/military/formationOverview';
-import {formationUnits,formationOperationalSummary} from '../engine/military/formationOverview';
+import type {FormationScope,FormationTargetScope} from '../engine/military/formationOverview';
+import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview} from '../engine/military/formationOverview';
 import {engineClient} from './engineClient';
 
 type Lang='ja'|'en';
 type Props={snap:UiSnapshot;lang:Lang;focus:FormationScope|null;pending:number;
-  onSelect:(ids:number[])=>void};
-export function FormationCommandCenter({snap,lang,focus,pending,onSelect}:Props){
+  selectedIds:number[];onSelect:(ids:number[])=>void};
+
+export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSelect}:Props){
   const [chosenFront,setChosenFront]=useState('');
+  const [targetScope,setTargetScope]=useState<FormationTargetScope>('all');
+  const [acknowledgedSignature,setAcknowledgedSignature]=useState<string|null>(null);
   const ja=lang==='ja';
   const label=(j:string,e:string)=>ja?j:e;
   const fmt=(n:number)=>n.toLocaleString(ja?'ja-JP':'en-US',{maximumFractionDigits:1});
@@ -22,9 +25,21 @@ export function FormationCommandCenter({snap,lang,focus,pending,onSelect}:Props)
     snap.commanders.find(c=>c.id===formation.commanderId&&c.country===country);
   const frontOptions=snap.fronts.filter(f=>f.owner===country&&player.atWar.includes(f.enemy));
   const front=frontOptions.find(f=>String(f.id)===chosenFront);
-  const enabled=!!formation&&units.length>0&&units.length<=256&&pending===0;
-  const ids=units.map(u=>u.id);
-  const send=(type:string,p:Record<string,unknown>)=>{if(enabled)engineClient.command(type,p);};
+  const scoped=scopedFormationUnits(units,targetScope,selectedIds);
+  const ids=scoped.map(u=>u.id);
+  const enabled=!!formation&&scoped.length>0&&scoped.length<=256&&pending===0;
+  const hold=formationOperationPreview(scoped,'hold');
+  const resume=formationOperationPreview(scoped,'resume');
+  const assign=formationOperationPreview(scoped,'assignFront',front?.id);
+  const unassign=formationOperationPreview(scoped,'unassignFront');
+  const releasingIds=scoped.filter(u=>u.manualHold&&assign.ids.includes(u.id)).map(u=>u.id);
+  const targetSignature=focus?.kind+':'+focus?.id+':'+chosenFront+':'+targetScope+
+    ':'+assign.ids.join(',')+':'+releasingIds.join(',');
+  // The acknowledgement is scoped to the exact division IDs and their hold state.
+  const confirmedRelease=acknowledgedSignature===targetSignature;
+  const send=(type:string,p:Record<string,unknown>,targetIds:readonly number[])=>{
+    if(enabled&&targetIds.length>0&&targetIds.length<=256)engineClient.command(type,p);
+  };
   return <section className="formation-command-center" data-testid="formation-command-center">
     <header className="formation-command-center-header">
       <b>{label('軍・軍集団の作戦指揮','Formation operations')}</b>
@@ -55,13 +70,28 @@ export function FormationCommandCenter({snap,lang,focus,pending,onSelect}:Props)
         {label('歩兵装備','Infantry')}: {fmt(Math.max(0,summary.maxInfantry-summary.infantry))} ·
         {label('火砲','Artillery')}: {fmt(Math.max(0,summary.maxArtillery-summary.artillery))}</small>
       </div>
+      <div className="formation-command-target">
+        <label htmlFor="formation-target-scope">{label('命令の対象','Order targets')}</label>
+        <select id="formation-target-scope" data-testid="formation-target-scope"
+          value={targetScope} onChange={e=>setTargetScope(e.target.value as FormationTargetScope)}>
+          <option value="all">{label('所属する全師団','All divisions')}</option>
+          <option value="attention">{label('要注意の師団のみ','Attention needed')}</option>
+          <option value="withoutFront">{label('戦線未配属のみ','Without a front')}</option>
+          <option value="selected">{label('地図・一覧で選択中のみ','Selected on map / roster')}</option>
+        </select>
+        <small data-testid="formation-target-count" aria-live="polite">
+          {label('対象','Targeted')}: {scoped.length} / {units.length}
+          {targetScope==='selected'&&label('（所属外の選択は除外）',' (outside formation excluded)')}
+          {scoped.length>256&&label(' — 最大256師団',' — limit 256')}
+        </small>
+      </div>
       <div className="formation-command-center-actions">
-        <button data-testid="formation-select-all" disabled={!units.length||units.length>256}
-          onClick={()=>onSelect(ids)}>{label('全師団を選択・地図で確認','Select all and locate')}</button>
-        <button data-testid="formation-manual-hold" disabled={!enabled||summary.manualHold===summary.count}
-          onClick={()=>send('setManualHold',{units:ids,hold:true})}>{label('自動作戦を保留','Hold automated orders')}</button>
-        <button data-testid="formation-resume" disabled={!enabled||summary.manualHold===0}
-          onClick={()=>send('setManualHold',{units:ids,hold:false})}>{label('自動作戦を再開','Resume automated orders')}</button>
+        <button data-testid="formation-select-all" disabled={!scoped.length||scoped.length>256}
+          onClick={()=>onSelect(ids)}>{label('対象を地図で選択','Select targets on map')} ({ids.length})</button>
+        <button data-testid="formation-manual-hold" disabled={!enabled||!hold.ids.length}
+          onClick={()=>send('setManualHold',{units:hold.ids,hold:true},hold.ids)}>{label('自動作戦を保留','Hold automated orders')} ({hold.ids.length})</button>
+        <button data-testid="formation-resume" disabled={!enabled||!resume.ids.length}
+          onClick={()=>send('setManualHold',{units:resume.ids,hold:false},resume.ids)}>{label('自動作戦を再開','Resume automated orders')} ({resume.ids.length})</button>
       </div>
       <div className="formation-command-center-actions">
         <select data-testid="formation-front-select" aria-label={label('割当先の戦線','Target front')}
@@ -72,21 +102,36 @@ export function FormationCommandCenter({snap,lang,focus,pending,onSelect}:Props)
             {f.stance==='attack'?label('攻勢','Attack'):f.stance==='retreat'?label('後退','Retreat'):label('防衛','Hold')}
           </option>)}
         </select>
-        <button data-testid="formation-assign-front" disabled={!enabled||!front}
-          onClick={()=>front&&send('assignToFront',{units:ids,frontId:front.id})}>
-          {label('全師団を戦線へ割当','Assign all to front')}
+        <button data-testid="formation-assign-front"
+          disabled={!enabled||!front||!assign.ids.length||(assign.releasesManualHold>0&&!confirmedRelease)}
+          onClick={()=>front&&send('assignToFront',{units:assign.ids,frontId:front.id},assign.ids)}>
+          {label('戦線へ割当・変更','Assign / change front')} ({assign.ids.length})
         </button>
-        <button data-testid="formation-unassign-front" disabled={!enabled||summary.frontAssigned===0}
-          onClick={()=>send('unassignFromFront',{units:ids})}>
-          {label('戦線割当を解除','Remove from fronts')}
+        <button data-testid="formation-unassign-front" disabled={!enabled||!unassign.ids.length}
+          onClick={()=>send('unassignFromFront',{units:unassign.ids},unassign.ids)}>
+          {label('戦線割当を解除','Remove from fronts')} ({unassign.ids.length})
         </button>
       </div>
+      <small className="formation-command-preview" data-testid="formation-command-preview" aria-live="polite">
+        {label('実際に変更する師団','Divisions to change')} — {label('保留','Hold')}: {hold.ids.length} ·
+        {label('再開','Resume')}: {resume.ids.length} ·
+        {label('戦線割当','Assign front')}: {assign.ids.length} ·
+        {label('戦線解除','Unassign front')}: {unassign.ids.length}
+      </small>
+      {front&&assign.releasesManualHold>0&&<label className="formation-command-warning" data-testid="formation-release-warning">
+        <input type="checkbox" data-testid="formation-confirm-release"
+          checked={confirmedRelease} onChange={e=>setAcknowledgedSignature(e.target.checked?targetSignature:null)}/>
+        {label(
+          'この戦線割当で'+assign.releasesManualHold+'師団の手動固定が解除され、自動作戦が再開します。確認して実行',
+          'Assigning this front clears manual hold for '+assign.releasesManualHold+' divisions and resumes automated orders. Confirm to proceed'
+        )}
+      </label>}
       {!frontOptions.length&&<small className="muted" data-testid="formation-no-fronts">
         {label('戦争中の戦線がありません。戦線画面で先に作成してください。','No active wartime fronts. Create one in the fronts panel.')}
       </small>}
       <small className="muted">{label(
-        '作戦の実行・移動は師団の手動命令と競合しないよう既存の戦線AIに委ねます。実行時にも所有権・戦線状態を検証します。',
-        'Movement stays with the existing front system and manual orders take precedence. All commands are revalidated on execution.'
+        '命令は変更が必要な師団だけに送信します。作戦の移動は既存の戦線AIに委ね、実行時にも所有権・戦線状態を検証します。',
+        'Only changed divisions receive commands. The existing front AI handles movement, and ownership and war state are revalidated.'
       )}</small>
     </>}
   </section>;

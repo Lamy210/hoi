@@ -287,6 +287,15 @@ input, select {
 .formation-command-center-actions { display:flex; flex-wrap:wrap; gap:6px; align-items:center; }
 .formation-command-center-actions select { flex:1; min-width:155px; max-width:100%; }
 .formation-command-center-actions button { min-height:30px; }
+.formation-command-target { display:flex; flex-wrap:wrap; gap:6px 10px; align-items:center; border-top:1px solid #486074; padding-top:8px; }
+.formation-command-target label { font-weight:600; }
+.formation-command-target select { min-width:190px; max-width:100%; flex:1; }
+.formation-command-target small { color:#cfdeeb; }
+.formation-command-preview { padding:7px; background:#23374b; border-radius:4px; color:#e2edf5; font-variant-numeric:tabular-nums; }
+.formation-command-warning { display:flex; gap:9px; align-items:flex-start; padding:9px; border:1px solid #d5a44d; border-radius:5px; background:#45371d; color:#fff3d6; cursor:pointer; }
+.formation-command-warning input { flex:none; margin-top:3px; }
+.formation-command-center button:disabled { opacity:.53; cursor:not-allowed; }
+
 @media (max-width:700px) { .formation-command-center-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 
