@@ -86,20 +86,32 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
     refitAmounts.net.every((cost,index)=>stock[index]>=cost);
   const fmtResources=(nums: readonly number[])=>nums.map(fmt).join(' / ');
   const exchangeUnit=selected.length===1?selected[0]:null;
+  const exchangeUnits=selected.length>0&&selected.length<=MAX_BATCH_REFIT?selected:[];
   const targetModel=snap.equipmentModels.find(model=>model.id===exchangeTarget);
   const availableTarget=player.modelStock.find(row=>row.modelId===exchangeTarget)?.quantity??0;
   const category=targetModel?.category;
-  const actualEquipment=exchangeUnit&&category
-    ? (category==='infantry'?exchangeUnit.infEquipment:exchangeUnit.artEquipment):0;
-  const identified=exchangeUnit&&category?exchangeUnit.issuedModels.filter(row=>
+  const identifiedFor=(u:UiUnit)=>category?u.issuedModels.filter(row=>
     snap.equipmentModels.some(model=>model.id===row.modelId&&model.category===category)):[];
-  const unclassified=Math.max(0,actualEquipment-identified.reduce((sum,row)=>sum+row.quantity,0));
-  const availableSource=exchangeSource==='unclassified'?unclassified:
-    identified.find(row=>row.modelId===exchangeSource)?.quantity??0;
+  const unclassifiedFor=(u:UiUnit)=>{
+    const held=category==='infantry'?u.infEquipment:category==='artillery'?u.artEquipment:0;
+    return Math.max(0,held-identifiedFor(u).reduce((sum,row)=>sum+row.quantity,0));
+  };
+  const sourceFor=(u:UiUnit)=>exchangeSource==='unclassified'
+    ? unclassifiedFor(u) : (identifiedFor(u).find(row=>row.modelId===exchangeSource)?.quantity??0);
+  const sourceIds=[...new Set(exchangeUnits.flatMap(u=>identifiedFor(u).map(row=>row.modelId)))]
+    .filter(id=>id!==exchangeTarget).sort();
+  const unclassified=exchangeUnits.length?
+    Math.min(...exchangeUnits.map(unclassifiedFor)):0;
+  const availableSource=exchangeUnits.length?
+    Math.min(...exchangeUnits.map(sourceFor)):0;
   const amount=Number(exchangeAmount);
-  const exchangeAllowed=!!exchangeUnit&&!!targetModel&&isEligible&&canCommand&&
+  const requestedTotal=amount*exchangeUnits.length;
+  const validExchange=!!targetModel&&isEligible&&canCommand&&
     Number.isSafeInteger(amount)&&amount>=1&&amount<=100000&&
-    exchangeSource!==exchangeTarget&&availableTarget>=amount&&availableSource+1e-7>=amount;
+    exchangeSource!==exchangeTarget&&availableSource+1e-7>=amount;
+  const exchangeAllowed=!!exchangeUnit&&validExchange&&availableTarget>=amount;
+  const batchExchangeAllowed=exchangeUnits.length>=2&&validExchange&&
+    Number.isSafeInteger(requestedTotal)&&availableTarget>=requestedTotal;
   const refitReason = !refitTemplate ? label('改編先を選択してください','Select a saved template') :
     selected.length>MAX_BATCH_REFIT ? label('一度に100師団まで','Up to 100 divisions per order') :
     !isEligible ? label('移動中・戦闘中・包囲中・敵支配州にいる師団は改編不可','Moving, battling, encircled or occupied divisions cannot refit') :
@@ -151,10 +163,12 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
           </select>
           <select data-testid="exchange-model-source" aria-label={label('交換前の装備型番','Old equipment model')}
             value={exchangeSource} onChange={e=>setExchangeSource(e.target.value)}
-            disabled={!targetModel||!exchangeUnit}>
+            disabled={!targetModel||exchangeUnits.length===0}>
             <option value="unclassified">{label('未分類の装備','Unclassified equipment')} · {fmt(unclassified)}</option>
-            {identified.filter(row=>row.modelId!==exchangeTarget).map(row=>
-              <option key={row.modelId} value={row.modelId}>{row.modelId} · {fmt(row.quantity)}</option>)}
+            {sourceIds.map(id=>
+              <option key={id} value={id}>{id} · {fmt(Math.min(
+                ...exchangeUnits.map(u=>identifiedFor(u).find(row=>row.modelId===id)?.quantity??0)
+              ))}</option>)}
           </select>
           <input data-testid="exchange-model-quantity" type="number" min="1" max="100000" step="1"
             aria-label={label('交換数量','Exchange quantity')} value={exchangeAmount}
@@ -162,11 +176,18 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
           <button data-testid="exchange-model-submit" disabled={!exchangeAllowed}
             onClick={()=>exchangeUnit&&engineClient.command('exchangeUnitEquipment',{
               unitId:exchangeUnit.id,fromModelId:exchangeSource,toModelId:exchangeTarget,quantity:amount,
-            })}>{label('装備を交換','Exchange equipment')}</button>
+            })}>{label('1師団の装備を交換','Exchange one')}</button>
+          <button data-testid="exchange-model-batch-submit" disabled={!batchExchangeAllowed}
+            onClick={()=>engineClient.command('exchangeUnitsEquipment',{
+              unitIds:exchangeUnits.map(u=>u.id),
+              fromModelId:exchangeSource,toModelId:exchangeTarget,quantity:amount,
+            })}>{label('選択師団を一括交換','Exchange selected')}</button>
         </div>
-        {exchangeUnit&&targetModel&&<small data-testid="exchange-model-availability">
-          {label('交換元','Source')}: {fmt(availableSource)} ·
-          {label('倉庫の交換先在庫','Target stock')}: {fmt(availableTarget)}
+        {exchangeUnits.length>0&&targetModel&&<small data-testid="exchange-model-availability">
+          {label('選択師団数','Selected divisions')}: {exchangeUnits.length} ·
+          {label('各師団の交換元最小残数','Minimum source per division')}: {fmt(availableSource)} ·
+          {label('国家倉庫の交換先在庫','Target warehouse stock')}: {fmt(availableTarget)} ·
+          {label('一括交換時の総必要数','Total required for batch')}: {Number.isFinite(requestedTotal)?fmt(requestedTotal):'—'}
           {!isEligible&&label('（移動中・戦闘中・包囲中・非支配州では交換不可）',
             ' (unavailable while moving, battling, encircled or outside controlled provinces)')}
         </small>}
