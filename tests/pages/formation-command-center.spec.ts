@@ -35,11 +35,7 @@ test('軍集団指揮画面で2師団を集計し自動作戦の保留と再開�
   await expect(page.getByTestId('formation-no-fronts')).toBeVisible();
   await page.getByTestId('formation-manual-hold').click();await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('formation-manual-hold')).toBeDisabled();
-  await expect(page.getByTestId('formation-manual-hold')).toBeDisabled();
-  await expect(page.getByTestId('formation-manual-hold')).toBeDisabled();
   await expect(page.getByTestId('formation-resume')).toBeEnabled();
-  await expect(page.getByTestId('formation-manual-hold')).toBeDisabled();
-  await expect(page.getByTestId('formation-manual-hold')).toBeDisabled();
   await expect(page.getByTestId('formation-focused-commander')).toContainText('未配置');
   await page.getByTestId('formation-resume').click();await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('formation-manual-hold')).toBeEnabled();
@@ -49,4 +45,7 @@ test('軍集団指揮画面で2師団を集計し自動作戦の保留と再開�
   await page.getByTestId('army-select-1').click();
   await expect(page.getByTestId('formation-focused-name')).toContainText('第1軍');
   await expect(page.getByTestId('formation-count')).toHaveText('2');
+  await page.getByTestId('roster-mode-tree').click();
+  await page.getByTestId('oob-select-group-1').click();
+  await expect(page.getByTestId('formation-focused-name')).toContainText('北方軍集団');
 });
