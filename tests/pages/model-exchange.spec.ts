@@ -1,0 +1,20 @@
+import {test,expect} from '@playwright/test';
+test('師団編制画面で型番の装備交換を準備し、在庫がない場合は命令を無効化',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-JPN').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  const exchange=page.getByTestId('army-model-exchange');
+  await expect(exchange).toBeVisible();
+  await expect(exchange).toContainText('総装備数は変わりません');
+  await expect(page.getByTestId('exchange-model-submit')).toBeDisabled();
+  const first=page.getByTestId('order-of-battle').locator('[data-testid^="oob-unit-"]').first();
+  await first.click();
+  await expect(page.getByTestId('quick-selected-count')).toContainText('1');
+  await expect(page.getByTestId('exchange-model-target')).toBeEnabled();
+  await expect(page.getByTestId('exchange-model-target').locator('option')).toHaveCount(1);
+  await page.getByTestId('exchange-model-quantity').fill('200');
+  await expect(page.getByTestId('exchange-model-submit')).toBeDisabled();
+});
