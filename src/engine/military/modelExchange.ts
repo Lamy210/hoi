@@ -61,3 +61,68 @@ export function applyModelExchange(w:WorldState,c:number,p:Record<string,unknown
   }
   attributeEquipment(w,'unit',unitId,[{country:c,modelId:toModelId,quantity}]);
 }
+
+/**
+ * Batch exchange is preflighted against the combined warehouse demand, not
+ * validated independently per unit. Duplicate IDs are rejected and command
+ * order is canonical. Minimum two divisions; single-unit callers retain the
+ * original exchangeUnitEquipment command.
+ */
+export const MAX_BATCH_MODEL_EXCHANGE=100;
+export interface BatchModelExchangePlan {
+  unitIds:number[];
+  fromModelId:string;
+  toModelId:string;
+  quantity:number;
+  total:number;
+}
+export type BatchModelExchangeDecision=
+  {reason:string;plan:null}|{reason:null;plan:BatchModelExchangePlan};
+
+export function planBatchModelExchange(w:WorldState,c:number,p:Record<string,unknown>):
+  BatchModelExchangeDecision {
+  const ids=p.unitIds;
+  const {fromModelId,toModelId,quantity}=p;
+  if(!Array.isArray(ids)||ids.length<2||ids.length>MAX_BATCH_MODEL_EXCHANGE||
+    ids.some(x=>typeof x!=='number'||!Number.isSafeInteger(x)||x<1)||
+    new Set(ids).size!==ids.length||
+    typeof fromModelId!=='string'||typeof toModelId!=='string'||
+    typeof quantity!=='number'||!Number.isSafeInteger(quantity)||quantity<1||
+    quantity>MAX_MODEL_EXCHANGE)return {reason:'badParams',plan:null};
+  const sortedIds=(ids as number[]).slice().sort((a,b)=>a-b);
+  for(const id of sortedIds){
+    const problem=validateModelExchange(w,c,{
+      unitId:id,fromModelId,toModelId,quantity,
+    });
+    if(problem)return {reason:problem,plan:null};
+  }
+  const total=quantity*sortedIds.length;
+  if(!Number.isSafeInteger(total))return {reason:'badParams',plan:null};
+  const targetStock=w.modelStock.find(r=>r.country===c&&r.modelId===toModelId)?.quantity??0;
+  if(targetStock<total)return {reason:'insufficientModelStock',plan:null};
+  return {reason:null,plan:{unitIds:sortedIds,fromModelId,toModelId,quantity,total}};
+}
+
+/** Copy-on-write: even if a later exchange throws, none of the live ledgers
+ * are modified. Commit stock, typed warehouse, and issued ledger together.
+ */
+export function applyBatchModelExchange(w:WorldState,c:number,p:Record<string,unknown>):void {
+  const decision=planBatchModelExchange(w,c,p);
+  if(!decision.plan)throw new Error('invalid batch model exchange: '+decision.reason);
+  const stockInf=w.countries.infEquipmentStock.slice();
+  const stockArt=w.countries.artEquipmentStock.slice();
+  const candidate:WorldState={
+    ...w,
+    countries:{...w.countries,infEquipmentStock:stockInf,artEquipmentStock:stockArt},
+    modelStock:w.modelStock.map(row=>({...row})),
+    issuedEquipment:w.issuedEquipment.map(row=>({...row})),
+  };
+  const {unitIds,fromModelId,toModelId,quantity}=decision.plan;
+  for(const unitId of unitIds){
+    applyModelExchange(candidate,c,{unitId,fromModelId,toModelId,quantity});
+  }
+  w.countries.infEquipmentStock=stockInf;
+  w.countries.artEquipmentStock=stockArt;
+  w.modelStock=candidate.modelStock;
+  w.issuedEquipment=candidate.issuedEquipment;
+}
