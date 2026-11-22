@@ -288,3 +288,24 @@ input, select {
 .formation-command-center-actions select { flex:1; min-width:155px; max-width:100%; }
 .formation-command-center-actions button { min-height:30px; }
 @media (max-width:700px) { .formation-command-center-metrics { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+
+/* Formation reassignment: visible without opening the legacy edit drawer. */
+.formation-assignment-panel { display:grid; gap:8px; padding:10px; margin:8px 0; border:1px solid #506d83; background:#162434; border-radius:8px; }
+.formation-assignment-panel>header { display:flex; gap:8px; flex-wrap:wrap; justify-content:space-between; align-items:baseline; }
+.formation-assignment-panel>header small { color:#b4cbd9; }
+.formation-assignment-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
+.formation-assignment-grid fieldset { min-width:0; display:flex; flex-direction:column; gap:9px; padding:10px; border:1px solid #496278; border-radius:6px; }
+.formation-assignment-grid fieldset>label { display:grid; gap:4px; font-size:12px; }
+.formation-assignment-grid select { width:100%; max-width:100%; min-width:0; }
+.formation-assignment-grid legend { font-weight:600; font-size:13px; padding:0 4px; }
+.formation-assignment-grid small { color:#b4cbd9; }
+.formation-assignment-actions { display:flex; flex-wrap:wrap; gap:5px; }
+.formation-assignment-actions button { font-size:12px; }
+.formation-army-picker { display:grid; gap:5px; max-height:185px; overflow:auto; }
+.formation-army-picker-item { display:flex; align-items:center; gap:6px; font-size:12px; padding:5px; background:#26384a; border-radius:4px; }
+.formation-army-picker-item span:nth-of-type(2) { flex:1; overflow-wrap:anywhere; }
+.formation-army-picker-item input { margin:0; }
+.oob-selection-actions { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
+.oob-selection-actions button { font-size:12px; }
+@media(max-width:920px) { .formation-assignment-grid { grid-template-columns:1fr; } }

@@ -4,6 +4,7 @@ import { ARMY_COLORS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES } from '../engine/militar
 import { engineClient } from './engineClient';
 import { appStore } from './store';
 import {FormationCommandCenter} from './FormationCommandCenter';
+import {FormationAssignmentPanel} from './FormationAssignmentPanel';
 import type {FormationScope} from '../engine/military/formationOverview';
 
 type Lang = 'ja' | 'en';
@@ -132,6 +133,7 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect,focus,onF
       <button data-testid="select-unassigned" onClick={()=>{onFocus(null);onSelect(units.filter(u=>u.armyId===null).map(u=>u.id));}}>{label('未編入','Unassigned')} · {units.filter(u=>u.armyId===null).length}</button>
     </div>
     <FormationCommandCenter snap={snap} lang={lang} focus={focus} pending={pending} onSelect={onSelect}/>
+    <FormationAssignmentPanel snap={snap} lang={lang} focus={focus} pending={pending} selectedIds={selectedIds}/>
     <div className="army-quick-action" data-testid="army-quick-action">
       <div className="kv"><b>{label('選択した師団','Selected divisions')}</b><strong>{selected.length}</strong></div>
       {refitTarget && <div className="muted">#{refitTarget.id} · {refitTarget.customTemplateId!==undefined?refitTarget.customTemplateId+' v'+refitTarget.customRevision:(refitTarget.templateId??'standard-v1')}</div>}
