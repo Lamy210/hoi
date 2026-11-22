@@ -6,10 +6,9 @@ import {engineClient} from './engineClient';
 
 type Props={
   snap:UiSnapshot;lang:'ja'|'en';selectedIds:number[];pending:number;
-  focus:FormationScope|null;onSelect:(ids:number[])=>void;
-  onFocus:(f:FormationScope|null)=>void;
+  focus:FormationScope|null;
 };
-export function FormationAssignmentPanel({snap,lang,selectedIds,pending,focus,onSelect,onFocus}:Props){
+export function FormationAssignmentPanel({snap,lang,selectedIds,pending,focus}:Props){
   const ja=lang==='ja',label=(jp:string,en:string)=>ja?jp:en;
   const [divisionTarget,setDivisionTarget]=useState('');
   const [groupTarget,setGroupTarget]=useState('');
