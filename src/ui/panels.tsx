@@ -48,7 +48,9 @@ function TraceBox() {
       <b>{st.trace.title}</b>
       {st.trace.contribs.map((c, i) => (
         <div key={i} className="trace-contrib">
-          <span className="k">{c.label} <span className="muted">{c.formula}</span></span>
+          <span className="k">{c.label==='equipmentModel'
+            ? (st.lang==='ja'?'実配備装備の品質':'Equipped model quality') : c.label}
+            {' '}<span className="muted">{c.formula}</span></span>
           <span>{typeof c.value === 'number' ? Math.round(c.value * 1000) / 1000 : c.value}</span>
         </div>
       ))}
