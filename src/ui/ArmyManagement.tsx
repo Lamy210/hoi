@@ -3,6 +3,8 @@ import type { UiSnapshot, UiUnit } from '../engine/ui';
 import { ARMY_COLORS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES } from '../engine/military/armies';
 import { engineClient } from './engineClient';
 import { appStore } from './store';
+import {FormationCommandCenter} from './FormationCommandCenter';
+import type {FormationScope} from '../engine/military/formationOverview';
 
 type Lang = 'ja' | 'en';
 type Props = { snap: UiSnapshot; lang: Lang; selectedIds: number[]; pending: number; onSelect: (ids: number[]) => void };
@@ -50,6 +52,7 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const [editing,setEditing]=useState(false);
   const [armyId,setArmyId]=useState('');
   const [groupId,setGroupId]=useState('');
+  const [focus,setFocus]=useState<FormationScope|null>(null);
   const [scope,setScope]=useState('selection');
   const [quickTemplate,setQuickTemplate]=useState('');
   const [exchangeTarget,setExchangeTarget]=useState('');
@@ -125,10 +128,11 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   return <section className="army-management" data-testid="army-management">
     <h4>{label('陸軍指揮・編成','Army command')}</h4>
     <div className="army-bar">
-      {groups.map(g=><button key={g.id} data-testid={'group-select-'+g.id} style={{borderColor:g.color}} onClick={()=>{setGroupId(String(g.id));onSelect(groupUnits(g.id));}}>{g.name} · {armies.filter(a=>a.groupId===g.id).length}/{MAX_GROUP_ARMIES}<small className="formation-leader" data-testid={'group-leader-'+g.id}>{commanderName(g.commanderId)}</small></button>)}
-      {armies.map(a=><button key={a.id} data-testid={'army-select-'+a.id} style={{borderColor:a.color}} onClick={()=>{setArmyId(String(a.id));onSelect(memberIds(a.id));}}>{a.name} · {memberIds(a.id).length}/{MAX_ARMY_UNITS}<small className="formation-leader" data-testid={'army-leader-'+a.id}>{commanderName(a.commanderId)}</small></button>)}
-      <button data-testid="select-unassigned" onClick={()=>onSelect(units.filter(u=>u.armyId===null).map(u=>u.id))}>{label('未編入','Unassigned')} · {units.filter(u=>u.armyId===null).length}</button>
+      {groups.map(g=><button key={g.id} data-testid={'group-select-'+g.id} style={{borderColor:g.color}} onClick={()=>{setGroupId(String(g.id));setFocus({kind:'group',id:g.id});onSelect(groupUnits(g.id));}}>{g.name} · {armies.filter(a=>a.groupId===g.id).length}/{MAX_GROUP_ARMIES}<small className="formation-leader" data-testid={'group-leader-'+g.id}>{commanderName(g.commanderId)}</small></button>)}
+      {armies.map(a=><button key={a.id} data-testid={'army-select-'+a.id} style={{borderColor:a.color}} onClick={()=>{setArmyId(String(a.id));setFocus({kind:'army',id:a.id});onSelect(memberIds(a.id));}}>{a.name} · {memberIds(a.id).length}/{MAX_ARMY_UNITS}<small className="formation-leader" data-testid={'army-leader-'+a.id}>{commanderName(a.commanderId)}</small></button>)}
+      <button data-testid="select-unassigned" onClick={()=>{setFocus(null);onSelect(units.filter(u=>u.armyId===null).map(u=>u.id));}}>{label('未編入','Unassigned')} · {units.filter(u=>u.armyId===null).length}</button>
     </div>
+    <FormationCommandCenter snap={snap} lang={lang} focus={focus} pending={pending} onSelect={onSelect}/>
     <div className="army-quick-action" data-testid="army-quick-action">
       <div className="kv"><b>{label('選択した師団','Selected divisions')}</b><strong>{selected.length}</strong></div>
       {refitTarget && <div className="muted">#{refitTarget.id} · {refitTarget.customTemplateId!==undefined?refitTarget.customTemplateId+' v'+refitTarget.customRevision:(refitTarget.templateId??'standard-v1')}</div>}
