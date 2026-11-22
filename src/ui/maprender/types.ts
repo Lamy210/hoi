@@ -31,6 +31,8 @@ export interface MapRenderer {
   setSelected(prov: number | null): void;
   /** プロヴィンスPicking（画面座標→州インデックス。非該当はnull） */
   pickAt(clientX: number, clientY: number): number | null;
+  /** State-independent province label anchor in CSS pixels relative to the map viewport. */
+  projectProvince(prov: number): {x:number;y:number} | null;
   /** 状態ハッシュから決定論的に全配色を再構築（モード切替時） */
   rebuildAll(colors: string[]): void;
   zoomBy(factor: number): void;
