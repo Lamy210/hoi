@@ -280,11 +280,17 @@ export function GameScreen() {
     if (focus && first) rendererRef.current?.focusProvince(first.loc);
   }
   function toggleMoveSelection() {
+    setMarqueeMode(false);
+    setMarquee(null);
+    marqueePointer.current=null;
     setAttackMode(false);
     setDestination('');
     setMoveMode(!moveMode);
   }
   function toggleAttackSelection() {
+    setMarqueeMode(false);
+    setMarquee(null);
+    marqueePointer.current=null;
     setMoveMode(false);
     setDestination('');
     setAttackMode(!attackMode);
@@ -410,6 +416,7 @@ export function GameScreen() {
   }
 
   function handleMapMove(e: React.MouseEvent): void {
+    if(marqueeMode)return;
     const r = rendererRef.current;
     if (!r) return;
     setHoverPos({ x: e.clientX, y: e.clientY });
@@ -486,7 +493,7 @@ export function GameScreen() {
             onPointerCancel={e=>endMarquee(e,true)}
             onLostPointerCapture={e=>endMarquee(e,true)}
             onClick={e=>e.stopPropagation()}
-            onContextMenu={e=>e.preventDefault()}>
+            onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
             {marquee&&<div className="map-marquee-rectangle" data-testid="map-marquee-rectangle" aria-hidden="true"
               style={{left:Math.min(marquee.x1,marquee.x2),top:Math.min(marquee.y1,marquee.y2),
                 width:Math.abs(marquee.x2-marquee.x1),height:Math.abs(marquee.y2-marquee.y1)}}/>}
