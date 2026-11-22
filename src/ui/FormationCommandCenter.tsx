@@ -48,7 +48,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,onSelect}:Props)
         <div><small>{label('戦闘中','Battling')}</small><b>{summary.combat}</b></div>
         <div><small>{label('移動中','Moving')}</small><b>{summary.moving}</b></div>
         <div><small>{label('戦線配属','Assigned to front')}</small><b data-testid="formation-front-assigned">{summary.frontAssigned}</b></div>
-        <div><small>{label('手動固定','Manual hold')}</small><b data-testid="formation-manual-hold">{summary.manualHold}</b></div>
+        <div><small>{label('手動固定','Manual hold')}</small><b data-testid="formation-manual-hold-count">{summary.manualHold}</b></div>
       </div>
       <div className="formation-command-center-deficits" data-testid="formation-equipment-deficit">
         <small>{label('不足','Missing')} — {label('人員','Manpower')}: {fmt(Math.max(0,summary.maxManpower-summary.manpower))} ·
