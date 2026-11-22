@@ -145,19 +145,19 @@ describe('batch division equipment exchange',()=>{
     const e=await createTestEngine(),w=e.world,c=w.playerCountry;
     const units=findUnits(w,c).slice(0,2);expect(units).toHaveLength(2);
     grant(w,c,newRifle,250);
-    // Manufacture a contradictory yet preflight-passable ledger so a second
-    // refund would fail. Candidate mutation must never leak into live state.
+    // Deliberately inject an extreme legacy ledger that passes command
+    // preflight but overflows the safe model quantity on the SECOND refund.
+    // The first successful candidate update must not leak into live state.
+    w.modelStock.push({country:c,modelId:oldRifle,quantity:Number.MAX_SAFE_INTEGER-150});
+    w.modelStock.sort((a,b)=>a.country-b.country||a.modelId.localeCompare(b.modelId));
+    w.countries.infEquipmentStock[c]=Number.MAX_SAFE_INTEGER+10000;
     attributeEquipment(w,'unit',units[0].id,[{country:c,modelId:oldRifle,quantity:100}]);
     attributeEquipment(w,'unit',units[1].id,[{country:c,modelId:oldRifle,quantity:100}]);
     const p={unitIds:units.map(u=>u.id),fromModelId:oldRifle,
       toModelId:newRifle,quantity:100};
     const snap=snapshots(w);
-    // A valid batch remains valid; copy-on-write cannot change live arrays
-    // before all steps have completed.
-    const result=planBatchModelExchange(w,c,p);
-    expect(result.reason).toBeNull();
-    applyBatchModelExchange(w,c,p);
-    expect(w.countries.infEquipmentStock[c]).toBe(JSON.parse(snap).inf[c]);
-    expect(w.modelStock.find(r=>r.country===c&&r.modelId===oldRifle)?.quantity).toBe(200);
+    expect(planBatchModelExchange(w,c,p).reason).toBeNull();
+    expect(()=>applyBatchModelExchange(w,c,p)).toThrow('model warehouse overflow');
+    expect(snapshots(w)).toBe(snap);
   });
 });
