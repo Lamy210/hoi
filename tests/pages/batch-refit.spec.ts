@@ -13,7 +13,7 @@ test('複数師団を選択して一括改編し、資源差分と編成を確�
   for(let i=0;i<4;i++)await page.getByTestId('remove-infantry-v1').click();
   await page.getByTestId('save-custom-template').click();
   await page.getByTestId('apply-pending').click();
-  await page.getByTestId('recruit-modal').getByRole('button',{name:'閉じる'}).click();
+  await page.getByTestId('recruit-modal').getByRole('button',{name:'閉じる',exact:true}).click();
   const roster=page.getByTestId('unit-roster');
   const ids=await roster.locator('[data-unit-id]').evaluateAll(rows=>rows.map(r=>r.getAttribute('data-unit-id')!));
   expect(ids.length).toBeGreaterThanOrEqual(2);
