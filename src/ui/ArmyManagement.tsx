@@ -132,7 +132,7 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect,focus,onF
       {armies.map(a=><button key={a.id} data-testid={'army-select-'+a.id} style={{borderColor:a.color}} onClick={()=>{setArmyId(String(a.id));onFocus({kind:'army',id:a.id});onSelect(memberIds(a.id));}}>{a.name} · {memberIds(a.id).length}/{MAX_ARMY_UNITS}<small className="formation-leader" data-testid={'army-leader-'+a.id}>{commanderName(a.commanderId)}</small></button>)}
       <button data-testid="select-unassigned" onClick={()=>{onFocus(null);onSelect(units.filter(u=>u.armyId===null).map(u=>u.id));}}>{label('未編入','Unassigned')} · {units.filter(u=>u.armyId===null).length}</button>
     </div>
-    <FormationCommandCenter snap={snap} lang={lang} focus={focus} pending={pending} onSelect={onSelect}/>
+    <FormationCommandCenter snap={snap} lang={lang} focus={focus} pending={pending} selectedIds={selectedIds} onSelect={onSelect}/>
     <FormationAssignmentPanel snap={snap} lang={lang} focus={focus} pending={pending} selectedIds={selectedIds}/>
     <div className="army-quick-action" data-testid="army-quick-action">
       <div className="kv"><b>{label('選択した師団','Selected divisions')}</b><strong>{selected.length}</strong></div>
