@@ -37,7 +37,7 @@ export function recordModelProduction(
     }
   }
   // Canonical order also makes manual load assertions, save bytes and hashes stable.
-  w.modelProduction.sort((a,b)=>a.country-b.country || a.modelId.localeCompare(b.modelId,'en'));
+  w.modelProduction.sort((a,b)=>a.country-b.country || (a.modelId<b.modelId?-1:a.modelId>b.modelId?1:0));
 }
 
 /** Validate against a pinned pack catalog before constructing a WorldState. */
