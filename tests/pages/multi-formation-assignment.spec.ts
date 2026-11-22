@@ -30,11 +30,10 @@ test('軍のチェック複数選択から軍集団へ一括編入・解除し�
   await expect(page.getByTestId('group-select-1')).toContainText('2/5');
 
   const tree=page.getByTestId('order-of-battle');
+  await tree.getByTestId('oob-unassigned').locator('summary').click();
   const divisionButtons=tree.locator('[data-testid^="oob-unit-"]');
   await expect(divisionButtons.nth(1)).toBeVisible();
   const first=divisionButtons.nth(0),second=divisionButtons.nth(1);
-  const ids=[(await first.getAttribute('data-testid'))!.replace('oob-unit-',''),
-    (await second.getAttribute('data-testid'))!.replace('oob-unit-','')];
   await first.click();
   await second.click({modifiers:['Shift']});
   await expect(page.getByTestId('oob-selected-count')).toContainText('2/256');
@@ -47,8 +46,9 @@ test('軍のチェック複数選択から軍集団へ一括編入・解除し�
   await page.getByTestId('assignment-assign-divisions').click();await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('army-select-1')).toContainText('2/24');
   await expect(page.getByTestId('army-select-2')).toContainText('0/24');
-  await page.getByTestId('oob-search').fill(ids[0]);
-  await expect(page.getByTestId('oob-visible-count')).toContainText('1 /');
+  await page.getByTestId('oob-search').fill('non-existent-province-000');
+  await expect(page.getByTestId('oob-visible-count')).toContainText('0 /');
+  await expect(page.getByTestId('oob-selected-count')).toContainText('2/256');
   await page.getByTestId('oob-search').fill('');
   await page.getByTestId('oob-clear-selection').click();
   await expect(page.getByTestId('oob-selected-count')).toContainText('0/256');
