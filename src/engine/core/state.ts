@@ -264,6 +264,8 @@ export interface WorldState {
   modelProduction: import('../systems/modelProductionLedger').ModelProductionRecord[];
   /** v17: identifiable equipment still in national warehouses, subset of two-goods stocks. */
   modelStock: import('../systems/modelWarehouse').ModelWarehouseRecord[];
+  /** v18: identifiable equipment held by training reservations and deployed units. */
+  issuedEquipment: import('../systems/issuedEquipment').IssuedEquipmentRecord[];
   firedEvents: string[]; // 発火済みイベントID
   // ── phase3（国家・経済運営）──
   treasury: number[]; // 国庫

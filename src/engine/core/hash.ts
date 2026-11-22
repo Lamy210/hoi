@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true, includeIssuedEquipment = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -288,6 +288,18 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
       h=mixInt(h,row.country);
       h=mixStr(h,row.modelId);
       h=mixFloat(h,row.quantity);
+    }
+  }
+  if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&
+    includeCustomTemplates&&includeCustomTraining&&includeReinforcementPriority&&
+    includeQueuedTraining&&includeProductionPlans&&includeProductionMode&&
+    includeModelProduction&&includeModelStock&&includeIssuedEquipment){
+    h=mixStr(h,'issued-model-equipment-v18');
+    for(const rec of w.issuedEquipment){
+      h=mixStr(h,rec.holder);
+      h=mixInt(h,rec.holderId);
+      h=mixStr(h,rec.modelId);
+      h=mixFloat(h,rec.quantity);
     }
   }
   return h >>> 0;
