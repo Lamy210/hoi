@@ -1,9 +1,9 @@
 // Pure, snapshot-only previews for division / army group transfers.
 // Validation mirrors existing commands and does not alter simulation state.
-import type {UiUnit} from '../ui';
 import type {Army,ArmyGroup} from './armies';
 import {MAX_ARMY_UNITS,MAX_GROUP_ARMIES} from './armies';
 
+export interface AssignmentUnit {id:number;owner:number;armyId?:number|null}
 export interface AssignmentPreview{
   reason:'empty'|'badSelection'|'notOwned'|'noTarget'|'limitExceeded'|'unchanged'|null;
   selected:number;
@@ -18,7 +18,7 @@ const distinct=(ids:readonly number[],max:number)=>
   ids.every(id=>Number.isSafeInteger(id)&&id>0)&&new Set(ids).size===ids.length;
 
 export function previewDivisionAssignment(
-  units:readonly Pick<UiUnit,'id'|'owner'|'armyId'>[],armies:readonly Army[],
+  units:readonly AssignmentUnit[],armies:readonly Army[],
   owner:number,selectedIds:readonly number[],targetArmyId:number|null
 ):AssignmentPreview{
   const capacity=MAX_ARMY_UNITS;
@@ -29,8 +29,8 @@ export function previewDivisionAssignment(
   if(!distinct(selectedIds,256)||chosen.length!==selectedIds.length)return {...base,reason:'badSelection'};
   if(targetArmyId!==null&&!armies.some(a=>a.id===targetArmyId&&a.owner===owner))
     return {...base,reason:'noTarget'};
-  const moved=chosen.filter(u=>u.armyId!==targetArmyId).length;
-  const projected=targetArmyId===null?0:current+chosen.filter(u=>u.armyId!==targetArmyId).length;
+  const moved=chosen.filter(u=>(u.armyId??null)!==targetArmyId).length;
+  const projected=targetArmyId===null?0:current+chosen.filter(u=>(u.armyId??null)!==targetArmyId).length;
   return {...base,projected,moved,reason:projected>capacity?'limitExceeded':!moved?'unchanged':null};
 }
 
