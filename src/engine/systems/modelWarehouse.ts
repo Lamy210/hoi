@@ -60,6 +60,21 @@ export function creditModelWarehouse(w:WorldState,c:number,modelId:string,amount
   w.modelStock.sort((a,b)=>a.country-b.country||sortedModelId(a.modelId,b.modelId));
 }
 
+/** Withdraw a specific identified model rather than the default unclassified-first mix.
+ * Used by an explicit division re-equipment order after its stock is validated.
+ */
+export function withdrawModelWarehouse(w:WorldState,c:number,modelId:string,amount:number):void {
+  assertCountry(w,c);
+  const category=categoryOf(modelId);
+  if(!Number.isSafeInteger(amount)||amount<=0||amount>100000)
+    throw new RangeError('invalid specific equipment withdrawal');
+  const row=w.modelStock.find(r=>r.country===c&&r.modelId===modelId);
+  if(!row||row.quantity<amount)throw new RangeError('insufficient specific equipment');
+  row.quantity-=amount;
+  w.modelStock=w.modelStock.filter(r=>r.quantity>0);
+  stock(w,category)[c]-=amount;
+}
+
 /**
  * Signed change to aggregate warehouse stock. For debits use unclassified
  * goods first, then model IDs ascending. Returns the typed part removed,

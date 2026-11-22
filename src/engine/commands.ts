@@ -20,6 +20,7 @@ import { MAX_EQUIPMENT_LINES, MAX_REQUESTED_FACTORIES, efficiencyAfterSwitch } f
 import { countryProductionLines, modelUnlocked } from './systems/productionLineState';
 import { adjustWarehouse } from './systems/modelWarehouse';
 import { attributeEquipment } from './systems/issuedEquipment';
+import {validateModelExchange,applyModelExchange} from './military/modelExchange';
 import { applyBatchRefit, planBatchRefit } from './military/refit';
 import { LAW_PP_COST } from './systems/politics';
 import { techDefs, MAX_ACTIVE_RESEARCH } from './systems/research';
@@ -119,6 +120,18 @@ export function registerAllCommands(): void {
         actor: country, province: prov,
       });
       void issuer;
+    },
+  });
+
+  registerCommand('exchangeUnitEquipment', {
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||issuer==='frontai'||!w.countries.alive[c])return 'badIssuer';
+      return validateModelExchange(w,c,p);
+    },
+    apply(w,p,issuer){
+      const c=actorCountry(w,issuer)!;
+      applyModelExchange(w,c,p);
     },
   });
 
