@@ -1,5 +1,6 @@
 // メインゲーム画面 — 地図中心レイアウト（game-ui仕様: docs/11 §2）
 import { useEffect, useRef, useState } from 'react';
+import type { PointerEvent as ReactPointerEvent, MouseEvent as ReactMouseEvent } from 'react';
 import { useApp } from './App';
 import { appStore } from './store';
 import { t } from './i18n';
@@ -7,6 +8,7 @@ import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
+import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
 import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
@@ -50,6 +52,11 @@ export function GameScreen() {
   const [frontVisibility,setFrontVisibility]=useState<FrontVisibility>('all');
   const [rosterQuery, setRosterQuery] = useState('');
   const [rosterFilter, setRosterFilter] = useState('all');
+  const [marqueeMode,setMarqueeMode]=useState(false);
+  const [marquee,setMarquee]=useState<ScreenRect|null>(null);
+  const marqueePointer=useRef<{id:number;origin:{x:number;y:number}}|null>(null);
+  const rosterRangeAnchor=useRef<number|null>(null);
+  const skipFocusId=useRef<number|null>(null);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -223,6 +230,8 @@ export function GameScreen() {
   // Selecting a deployed division from recruitment or the context panel also centers the map.
   useEffect(() => {
     if (!mapReady || st.selection.unitId === null) return;
+    if(skipFocusId.current===st.selection.unitId){skipFocusId.current=null;return;}
+    skipFocusId.current=null;
     const u = appStore.get().snap?.units.find(x => x.id === st.selection.unitId);
     if (u) rendererRef.current?.focusProvince(u.loc);
   }, [mapReady, st.selection.unitId]);
@@ -266,6 +275,7 @@ export function GameScreen() {
     const valid = ownUnits.filter(u => ids.includes(u.id));
     if (valid.length > 256) { appStore.set({ statusMessage: t(lang, 'units.limit') }); return; }
     const first = valid[0];
+    if(!focus)skipFocusId.current=first?.id??null;
     appStore.set({ selection: { prov: first?.loc ?? null, unitId: first?.id ?? null, unitIds: valid.map(u => u.id), country: null }, trace: null });
     if (focus && first) rendererRef.current?.focusProvince(first.loc);
   }
@@ -329,10 +339,74 @@ export function GameScreen() {
     if (marker) {
       const ids = ownUnits.filter(u => u.loc === prov).map(u => u.id);
       if (!ids.length) { appStore.set({ selection: { prov, unitId: null, country: null }, trace: null }); return; }
-      selectUnits(e.shiftKey || e.ctrlKey || e.metaKey ? [...new Set([...selectedIds, ...ids])] : ids, false);
+      const mode:SelectionMergeMode=e.altKey?'remove':e.ctrlKey||e.metaKey?'toggle':e.shiftKey?'add':'replace';
+      const next=mergeDivisionSelection(selectedIds,ids,ownUnits.map(u=>u.id),mode);
+      if(next===null)appStore.set({statusMessage:t(lang,'units.limit')});
+      else selectUnits(next,false);
       return;
     }
     appStore.set({ selection: { prov, unitId: null, country: null }, trace: null });
+  }
+
+  function handleRosterUnitClick(e:ReactMouseEvent<HTMLButtonElement>,unit:UiUnit){
+    const ids=visibleUnits.map(u=>u.id);
+    const anchor=rosterRangeAnchor.current===null?-1:ids.indexOf(rosterRangeAnchor.current);
+    const index=ids.indexOf(unit.id);
+    let incoming=[unit.id];
+    let mode:SelectionMergeMode='replace';
+    if(e.shiftKey&&anchor>=0&&index>=0){
+      incoming=ids.slice(Math.min(anchor,index),Math.max(anchor,index)+1);
+      mode='add';
+    }else if(e.ctrlKey||e.metaKey)mode='toggle';
+    const next=mergeDivisionSelection(selectedIds,incoming,ownUnits.map(u=>u.id),mode);
+    if(next===null)appStore.set({statusMessage:t(lang,'units.limit')});
+    else selectUnits(next,mode==='replace');
+    if(!e.shiftKey||anchor<0)rosterRangeAnchor.current=unit.id;
+  }
+
+  function pointInMarquee(e:ReactPointerEvent<HTMLDivElement>){
+    const rect=e.currentTarget.getBoundingClientRect();
+    return {x:Math.max(0,Math.min(rect.width,e.clientX-rect.left)),
+      y:Math.max(0,Math.min(rect.height,e.clientY-rect.top))};
+  }
+  function beginMarquee(e:ReactPointerEvent<HTMLDivElement>){
+    if(e.button!==0 || marqueePointer.current || !mapReady) return;
+    e.preventDefault();
+    const origin=pointInMarquee(e);
+    marqueePointer.current={id:e.pointerId,origin};
+    setMarquee({x1:origin.x,y1:origin.y,x2:origin.x,y2:origin.y});
+    e.currentTarget.setPointerCapture(e.pointerId);
+  }
+  function moveMarquee(e:ReactPointerEvent<HTMLDivElement>){
+    const current=marqueePointer.current;
+    if(current?.id!==e.pointerId)return;
+    const p=pointInMarquee(e);
+    setMarquee({x1:current.origin.x,y1:current.origin.y,x2:p.x,y2:p.y});
+  }
+  function endMarquee(e:ReactPointerEvent<HTMLDivElement>,cancel=false){
+    const current=marqueePointer.current;
+    if(current?.id!==e.pointerId)return;
+    marqueePointer.current=null;
+    setMarquee(null);
+    if(cancel)return;
+    const p=pointInMarquee(e);
+    if(Math.hypot(p.x-current.origin.x,p.y-current.origin.y)<5)return;
+    const r=rendererRef.current;
+    if(!r)return;
+    const box={x1:current.origin.x,y1:current.origin.y,x2:p.x,y2:p.y};
+    const incoming=divisionsInRectangle(ownUnits,province=>r.projectProvince(province),box);
+    const mode:SelectionMergeMode=e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'replace';
+    const next=mergeDivisionSelection(selectedIds,incoming,ownUnits.map(u=>u.id),mode);
+    if(next===null)appStore.set({statusMessage:t(lang,'units.limit')});
+    else selectUnits(next,false);
+  }
+  function toggleMarquee(){
+    marqueePointer.current=null;
+    setMarquee(null);
+    setMarqueeMode(!marqueeMode);
+    setMoveMode(false);
+    setAttackMode(false);
+    setDestination('');
   }
 
   function handleMapMove(e: React.MouseEvent): void {
@@ -403,14 +477,34 @@ export function GameScreen() {
           onContextMenu={handleMapContext}
           onMouseMove={handleMapMove}
           onMouseLeave={() => setHoverProv(null)}
-        />
+        >
+          {marqueeMode&&<div className="map-marquee-layer" data-testid="map-marquee-layer"
+            aria-label={lang==='ja'?'ドラッグで師団を矩形選択':'Drag to box-select divisions'}
+            onPointerDown={beginMarquee}
+            onPointerMove={moveMarquee}
+            onPointerUp={e=>endMarquee(e)}
+            onPointerCancel={e=>endMarquee(e,true)}
+            onLostPointerCapture={e=>endMarquee(e,true)}
+            onClick={e=>e.stopPropagation()}
+            onContextMenu={e=>e.preventDefault()}>
+            {marquee&&<div className="map-marquee-rectangle" data-testid="map-marquee-rectangle" aria-hidden="true"
+              style={{left:Math.min(marquee.x1,marquee.x2),top:Math.min(marquee.y1,marquee.y2),
+                width:Math.abs(marquee.x2-marquee.x1),height:Math.abs(marquee.y2-marquee.y1)}}/>}
+          </div>}
+        </div>
         <div className="map-tools" aria-label={t(lang, 'map.controls')}>
           <button aria-label={t(lang, 'map.zoomIn')} data-testid="map-zoom-in" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(1.25)}>＋</button>
           <button aria-label={t(lang, 'map.zoomOut')} data-testid="map-zoom-out" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(0.8)}>－</button>
           <select data-testid="front-visibility" aria-label={lang==='ja'?'戦線表示':'Front visibility'} value={frontVisibility} onChange={e=>setFrontVisibility(e.target.value as FrontVisibility)}><option value="all">{lang==='ja'?'全戦線':'All fronts'}</option><option value="selected">{lang==='ja'?'選択部隊の戦線':'Selected fronts'}</option><option value="off">{lang==='ja'?'戦線非表示':'Hide fronts'}</option></select>
           <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
+          <button type="button" data-testid="map-box-select" aria-pressed={marqueeMode} disabled={!mapReady}
+            onClick={toggleMarquee}>{marqueeMode?(lang==='ja'?'範囲選択を終了':'Exit box select'):(lang==='ja'?'▱ 範囲選択':'▱ Box select')}</button>
         </div>
-        {mapError && <div className="status-toast" role="alert">{mapError}</div>}
+        {marqueeMode&&<div className="map-marquee-hint" data-testid="map-marquee-hint" role="status">
+          {lang==='ja'?'ドラッグで師団を囲む · Ctrl/⌘/Shift:追加 · Alt:除外 · 最大256師団':
+            'Drag around divisions · Ctrl/⌘/Shift: add · Alt: remove · max 256'}
+        </div>}
+        {mapError && <div className="status-toast" role="alert">{mapError}</div>
         {hoverProv !== null && hoverPos && (
           <div
             style={{
@@ -482,9 +576,9 @@ export function GameScreen() {
                 {visibleUnits.map(u => <div className="unit-roster-entry" key={u.id}>
                   <input type="checkbox" aria-label={t(lang, 'units.select') + ' #' + u.id} data-testid={'unit-check-' + u.id}
                     checked={selectedIds.includes(u.id)} disabled={!selectedIds.includes(u.id) && chosen.length >= 256}
-                    onChange={e => selectUnits(e.target.checked ? [...selectedIds, u.id] : selectedIds.filter(id => id !== u.id), false)} />
+                    onChange={e => {rosterRangeAnchor.current=u.id;selectUnits(e.target.checked ? [...selectedIds, u.id] : selectedIds.filter(id => id !== u.id), false);}} />
                   <button data-testid={'unit-roster-' + u.id} data-unit-id={u.id} data-location={meta.provIds[u.loc]} aria-pressed={selectedIds.includes(u.id)}
-                    onClick={() => selectUnits([u.id])}>
+                    onClick={e => handleRosterUnitClick(e,u)}>
                     #{u.id} {u.customTemplateId!==undefined ? (snap.customTemplates.find(t=>t.country===u.owner&&t.templateId===u.customTemplateId&&t.revision===u.customRevision)?.name ?? (lang==='ja'?'独自師団':'Custom division')) : (lang === 'ja' ? divisionTemplate(u.templateId ?? 'standard-v1')?.nameJa : divisionTemplate(u.templateId ?? 'standard-v1')?.nameEn)}<br />
                     {u.armyId !== null && <span>{snap.armies.find(a=>a.id===u.armyId)?.name} · </span>}
                     {u.frontId>=0&&<span>{lang==='ja'?'戦線':'Front'} #{u.frontId} · </span>}{u.manualHold&&<span>{lang==='ja'?'手動優先':'Manual hold'} · </span>}
