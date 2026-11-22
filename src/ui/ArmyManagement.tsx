@@ -8,6 +8,7 @@ type Lang = 'ja' | 'en';
 type Props = { snap: UiSnapshot; lang: Lang; selectedIds: number[]; pending: number; onSelect: (ids: number[]) => void };
 
 import { summarizeDivisions } from '../engine/military/armySummary';
+import { customTemplateStats } from '../engine/military/customTemplates';
 
 export function DivisionResources({unit:u,lang,context=false}: {unit:UiUnit;lang:Lang;context?:boolean}) {
   const ja = lang === 'ja';
@@ -41,6 +42,7 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const [armyId,setArmyId]=useState('');
   const [groupId,setGroupId]=useState('');
   const [scope,setScope]=useState('selection');
+  const [quickTemplate,setQuickTemplate]=useState('');
   const country=snap.playerCountry;
   const armies=snap.armies.filter(a=>a.owner===country);
   const groups=snap.armyGroups.filter(g=>g.owner===country);
@@ -57,6 +59,22 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
   const commanderName=(id:number|undefined)=>{const c=commanders.find(c=>c.id===id);return c?(ja?c.nameJa:c.nameEn)+' S'+c.skill:(ja?'未配置':'Unassigned');};
   const role=(id:number)=>{const a=armies.find(a=>a.commanderId===id),g=groups.find(g=>g.commanderId===id),c=commanders.find(c=>c.id===id);return a?a.name:g?g.name:c&&c.assignedUnit>=0?(ja?'師団 #':'Division #')+c.assignedUnit:(ja?'空き':'Available');};
   const label=(j:string,e:string)=>ja?j:e;
+  const latestTemplates=snap.customTemplates.filter(t=>t.country===country)
+    .sort((a,b)=>a.templateId-b.templateId||b.revision-a.revision)
+    .filter((t,i,all)=>i===0||all[i-1].templateId!==t.templateId);
+  const refitTarget=selected.length===1?selected[0]:null;
+  const refitTemplate=latestTemplates.find(t=>String(t.templateId)+':'+t.revision===quickTemplate);
+  const refitStats=refitTemplate?customTemplateStats(refitTemplate):null;
+  const player=snap.countries[country];
+  const refitDelta=refitTarget&&refitStats?[
+    Math.max(0,refitStats.manpower-refitTarget.maxManpower),
+    Math.max(0,refitStats.infantry-refitTarget.maxInfEquipment),
+    Math.max(0,refitStats.artillery-refitTarget.maxArtEquipment)
+  ]:null;
+  const refitAllowed=!!refitTarget&&!!refitTemplate&&!!refitDelta&&canCommand&&
+    !refitTarget.moving&&!refitTarget.inBattle&&!refitTarget.encircled&&
+    snap.controller[refitTarget.loc]===country &&
+    player.manpowerPool>=refitDelta[0]&&player.infEquipmentStock>=refitDelta[1]&&player.artEquipmentStock>=refitDelta[2];
   const create=(kind:'createArmy'|'createArmyGroup')=>{
     const nextName=name.trim();
     if (!canCommand || !nextName) return;
@@ -69,6 +87,19 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect}:Props) {
       {groups.map(g=><button key={g.id} data-testid={'group-select-'+g.id} style={{borderColor:g.color}} onClick={()=>{setGroupId(String(g.id));onSelect(groupUnits(g.id));}}>{g.name} · {armies.filter(a=>a.groupId===g.id).length}/{MAX_GROUP_ARMIES}<small className="formation-leader" data-testid={'group-leader-'+g.id}>{commanderName(g.commanderId)}</small></button>)}
       {armies.map(a=><button key={a.id} data-testid={'army-select-'+a.id} style={{borderColor:a.color}} onClick={()=>{setArmyId(String(a.id));onSelect(memberIds(a.id));}}>{a.name} · {memberIds(a.id).length}/{MAX_ARMY_UNITS}<small className="formation-leader" data-testid={'army-leader-'+a.id}>{commanderName(a.commanderId)}</small></button>)}
       <button data-testid="select-unassigned" onClick={()=>onSelect(units.filter(u=>u.armyId===null).map(u=>u.id))}>{label('未編入','Unassigned')} · {units.filter(u=>u.armyId===null).length}</button>
+    </div>
+    <div className="army-quick-action" data-testid="army-quick-action">
+      <div className="kv"><b>{label('選択した師団','Selected divisions')}</b><strong>{selected.length}</strong></div>
+      {refitTarget && <div className="muted">#{refitTarget.id} · {refitTarget.customTemplateId!==undefined?refitTarget.customTemplateId+' v'+refitTarget.customRevision:(refitTarget.templateId??'standard-v1')}</div>}
+      <div className="move-controls">
+        <select data-testid="army-quick-template" aria-label={label('改編先の自由編成','Refit to custom template')} value={quickTemplate} onChange={e=>setQuickTemplate(e.target.value)}>
+          <option value="">{label('自由編成を選択','Select saved template')}</option>
+          {latestTemplates.map(t=><option key={t.templateId} value={String(t.templateId)+':'+t.revision}>{t.name} · v{t.revision}</option>)}
+        </select>
+        <button data-testid="army-quick-refit" className="primary" disabled={!refitAllowed} onClick={()=>{if(refitTarget&&refitTemplate)engineClient.command('refitUnit',{unitId:refitTarget.id,templateId:refitTemplate.templateId,revision:refitTemplate.revision});}}>{label('選択師団を改編','Refit selected division')}</button>
+      </div>
+      {refitDelta&&<small>{label('必要な追加資源（人員 / 小火器 / 火砲）','Additional resources (manpower / rifles / artillery)')}: {refitDelta.map(fmt).join(' / ')}</small>}
+      {selected.length!==1&&<small>{label('師団を1個選択すると、その場で編成を変更できます。','Select one division to refit without opening recruitment.')}</small>}
     </div>
     <button data-testid="toggle-army-editor" aria-expanded={editing} onClick={()=>setEditing(!editing)}>{label(editing?'編成編集を閉じる':'編成を編集',editing?'Close editor':'Edit formations')}</button>
     {editing && <>

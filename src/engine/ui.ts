@@ -55,6 +55,10 @@ export interface UiTechDef {
   cat: string;
   req: string[];
   days: number;
+  year?: number;
+  nameJa?: string;
+  nameEn?: string;
+  mods: Record<string, number>;
 }
 
 export interface UiFront {
@@ -388,7 +392,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     occupation: w.occupancyTimer.flatMap((days, province) => days > 0 ? [{province, candidate: w.occupierCandidate[province], days}] : []),
     fronts,
     commanders,
-    techs: techs.map((t) => ({ id: t.id, cat: t.cat, req: t.req.slice(), days: t.days })),
+    techs: techs.map((t) => ({ id: t.id, cat: t.cat, req: t.req.slice(), days: t.days, year: t.year, nameJa: t.nameJa, nameEn: t.nameEn, mods: { ...t.mods } })),
     claims: w.claims.slice(),
     treaties,
     relations: w.relations.map((r) => ({ a: r.a, b: r.b, v: Math.round(r.v) })),

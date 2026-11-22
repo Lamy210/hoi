@@ -1,1 +1,316 @@
-[{"id": "industry-basic", "cat": "industry", "req": [], "days": 400, "mods": {"factoryOutput": 0.05}}, {"id": "industry-mass", "cat": "industry", "req": ["industry-basic"], "days": 500, "mods": {"factoryOutput": 0.08}}, {"id": "industry-automation", "cat": "industry", "req": ["industry-mass"], "days": 650, "mods": {"factoryOutput": 0.1, "living": 0.02}}, {"id": "medical-basic", "cat": "medical", "req": [], "days": 350, "mods": {"living": 0.03}}, {"id": "medical-advanced", "cat": "medical", "req": ["medical-basic"], "days": 500, "mods": {"living": 0.04, "orgRegen": 0.05}}, {"id": "agri-modern", "cat": "agriculture", "req": [], "days": 300, "mods": {"living": 0.02}}, {"id": "comm-logistics", "cat": "communication", "req": [], "days": 400, "mods": {"supplyRadius": 0.1}}, {"id": "comm-network", "cat": "communication", "req": ["comm-logistics"], "days": 550, "mods": {"researchRate": 0.15, "orgRegen": 0.03}}]
+[
+  {
+    "id": "industry-basic",
+    "cat": "industry",
+    "req": [],
+    "days": 400,
+    "mods": {
+      "factoryOutput": 0.05
+    },
+    "year": 2000,
+    "nameJa": "\u57fa\u672c\u88fd\u9020\u6280\u8853",
+    "nameEn": "Basic manufacturing"
+  },
+  {
+    "id": "industry-mass",
+    "cat": "industry",
+    "req": [
+      "industry-basic"
+    ],
+    "days": 500,
+    "mods": {
+      "factoryOutput": 0.08
+    },
+    "year": 2010,
+    "nameJa": "\u91cf\u7523\u6280\u8853",
+    "nameEn": "Mass production"
+  },
+  {
+    "id": "industry-automation",
+    "cat": "industry",
+    "req": [
+      "industry-mass"
+    ],
+    "days": 650,
+    "mods": {
+      "factoryOutput": 0.1,
+      "living": 0.02
+    },
+    "year": 2025,
+    "nameJa": "\u5de5\u5834\u81ea\u52d5\u5316",
+    "nameEn": "Factory automation"
+  },
+  {
+    "id": "medical-basic",
+    "cat": "medical",
+    "req": [],
+    "days": 350,
+    "mods": {
+      "living": 0.03
+    },
+    "year": 2005,
+    "nameJa": "\u57fa\u790e\u533b\u7642",
+    "nameEn": "Basic medicine"
+  },
+  {
+    "id": "medical-advanced",
+    "cat": "medical",
+    "req": [
+      "medical-basic"
+    ],
+    "days": 500,
+    "mods": {
+      "living": 0.04,
+      "orgRegen": 0.05
+    },
+    "year": 2028,
+    "nameJa": "\u9ad8\u5ea6\u533b\u7642",
+    "nameEn": "Advanced medicine"
+  },
+  {
+    "id": "agri-modern",
+    "cat": "agriculture",
+    "req": [],
+    "days": 300,
+    "mods": {
+      "living": 0.02
+    },
+    "year": 2010,
+    "nameJa": "\u73fe\u4ee3\u8fb2\u696d",
+    "nameEn": "Modern agriculture"
+  },
+  {
+    "id": "comm-logistics",
+    "cat": "communication",
+    "req": [],
+    "days": 400,
+    "mods": {
+      "supplyRadius": 0.1
+    },
+    "year": 2010,
+    "nameJa": "\u5175\u7ad9\u901a\u4fe1",
+    "nameEn": "Logistics communications"
+  },
+  {
+    "id": "comm-network",
+    "cat": "communication",
+    "req": [
+      "comm-logistics"
+    ],
+    "days": 550,
+    "mods": {
+      "researchRate": 0.15,
+      "orgRegen": 0.03
+    },
+    "year": 2025,
+    "nameJa": "\u901a\u4fe1\u30cd\u30c3\u30c8\u30ef\u30fc\u30af",
+    "nameEn": "Networked command"
+  },
+  {
+    "id": "small-arms-standard",
+    "cat": "infantry",
+    "year": 1990,
+    "req": [],
+    "days": 260,
+    "mods": {
+      "infantryAttack": 0.03
+    },
+    "nameJa": "\u6a19\u6e96\u5c0f\u9283",
+    "nameEn": "Standard service rifles"
+  },
+  {
+    "id": "small-arms-modular",
+    "cat": "infantry",
+    "year": 2010,
+    "req": [
+      "small-arms-standard"
+    ],
+    "days": 410,
+    "mods": {
+      "infantryAttack": 0.05
+    },
+    "nameJa": "\u30e2\u30b8\u30e5\u30e9\u30fc\u5c0f\u9283",
+    "nameEn": "Modular small arms"
+  },
+  {
+    "id": "small-arms-smart",
+    "cat": "infantry",
+    "year": 2028,
+    "req": [
+      "small-arms-modular"
+    ],
+    "days": 520,
+    "mods": {
+      "infantryAttack": 0.07
+    },
+    "nameJa": "\u9ad8\u5ea6\u7167\u6e96\u30fb\u5c0f\u706b\u5668",
+    "nameEn": "Advanced optics and small arms"
+  },
+  {
+    "id": "small-arms-next",
+    "cat": "infantry",
+    "year": 2035,
+    "req": [
+      "small-arms-smart"
+    ],
+    "days": 680,
+    "mods": {
+      "infantryAttack": 0.08
+    },
+    "nameJa": "\u6b21\u4e16\u4ee3\u6b69\u5175\u706b\u5668",
+    "nameEn": "Next-generation infantry arms"
+  },
+  {
+    "id": "infantry-protection",
+    "cat": "infantry",
+    "year": 2010,
+    "req": [],
+    "days": 330,
+    "mods": {
+      "infantryDefense": 0.05
+    },
+    "nameJa": "\u500b\u4eba\u9632\u8b77\u88c5\u5099",
+    "nameEn": "Infantry protection"
+  },
+  {
+    "id": "infantry-protection-next",
+    "cat": "infantry",
+    "year": 2031,
+    "req": [
+      "infantry-protection"
+    ],
+    "days": 560,
+    "mods": {
+      "infantryDefense": 0.08
+    },
+    "nameJa": "\u6b21\u4e16\u4ee3\u9632\u8b77\u88c5\u5099",
+    "nameEn": "Next-gen body armor"
+  },
+  {
+    "id": "artillery-guidance",
+    "cat": "artillery",
+    "year": 2015,
+    "req": [],
+    "days": 420,
+    "mods": {
+      "artilleryAttack": 0.05
+    },
+    "nameJa": "\u706b\u7832\u5c04\u6483\u7ba1\u5236",
+    "nameEn": "Artillery fire control"
+  },
+  {
+    "id": "artillery-precision",
+    "cat": "artillery",
+    "year": 2029,
+    "req": [
+      "artillery-guidance"
+    ],
+    "days": 580,
+    "mods": {
+      "artilleryAttack": 0.08
+    },
+    "nameJa": "\u7cbe\u5bc6\u8a98\u5c0e\u7832\u5175",
+    "nameEn": "Precision artillery"
+  },
+  {
+    "id": "drone-recon",
+    "cat": "drones",
+    "year": 2025,
+    "req": [],
+    "days": 450,
+    "mods": {
+      "infantryDefense": 0.02,
+      "supplyRadius": 0.02
+    },
+    "nameJa": "\u7121\u4eba\u6a5f\u5075\u5bdf",
+    "nameEn": "Drone reconnaissance"
+  },
+  {
+    "id": "drone-strike",
+    "cat": "drones",
+    "year": 2030,
+    "req": [
+      "drone-recon"
+    ],
+    "days": 610,
+    "mods": {
+      "infantryAttack": 0.06
+    },
+    "nameJa": "\u7121\u4eba\u6a5f\u6253\u6483\u904b\u7528",
+    "nameEn": "Drone strike operations"
+  },
+  {
+    "id": "electronic-warfare",
+    "cat": "drones",
+    "year": 2033,
+    "req": [
+      "drone-recon",
+      "comm-network"
+    ],
+    "days": 680,
+    "mods": {
+      "infantryDefense": 0.06
+    },
+    "nameJa": "\u96fb\u5b50\u6226\u30fb\u5bfe\u7121\u4eba\u6a5f",
+    "nameEn": "Electronic warfare"
+  },
+  {
+    "id": "advanced-logistics",
+    "cat": "communication",
+    "year": 2031,
+    "req": [
+      "comm-network"
+    ],
+    "days": 580,
+    "mods": {
+      "supplyRadius": 0.08
+    },
+    "nameJa": "\u7d71\u5408\u5175\u7ad9\u7db2",
+    "nameEn": "Integrated logistics network"
+  },
+  {
+    "id": "industrial-robots",
+    "cat": "industry",
+    "year": 2034,
+    "req": [
+      "industry-automation"
+    ],
+    "days": 670,
+    "mods": {
+      "factoryOutput": 0.07
+    },
+    "nameJa": "\u7523\u696d\u30ed\u30dc\u30c6\u30a3\u30af\u30b9",
+    "nameEn": "Industrial robotics"
+  },
+  {
+    "id": "doctrine-maneuver",
+    "cat": "doctrine",
+    "year": 2025,
+    "req": [
+      "small-arms-modular"
+    ],
+    "days": 470,
+    "mods": {
+      "infantryAttack": 0.03,
+      "orgRegen": 0.02
+    },
+    "nameJa": "\u6a5f\u52d5\u6226\u30c9\u30af\u30c8\u30ea\u30f3",
+    "nameEn": "Maneuver doctrine"
+  },
+  {
+    "id": "doctrine-networked",
+    "cat": "doctrine",
+    "year": 2034,
+    "req": [
+      "doctrine-maneuver",
+      "comm-network"
+    ],
+    "days": 690,
+    "mods": {
+      "infantryAttack": 0.05,
+      "infantryDefense": 0.03
+    },
+    "nameJa": "\u30cd\u30c3\u30c8\u30ef\u30fc\u30af\u7d71\u5408\u4f5c\u6226",
+    "nameEn": "Network-centric operations"
+  }
+]

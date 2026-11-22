@@ -147,3 +147,42 @@ input, select {
 
 .formation-leader { display:block; font-size:11px; opacity:.85; }
 .formation-commanders { border-top:1px solid #566477; padding-top:5px; }
+
+
+/* Card-based command roster and chronological research tree. */
+.army-bar { display: grid; grid-template-columns: repeat(auto-fit,minmax(132px,1fr)); max-height: 210px; gap: 5px; }
+.army-bar button { text-align: left; min-height: 48px; border-left-width: 4px; }
+.army-bar button:hover,.army-bar button:focus-visible { box-shadow: inset 0 0 0 1px #87b5d8; }
+.army-quick-action { background: #202d3e; border: 1px solid #53738c; border-radius: 7px; padding: 9px; margin: 8px 0; }
+.army-quick-action select { flex: 1; min-width: 130px; }
+.research-screen { min-width: 0; color: #e8e6e1; }
+.modal:has(.research-screen) { width: min(1020px,96vw); max-width: min(1020px,96vw); }
+.research-overview { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 10px; background: #121e2e; border: 1px solid #395775; border-radius: 6px; }
+.research-overview b { font-size: 15px; }
+.research-overview span { color: #bdd8ec; }
+.research-active { display: grid; grid-template-columns: repeat(auto-fit,minmax(190px,1fr)); gap: 8px; margin: 10px 0; }
+.research-active-item { display: grid; grid-template-columns: 1fr auto; gap: 4px; background: #26364a; border-radius: 6px; padding: 8px; font-size: 12px; }
+.research-active-item progress { grid-column: 1 / -1; width: 100%; }
+.research-filters { display: grid; gap: 8px; margin-top: 8px; }
+.research-categories { display: flex; flex-wrap: wrap; gap: 4px; }
+.research-categories button[aria-pressed="true"] { background: #275579; border-color: #81c0f3; }
+.research-filters input { min-width: 0; width: 100%; }
+.research-branch { margin-top: 14px; background: #131c2a; border: 1px solid #33445b; border-radius: 8px; padding: 10px; }
+.research-branch h4 { margin: 0 0 10px; font-size: 13px; color: #cbe1f3; }
+.research-timeline { display: flex; gap: 24px; overflow-x: auto; padding: 3px 0 12px; }
+.research-tier { display: flex; flex-direction: column; flex: 0 0 185px; gap: 9px; position: relative; }
+.research-tier:not(:first-child)::before { content: "→"; position: absolute; top: 60px; left: -20px; font-size: 18px; color: #90abc4; }
+.research-tech { display: flex; flex-direction: column; gap: 7px; border-radius: 7px; background: #233449; border: 1px solid #526b82; padding: 10px; min-height: 178px; }
+.research-tech.locked { opacity: .65; background: #1c2430; }
+.research-tech.active { border-color: #78b8e8; background: #254764; }
+.research-tech.complete { border-color: #7caf91; background: #254135; }
+.research-tech-heading { display: flex; justify-content: space-between; gap: 6px; }
+.research-tech-heading span { color: #b8d6ec; font-size: 11px; }
+.research-prereqs { color: #9db6c8; min-height: 30px; }
+.research-effects { display: flex; flex-wrap: wrap; gap: 3px; }
+.research-effects span { padding: 2px 4px; font-size: 11px; border-radius: 3px; background: #334e66; }
+.research-penalty { color: #ffb976; }
+.research-complete { color: #b8e9c4; font-size: 12px; }
+.research-tech button { margin-top: auto; }
+.research-tech progress { width: 100%; margin-top: auto; accent-color: #73baf0; }
+@media (max-width: 700px) { .research-tier { flex-basis: 150px; } .research-tech { padding: 7px; } }
