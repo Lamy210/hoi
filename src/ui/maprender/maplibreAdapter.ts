@@ -173,6 +173,11 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
       const f = feats[0];
       return f ? Number(f.properties?.pidIdx) : null;
     },
+    projectProvince(prov: number) {
+      if (!map.loaded() || !Number.isInteger(prov) || prov<0 || prov>=ds.provIds.length) return null;
+      const point=map.project([ds.provLabelX[prov],ds.provLabelY[prov]]);
+      return {x:point.x,y:point.y};
+    },
     rebuildAll(next: string[]) {
       colors = next;
       if (map.getSource('prov')) {
