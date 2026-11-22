@@ -70,7 +70,7 @@ describe('v16 typed manufacturing history, not inventory',()=>{
     expect(blob.header.v).toBe(17);
     const v15=decode(original) as any;
     v15.header.v=15;
-    delete v15.stores.modelProduction;delete v15.stores.modelStock;
+    delete v15.stores.modelProduction;delete v15.stores.modelStock;delete v15.stores.issuedEquipment;
     v15.header.integrity=hashWorld(w,false,true,true,true,true,true,true,true,true,true,false);
     v15.payloadChecksum=savePayloadChecksum(v15.header,v15.stores);
     const loaded=deserializeWorld(encode(v15),pack);

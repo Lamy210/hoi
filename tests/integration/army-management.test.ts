@@ -92,7 +92,7 @@ describe('army hierarchy and military overview',()=>{
     const {e,w}=await fixture();
     const old=decode(e.serialize()) as any;
     delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
-    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction; delete old.stores.modelStock;
+    delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction; delete old.stores.modelStock; delete old.stores.issuedEquipment;
     old.header.v=6;old.header.integrity=hashWorld(w,false,false);
     delete old.stores.armies;delete old.stores.armyGroups;
     delete old.stores.counters.nextArmyId;delete old.stores.counters.nextArmyGroupId;

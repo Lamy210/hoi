@@ -30,7 +30,7 @@ export interface UiCountry {
   modelProduction: import('./systems/modelProductionLedger').ModelProductionRecord[];
   /** v17: identifiable model stock still held at warehouses (part of two-goods aggregate). */
   modelStock: import('./systems/modelWarehouse').ModelWarehouseRecord[];
-  /** Live in the lines production mode; per-model warehouses still not implemented. */
+  /** Actual in lines mode; old share mode displays hypothetical factory allocations. */
   productionLines: ProductionLineEstimate[];
   dailyEquipment: { infantry: number; artillery: number };
   training: TrainingOrder[];
@@ -126,6 +126,8 @@ export interface UiUnit {
   maxInfEquipment: number;
   artEquipment: number;
   maxArtEquipment: number;
+  /** Identifiable part of deployed equipment; the rest is unclassified. */
+  issuedModels: {modelId:string;quantity:number}[];
   supply: number;
   frontId: number;
   commanderId: number;
@@ -330,6 +332,8 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       maxInfEquipment: u.maxInfEquipment,
       artEquipment: u.artEquipment,
       maxArtEquipment: u.maxArtEquipment,
+      issuedModels: w.issuedEquipment.filter(r=>r.holder==='unit'&&r.holderId===u.id)
+        .map(r=>({modelId:r.modelId,quantity:r.quantity})),
       supply: effectiveSupply(w, u),
       frontId: u.frontId,
       commanderId: u.commanderId,
