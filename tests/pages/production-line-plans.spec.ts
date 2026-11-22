@@ -11,7 +11,7 @@ test('研究解禁済み装備の計画ラインを作成・更新・削除し�
   const planner=page.getByTestId('production-line-planner');
   await expect(planner).toBeVisible();
   await expect(page.getByTestId('production-plan-warning')).toContainText('従来配分率');
-  const rows=planner.locator('[data-testid^="production-plan-"]');
+  const rows=planner.locator('article[data-testid^="production-plan-"]');
   const before=await rows.count();
   expect(before).toBeGreaterThanOrEqual(2);
   const first=rows.first();
