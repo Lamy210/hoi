@@ -2,6 +2,7 @@
 // 発火はジャーナルへ記録（issuer=event）。once指定は1回のみ。照合順は定義順で決定論。
 import { allocateAiSequence } from '../core/sequence';
 import { addAlert, atWar, type WorldState } from '../core/state';
+import { adjustWarehouse } from './modelWarehouse';
 import { registerSystem, getSystems } from '../core/scheduler';
 import { daysFromCivil } from '../clock/date';
 import type { EventDef, Pack } from '../scenario/types';
@@ -79,8 +80,8 @@ function applyEffects(w: WorldState, def: EventDef): void {
       case 'equipment': {
         const c = resolveCountry(w, e.country);
         if (c >= 0 && w.countries.alive[c]) {
-          if (e.good === 'artEquipment') w.countries.artEquipmentStock[c] += e.amount ?? 0;
-          else w.countries.infEquipmentStock[c] += e.amount ?? 0;
+          if (e.good === 'artEquipment') adjustWarehouse(w,c,'artillery',e.amount??0);
+          else adjustWarehouse(w,c,'infantry',e.amount??0);
         }
         break;
       }

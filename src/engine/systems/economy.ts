@@ -9,6 +9,7 @@ import { techMods } from './research';
 import { lawLivingBonus } from './politics';
 import { activeWarBetween } from '../core/state';
 import { activeTreatyBetween } from '../diplomacy/treaties';
+import { transferWarehouse } from './modelWarehouse';
 
 export const GOODS = ['infEquipment', 'artEquipment', 'food', 'consumer'] as const;
 export const BASE_PRICES = [1.0, 5.0, 0.5, 1.0];
@@ -154,11 +155,9 @@ export function tickTrade(w: WorldState): void {
         w.treasury[d.c] -= paid;
         w.treasury[s.c] += paid;
         if (g === 0) {
-          w.countries.infEquipmentStock[s.c] -= amount;
-          w.countries.infEquipmentStock[d.c] += amount;
+          transferWarehouse(w,s.c,d.c,'infantry',amount);
         } else if (g === 1) {
-          w.countries.artEquipmentStock[s.c] -= amount;
-          w.countries.artEquipmentStock[d.c] += amount;
+          transferWarehouse(w,s.c,d.c,'artillery',amount);
         } else if (g === 2) {
           w.foodStock[s.c] -= amount;
           w.foodStock[d.c] += amount;

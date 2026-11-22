@@ -3,6 +3,7 @@
 import type { Unit, WorldState } from '../core/state';
 import { customTemplateStats, type CustomTemplateRevision } from './customTemplates';
 import type { TemplateStats } from './templateStats';
+import { adjustWarehouse } from '../systems/modelWarehouse';
 
 export const MAX_BATCH_REFIT = 100;
 export type ResourceAmounts = [manpower: number, infantry: number, artillery: number];
@@ -79,6 +80,6 @@ export function applyBatchRefit(w: WorldState, country: number, plan: RefitBatch
     delete u.templateId;
   }
   w.countries.manpowerPool[country] -= amounts.net[0];
-  w.countries.infEquipmentStock[country] -= amounts.net[1];
-  w.countries.artEquipmentStock[country] -= amounts.net[2];
+  adjustWarehouse(w,country,'infantry',-amounts.net[1]);
+  adjustWarehouse(w,country,'artillery',-amounts.net[2]);
 }
