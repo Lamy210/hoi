@@ -58,3 +58,19 @@ test('師団一覧でShift範囲選択・Ctrlトグルが一括指揮に反映�
   await expect(rows.nth(1)).toHaveAttribute('aria-pressed','false');
   await expect(page.getByTestId('quick-halt-selected')).toBeEnabled();
 });
+
+test('範囲選択モードを使わないドラッグは地図のパン操作を維持する',async({page})=>{
+  await startJapan(page);
+  const canvas=page.getByTestId('map').locator('canvas').first();
+  const bounds=await canvas.boundingBox();
+  if(!bounds)throw Error('canvas not available');
+  const original=await canvas.getAttribute('data-camera-x');
+  const x=bounds.x+bounds.width/2,y=bounds.y+bounds.height/2;
+  await page.mouse.move(x,y);
+  await page.mouse.down();
+  await page.mouse.move(x+70,y+30,{steps:6});
+  await page.mouse.up();
+  await expect(canvas).not.toHaveAttribute('data-camera-x',original??'');
+  await expect(page.getByTestId('map-marquee-layer')).toHaveCount(0);
+  await expect(page.getByTestId('quick-unit-actions')).toHaveCount(0);
+});
