@@ -62,7 +62,7 @@ describe('real-engine battle frontage projection',()=>{
     expect(p.defenders.reserveIds).toHaveLength(0);
     w.wars=[];
     expect(projectCombatFronts(w)).toEqual([]);
-    w.wars.push(startWar(w,w.playerCountry,w.units.find(u=>u.id===90100)!.owner,true));
+    startWar(w,w.playerCountry,w.units.find(u=>u.id===90100)!.owner,true);
     expect(projectCombatFronts(w)).toHaveLength(1);
     w.units.find(u=>u.id===90100)!.destroyed=true;
     expect(projectCombatFronts(w)).toEqual([]);
