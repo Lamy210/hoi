@@ -16,9 +16,9 @@
 | DesignRevision | designId, revision, countryId, type=tank/aircraft, chassisOrFrameId, moduleIdsBySlot[], designerMioId?, catalogVersion, frozenStats, createdTick, techSnapshotId | 不変。変更は次revision/新modelId。実在部品のみ・順序正規化 |
 | EquipmentDesign（既存） | modelId, category, frozenDesignRevisionId, soft/hard/defense/breakthrough/armor/piercing/reliability/IC, resources | final statsは設計版から導出、既存LotのmodelIdと一致 |
 | ProductionLine（既存） | lineId, countryId, modelId, factoryId, efficiency, carryIC, productionMioId? | 型番切替は明示コマンド。MIO量産補正はライン生産にだけ適用 |
-| EquipmentLot（既存拡張） | modelId, holder=warehouse/division/garrison/airwing/transit, holderId, quantity | 1ユニットは必ず1バケット所属。紛失はloss ledger、修理は在庫移転 |
+| EquipmentLot（既存拡張） | modelId, holder=warehouse/division/garrison/airwing/repairing/transit, holderId, quantity | 1機・1両は必ず1バケット所属。ready機はairwingロット量から派生、修理中はrepairingロット。紛失はloss ledger、修理は在庫移転 |
 | DivisionTemplateRevision | templateId, revision, battalions[{type,modelGroup,width,requiredQty}], support[], doctrine | 各師団はrevisionを固定参照 |
-| AirWing | wingId, countryId, airbaseId, modelId, planesReady, planesRepairing, reservePoolRef, pilotCount, mission, targetAirRegionId, sortiePriority, avgExperience | airframe・pilot・fuel・airbase・距離・任務が実在 |
+| AirWing | wingId, countryId, airbaseId, modelId, aircraftLotKey, pilotReservistCount, mission, targetAirRegionId, sortiePriority, avgExperience | 機数はEquipmentLot holder=airwing/repairingから派生し重複保存しない。pilotReservistCountはpop.soldiersの一部として排他予約。燃料/airbase/距離/任務が実在 |
 | AirRegion/Airbase | airRegionId, provinceIds, radarCoverage, weatherId / airbaseId, provinceId, capacity, damage | 一基地で使う機体数が基地容量を超えない |
 | MioOrganization | mioId, countryId, specialization, xp, unlockedTraitIds, pendingAssignments[], maxConcurrentTasks, revision | XPは帳簿正本。traitDAG、国別所有、国策grant以外free unlock不可 |
 | ResearchTechDef / Project | techId, branch=foundation/module/air/doctrine, prereqIds, year, costRP, unlockModuleIds / countryId, allocatedPriority, progressRP, usedBonusTokenIds, mioId? | DAG、bonusTokenは原子的消費、同一技術二重研究禁止 |
@@ -123,7 +123,7 @@ p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance
 - Distance: 戦車 1+0.4×max(0,TravelDistanceKm/100−1)、上限2.0。航空機 1+0.5×max(0,MissionDistance/DesignRange−0.6)、上限1.2。航続圏外は sortie拒否。
 - Maintenance: 平時整備0.8、標準1、燃料/補給不足1.5、包囲/拠点損傷2.0。倍率は一回だけ掛ける。
 - 各entity/day/subphase/causeをPCG32派生シードにして Expected=N×p から整数損失 = floor(Expected)+Bernoulli(frac(Expected))。同サブフェーズの実損失はN以下。中間計算はdoubleで構わないが、確率ソート・seedは固定。発生理由を保有ロット上のlossLedgerで一度だけ引き落とす。
-- 同一の機体が air-to-air loss / AA loss / noncombat loss の複数対象にならないよう、生存航空機を順次減らす。故障機はdestroyedとrepairableに分けてもよいが、回復可能分はrepairing bucketに移し工業IC/部品を支払わない限りreadyへ復帰させない。現段階の参照計算では全件を廃棄とする。
+- 同一の機体が air-to-air loss / AA loss / noncombat loss の複数対象にならないよう、生存航空機を順次減らす。故障機はdestroyedとrepairableに分けてもよいが、回復可能分はEquipmentLot holder=repairingへ移し工業IC/部品を支払わない限りreadyへ復帰させない。参照数式の初期PoCでは全件を廃棄としてもよいが、その場合repairing在庫に同じ機体を残してはならない。
 - 例: R=.80、悪天候W1.8、泥濘2、長距離1.3、整備1 → p=0.0004×(2^1.5)×1.8×2×1.3≈0.00529/6h（約0.529%）。高信頼R=.95なら約0.066%。6h×4日の損耗は逐次残数を使い、初期数N×4pで一括計上しない。
 
 ## 5. 陸戦：師団幅、編制、装甲/貫通
@@ -152,6 +152,8 @@ p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance
 
 ## 6. 航空ミッションと陸空統合
 任務は air-superiority / interception / close-air-support / strategic-bombing（将来 naval-strike / recon）。指揮官はwingと任務/空域/基地を指定。要求: 研究済み設計版の機体、在庫から配備済みのready機数、実乗員・燃料・基地容量・航続距離内・敵味方の戦争/領空権限を満たす。平時にCAS/戦略爆撃しない。AI側も手動固定/承認を再検証。
+
+国家の現役POPはDivision兵員+AirWing搭乗員+Garrison兵員+未配備の現役兵に一意に分割する。Σ部隊/航空/駐屯の予約現役兵 <= population.soldiersを全tickで検証。パイロットが退役/墜落/移籍した場合は二重に動員しない。
 
 1日4×6hサブフェーズの順序: (1) 出撃可能数・航続距離・燃料・天候でsorties予約→(2) detection/迎撃と空対空損失→(3) surviving bomber/CASにAA対空損失と任務妨害→(4) surviving fightersによる制空指数→(5) CAS陸戦追加損害→(6) 戦略爆撃→(7) 最終生存機の非戦闘故障→(8) 空域/factory/logistics dirtyと在庫収支記録。空戦・AA・故障の順序は固定。CASが陸戦開始前に存在しても同じ6h戦闘から直接損害を引かない（戦闘が存在するときだけ）。
 - ActiveSorties = min(ready, pilots, availableFuel/fuelPerSortie, freeAirbaseCapacity)×weatherLaunchFactor×rangeFactor×missionAvailability（整数化、fractionは確定乱数）。distance>rangeなら0。
