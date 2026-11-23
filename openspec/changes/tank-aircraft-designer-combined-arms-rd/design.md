@@ -59,6 +59,7 @@
 - RawComplexity = ΣModuleComplexity; Overflow=max(0,RawComplexity-ChassisBudget)
 - PowerWeight = EnginePowerKW / MassT [kW/t]
 - SpeedKmh = clamp(ChassisSpeed × sqrt(PowerWeight/12), 5, 80)
+- FuelPer100km = (0.06×MassT+0.0015×EnginePowerKW)×EngineFuelMultiplier。TankOperationalRangeKm = 400×(1+SpecialFuelRangeBonus)/EngineFuelMultiplier。燃料が不足した戦車は移動/攻撃を制限する。速度と燃料を無関係にして無償の高速化を許さない。
 - Armor = clamp((ChassisArmor+ArmorModule+SpecialArmor)×SlopeMultiplier,0,250)
 - SoftAttack = GunSA × TurretAttackFactor + ΣSpecialSA, HardAttack 同様
 - Piercing = GunAP + ΣSpecialAP; Breakthrough = BaseBT(chassis:軽6/中9/重14/超重20) + TurretBT + SpecialBT + 0.10×Armor
@@ -118,12 +119,12 @@ Range≈650×1.40/(1+.018)=894km; AirAttack=18; BaseR .92−.01−.015−.005−
 戦闘損害・対空撃墜・非戦闘故障を区別する。故障は保有ロットから実際に引き落とす。各6時間サブフェーズに有効な活動装備数Nで:
 p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance, 0, 0.05)
 - p0: tank 0.0004 / aircraft 0.0006（航空機は実出撃機に限る）。
-- W: 快晴1、雨1.4、雪1.7、嵐2.3。地上移動中は泥濘2.0、山岳1.6、砂漠1.5、通常1。航空機Terrain=1。
+- W: 快晴1、雨1.4、雪1.7、悪天候中間1.8、嵐2.3。地上移動中は泥濘2.0、山岳1.6、砂漠1.5、通常1。航空機Terrain=1。
 - Distance: 戦車 1+0.4×max(0,TravelDistanceKm/100−1)、上限2.0。航空機 1+0.5×max(0,MissionDistance/DesignRange−0.6)、上限1.2。航続圏外は sortie拒否。
 - Maintenance: 平時整備0.8、標準1、燃料/補給不足1.5、包囲/拠点損傷2.0。倍率は一回だけ掛ける。
 - 各entity/day/subphase/causeをPCG32派生シードにして Expected=N×p から整数損失 = floor(Expected)+Bernoulli(frac(Expected))。同サブフェーズの実損失はN以下。中間計算はdoubleで構わないが、確率ソート・seedは固定。発生理由を保有ロット上のlossLedgerで一度だけ引き落とす。
 - 同一の機体が air-to-air loss / AA loss / noncombat loss の複数対象にならないよう、生存航空機を順次減らす。故障機はdestroyedとrepairableに分けてもよいが、回復可能分はrepairing bucketに移し工業IC/部品を支払わない限りreadyへ復帰させない。現段階の参照計算では全件を廃棄とする。
-- 例: R=.80、雨W1.8相当の悪天候、泥濘2、長距離1.3、整備1 → p=0.0004×(2^1.5)×1.8×2×1.3≈0.00529/6h（約0.529%）。高信頼R=.95なら約0.066%。6h×4日の損耗は逐次残数を使い、初期数N×4pで一括計上しない。
+- 例: R=.80、悪天候W1.8、泥濘2、長距離1.3、整備1 → p=0.0004×(2^1.5)×1.8×2×1.3≈0.00529/6h（約0.529%）。高信頼R=.95なら約0.066%。6h×4日の損耗は逐次残数を使い、初期数N×4pで一括計上しない。
 
 ## 5. 陸戦：師団幅、編制、装甲/貫通
 | 大隊 | width | 主戦力 | 初期補給需要(相対) |
@@ -169,11 +170,12 @@ p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance
 - modules: gun.at.1 → gun.at.2; engine.diesel.1 → engine.turbine.1; prop.1 → jet.1; radar.1→radar.2; armored-fuel.1。各moduleは必要foundationとtechをANDで満たしたときのみ搭載可。
 - doctrine: land.armored/land.firepower/air.superiority/air.support/air.strategic の排他選択や国家方針との関係はデータ定義。研究の中身が全師団/全機体を無償で新装備に置換しない。
 
-研究枠（既存strategy/rules.tsに整合）:
-IndustrialScore=0.45×sqrt(clamp(operatingIC/80,0,1))+0.40×literacy+0.15×infrastructure;
+研究枠（本設計のv2式。現行strategy/rules.tsの3要素算式はDESIGN-02/RND-01で変更する）:
+IndustrialScore=0.40×sqrt(clamp(operatingIC/80,0,1))+0.25×literacy+0.20×education+0.15×infrastructure;
 Slots=clamp(1+Σ1[score>=.30,.50,.70,.88]+FocusBonus,1,6)。
-国総研究点（既存参照式）:
-RPtotal/day=max(0.05,Researchers×0.003×literacy×(0.3+0.7education)×(0.5+0.5infra))。
+国総研究点（本設計のv2式。教育・工業力・安定度を速度へ反映し、無限成長のための研究枠乗算は不可）:
+RPtotal/day=max(0.05,Researchers×0.003×literacy×(0.3+0.7education)×(0.5+0.5infra)×(0.85+0.15×clamp(operatingIC/80,0,1))×(0.75+0.25×stability))。
+工場・教育・安定度の係数は有界、戦争による0割/即日無限スノーボールを防ぐ。これは既存参照実装とは異なる今後のルールであり、本PRでは実行コードを変更しない。
 各枠割当 RP_j=RPtotal×PriorityWeight_j/ΣActiveWeights(上位Slots件)。枠増加でΣRP_jを増やさない。0人/経済崩壊でも最低0.05の研究点は維持（逆に無料枠/自動生産は追加しない）。
 - ΔY=max(0,techYear−scenarioYear−ΣusedToken.yearDiscount)。token合計割引は年2まで。
 - AheadPenalty=min(5,1+0.75ΔY+0.15ΔY²)。
@@ -183,7 +185,7 @@ RPtotal/day=max(0.05,Researchers×0.003×literacy×(0.3+0.7education)×(0.5+0.5i
 
 ## 8. MIO（設計局/産業組織）
 MIOは countryId+organizationId に帰属し、国家方針・研究完了・契約から設計/生産/研究への参入可否が決まる。1社あたり同時タスク3を初期上限。専門分野 tank/air/small-arms の不一致は割当拒否。実行結果に紐づけたXP ledgerを唯一の正本にする。
-- XP/day = min(20, 1.5×sqrt(CompletedDesignRelatedIC)+0.5×ActiveResearchTasks+2×CompletedResearchEvents)。待機/停止/不正研究からはXP0。複数対象が同じ生産ICをXPへ二重計上しない。
+- XP/day = min(20, 1.5×sqrt(CompletedProductionIC)+0.5×ActiveResearchTasks+2×CompletedResearchEvents+min(2,0.05×ActuallySpentPrototypeIC))。設計局が受注した開発プロジェクトは実際に試作IC/資材/国庫を消費した場合だけ開発XPを得る。設計の保存・rev番号だけではXP0。待機/停止/不正研究からはXP0。複数対象が同じ生産ICをXPへ二重計上しない。
 - perkコスト=20+15×UnlockedCount、最大8perks/MIO、前提DAG・相互排他・分野/レベルでロックする。
 | Trait | 作用位置 | 初期効果 | 排他/上限 |
 |---|---|---|---|
@@ -196,7 +198,7 @@ MIOは countryId+organizationId に帰属し、国家方針・研究完了・契
 
 - 設計MIOは「設計版完成時」にsnapshotし、後日MIOがlevel upしても既存在庫の能力を書き換えない。新revisionの設計を製造すれば新性能に変更できる。
 - 研究MIOは日次RPの用途にのみ作用、同一sourceId/techIdの二重補正禁止。生産MIOはline effective ICへ作用し、製造した装備のfrozen IC/性能を再度変化させない。MIO効果の適用位置を毎回traceできるようにする。
-- 分野XP獲得は完成IC等の実績からのみ計算。設計→未生産→割当だけでは無限XP獲得しない。
+- 分野XP獲得は実際の試作支出・完成IC等の実績からのみ計算。設計→未生産→割当だけでは無限XP獲得しない。試作がキャンセルされても消費済IC/資材は返さないが、未消費の予約は返却可能。
 
 ## 9. Tickパイプライン・コマンド・性能
 新ゲーム参照Tick/本番接続契約:
