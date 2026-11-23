@@ -17,6 +17,25 @@ export function autoFrontProvinces(w: WorldState, owner: number, enemy: number):
   return out.sort((a, b) => a - b);
 }
 
+/** Active operational boundary for a front. The drawn home border remains unchanged;
+ * captured enemy provinces containing assigned divisions can extend the live line.
+ * A different war or unrelated distant border never becomes part of this front.
+ */
+export function operationalFrontProvinces(w:WorldState,front:Front):number[] {
+  const active=new Set(front.provinces.filter(p=>w.prov.controller[p]===front.owner));
+  for(const u of w.units){
+    if(u.destroyed||u.owner!==front.owner||u.frontId!==front.id||u.path.length||
+      w.prov.controller[u.loc]!==front.owner||w.prov.owner[u.loc]!==front.enemy)continue;
+    // Do not extend through straits or areas that are no longer adjacent to this enemy.
+    for(let i=w.adj.offsets[u.loc];i<w.adj.offsets[u.loc+1];i++){
+      if(!w.adj.strait[i]&&w.prov.controller[w.adj.targets[i]]===front.enemy){
+        active.add(u.loc);break;
+      }
+    }
+  }
+  return [...active].sort((a,b)=>a-b);
+}
+
 export function createFront(w: WorldState, owner: number, enemy: number, provinces: number[], targets: number[], cap: number): Front {
   const front: Front = {
     id: w.nextFrontId++,
