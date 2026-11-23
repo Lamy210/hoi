@@ -3,7 +3,7 @@ import {decode,encode} from '@msgpack/msgpack';
 import {createTestEngine,loadTestPack} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
 import {hashWorld} from '../../src/engine/core/hash';
-import {savePayloadChecksum,deserializeWorld} from '../../src/engine/save/serialize';
+import {savePayloadChecksum,deserializeWorld,SAVE_SCHEMA_VERSION} from '../../src/engine/save/serialize';
 import {legacyProductionLineState} from '../../src/engine/systems/productionLineState';
 
 const run=(w:Awaited<ReturnType<typeof createTestEngine>>['world'],type:string,p:Record<string,unknown>,seq:number,issuer='player')=>
@@ -79,6 +79,6 @@ describe('persisted v14 production-line planning',()=>{
     expect(migrated.violations).toEqual([]);
     expect(migrated.world?.productionLines).toEqual(legacyProductionLineState(
       oldWorld.countries.milFactories,oldWorld.productionShare,pack.equipmentModels??[]).productionLines);
-    expect(data.header.v).toBe(18);
+    expect(data.header.v).toBe(SAVE_SCHEMA_VERSION);
   });
 });
