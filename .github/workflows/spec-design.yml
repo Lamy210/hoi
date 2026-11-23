@@ -31,6 +31,7 @@ jobs:
       - run: npx openspec validate atomic-map-front-formation --strict
       - run: npx openspec validate edit-existing-map-fronts --strict
       - run: npx openspec validate integrated-grand-strategy-foundations --strict
+      - run: npx openspec validate tank-aircraft-designer-combined-arms-rd --strict
       - run: npx openspec validate map-marquee-formation-selection --strict
       - run: npx openspec validate formation-operation-scope-preview --strict
       - run: npx openspec validate phase8-maritime-map --strict
