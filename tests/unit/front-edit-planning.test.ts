@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {canCommitFrontEdit,frontProvinceChangeSummary} from '../../src/ui/frontMapPlanning';
+import {canCommitFrontEdit,frontProvinceChangeSummary,nearestProjectedProvince} from '../../src/ui/frontMapPlanning';
 
 describe('地図戦線の差分・世代検証',()=>{
   const owner=0,enemy=1,controller=[0,0,0,1,1];
@@ -21,4 +21,14 @@ describe('地図戦線の差分・世代検証',()=>{
     expect(valid([0],[1],2,2,true)).toBe(false);
     expect(canCommitFrontEdit([0],[0,1],2,2,enemy,owner,controller,[],false)).toBe(false);
   });
+  it('投影マーカーの近くではポリゴン境界より当該自軍州を優先し、他国や不正投影を無視する',()=>{
+    const controlled=[0,0,1,0,1];
+    const point=(p:number)=>p===3?{x:NaN,y:0}:{x:p*40,y:20};
+    expect(nearestProjectedProvince(controlled,0,point,{x:40,y:20},18)).toBe(1);
+    expect(nearestProjectedProvince(controlled,0,point,{x:80,y:20},18)).toBeNull();
+    expect(nearestProjectedProvince(controlled,0,point,{x:40,y:20},-1)).toBeNull();
+    expect(nearestProjectedProvince(controlled,0,point,{x:NaN,y:20})).toBeNull();
+    expect(nearestProjectedProvince([0,0],0,()=>({x:10,y:10}),{x:10,y:10})).toBe(0);
+  });
+
 });
