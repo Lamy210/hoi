@@ -326,3 +326,25 @@ input, select {
 .oob-selection-actions { display:flex; gap:5px; flex-wrap:wrap; align-items:center; }
 .oob-selection-actions button { font-size:12px; }
 @media(max-width:920px) { .formation-assignment-grid { grid-template-columns:1fr; } }
+
+
+/* Live map planning controls remain separate from simulated front and movement orders. */
+.map-tools {flex-wrap:wrap;max-width:calc(100% - 360px);}
+.map-tools [data-testid="map-front-draw"][aria-pressed="true"],
+.map-tools [data-testid="map-front-target-mode"][aria-pressed="true"] {background:#285b52;border-color:#68c7b7;}
+.map-front-planner {position:absolute;top:64px;left:12px;z-index:24;display:grid;gap:8px;
+  width:min(420px,calc(100% - 380px));padding:12px;border-radius:6px;
+  border:1px solid #68c7b7;background:rgba(18,30,40,.97);box-shadow:0 8px 24px #10131c99;font-size:12px;}
+.map-front-planner label {display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.map-front-planner select {flex:1;min-width:120px;}
+.map-front-planner small {line-height:1.5;}
+.front-plan.draft {color:#69ddc7;opacity:1;}
+.front-plan.draft .front-province {stroke-width:3;stroke-dasharray:5 3;}
+@media(max-width:900px){
+  .map-tools {max-width:calc(100% - 160px);}
+  .map-front-planner {top:106px;width:min(420px,calc(100% - 180px));}
+}
+@media(max-width:700px){
+  .map-tools {max-width:100%;}
+  .map-front-planner {top:145px;width:min(360px,calc(100% - 16px));left:8px;}
+}
