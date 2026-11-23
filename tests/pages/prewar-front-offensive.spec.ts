@@ -71,5 +71,24 @@ test('平時に戦線を作り未所属師団を一括紐づけ、ドラッグ�
   await expect(page.getByTestId('front-state-'+frontId)).toHaveText('一時停止');
   await expect(pause).toBeEnabled();
   await page.getByTestId('close-fronts').click();
+  // Newly added bottom commands must honor the same wartime and paused
+  // gates as the existing front panel before issuing any automated assault.
+  await expect(page.getByTestId('dock-start-offensive')).toBeDisabled();
+  await page.getByTestId('dock-toggle-front-pause').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('dock-start-offensive')).toBeEnabled();
+  await page.getByTestId('dock-defend-front').click();
+  await page.getByTestId('apply-pending').click();
+  await page.getByTestId('btn-fronts-top').click();
+  await expect(page.getByTestId('front-stance-hold')).toHaveClass(/primary/);
+  await page.getByTestId('close-fronts').click();
+  await page.getByTestId('dock-start-offensive').click();
+  await page.getByTestId('apply-pending').click();
+  await page.getByTestId('btn-fronts-top').click();
+  await expect(page.getByTestId('front-stance-attack')).toHaveClass(/primary/);
+  await page.getByTestId('close-fronts').click();
+  await page.getByTestId('dock-toggle-front-pause').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('dock-start-offensive')).toBeDisabled();
   expect(errors).toEqual([]);
 });

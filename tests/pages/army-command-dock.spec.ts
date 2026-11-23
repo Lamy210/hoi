@@ -35,4 +35,7 @@ test('下部ドックから連番軍団作成・師団編入・軍集団編入�
   await expect(page.getByTestId('dock-draw-front')).toBeVisible();
   await expect(page.getByTestId('dock-deploy-front')).toBeDisabled();
   await expect(page.getByTestId('dock-offensive-direction')).toBeDisabled();
+  await expect(page.getByTestId('dock-start-offensive')).toBeDisabled();
+  await expect(page.getByTestId('dock-toggle-front-pause')).toBeDisabled();
+  await expect(page.getByTestId('dock-release-hold')).toBeDisabled();
 });
