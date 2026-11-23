@@ -12,6 +12,8 @@ export interface Unit {
   armyId?: number | null;
   manualHold?: boolean; // 手動命令後は自動再配置を明示的に再開するまで抑止
   frontlinePriority?: number; // 前線投入優先度 0..9（未設定は5、同順位は師団ID順）
+  entrenchment?: number; // v20: 防御準備0..6。移動時は失効
+  preparation?: number; // v20: 攻勢準備0..5。移動・戦闘で減衰
   templateId?: import('../military/templates').DivisionTemplateId;
   customTemplateId?: number;
   customRevision?: number;

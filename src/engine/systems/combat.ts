@@ -14,6 +14,7 @@ import { commanderMod, commanderTrait, releaseCommander } from '../military/comm
 import { techMods } from './research';
 import {issuedModelCombatFactor,operationalCombatTechBonus} from '../military/equipmentCombat';
 import { checkAnnexation } from '../military/war';
+import {advanceBattlePreparedness,preparednessPowerFactor} from '../military/preparedness';
 import { addContribution, CONTRIB_CAPITAL, CONTRIB_OCCUPATION } from '../diplomacy/peace';
 
 /** 地形修飾（balanced）。indexはTERRAIN配列の順。 */
@@ -70,6 +71,7 @@ export function unitPowerFactorsPure(
     { label: 'supply', value: supplyMod, formula: '0.5+0.5×supplyEff' },
     { label: 'weather', value: weather, formula: 'weather.atk' },
     { label: 'commander', value: cmdrMod, formula: '1+skill×0.04(+trait)' },
+    { label: side === 'defend' ? 'entrenchment' : 'planning', value: preparednessPowerFactor(u,side), formula: side === 'defend' ? '1+0.05×entrenchmentLevel' : '1+0.04×preparationLevel' },
   ];
 }
 
@@ -347,6 +349,10 @@ export function registerCombatSystems(): void {
     name: 'combat',
     cadence: 'daily',
     fn: (w) => {
+      // Capture the locations before path movement: both travel and retreat
+      // invalidate prepared defenses at the end of this combat day.
+      const initialLocations = new Map(w.units.filter(u=>!u.destroyed).map(u=>[u.id,u.loc]));
+      const travelling=new Set(w.units.filter(u=>!u.destroyed&&u.path.length>0).map(u=>u.id));
       // 1) 移動進行 → 到着ユニットが戦闘/占領の対象になる
       tickMovement(w);
       const battles = gatherBattles(w);
@@ -383,6 +389,8 @@ export function registerCombatSystems(): void {
       // 3) 占領タイマ → 4) 損耗・回復 → 5) 破壊済み除去 → 6) 併合判定（phase2-fronts-logistics）
       tickOccupation(w, battles);
       tickAttrition(w, battles);
+      for(const u of w.units)if(initialLocations.get(u.id)!==u.loc)travelling.add(u.id);
+      advanceBattlePreparedness(w,travelling,nowActive);
       for (const c of checkAnnexation(w)) {
         addAlert(w, {
           kind: 'provinceLiberated', priority: 9,

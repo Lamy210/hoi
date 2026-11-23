@@ -15,6 +15,8 @@ test('戦線の表示・所属師団選択・拡大・非表示',async({page})=>
   await page.getByTestId('apply-pending').click();
   const unit=page.getByTestId('unit-roster').locator('[data-location="KR-41"]').first();
   await unit.click();
+  await expect(page.getByTestId('unit-entrenchment')).toContainText('/ 6');
+  await expect(page.getByTestId('unit-preparation')).toContainText('/ 5');
   await page.getByTestId('open-selected-fronts').click();
   await page.getByTestId('btn-create-front').click();
   await page.getByTestId('apply-pending').click();
