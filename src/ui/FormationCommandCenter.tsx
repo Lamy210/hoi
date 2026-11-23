@@ -103,7 +103,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           <option value="">{label('戦線を選択','Choose a front')}</option>
           {frontOptions.map(f=><option key={f.id} value={f.id}>
             #{f.id} {ja?snap.countries[f.enemy].nameJa:snap.countries[f.enemy].nameEn} ·
-            {f.stance==='attack'?label('攻勢','Attack'):f.stance==='retreat'?label('後退','Retreat'):label('防衛','Hold')}
+            {f.stance==='attack'?label('攻勢','Attack'):f.stance==='counterattack'?label('限定反撃','Counterattack'):f.stance==='retreat'?label('後退','Retreat'):label('防衛','Hold')}
           </option>)}
         </select>
         <button data-testid="formation-assign-front"

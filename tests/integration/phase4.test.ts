@@ -135,10 +135,17 @@ describe('phase4-peace-conference: 講和会議', () => {
     const seoul = provIdx(engine, 'KR-11');
     const ids = engine.world.units.filter((u) => u.owner === PRK && u.loc === pyongyang).map((u) => u.id);
     playerCommand(engine, 'moveUnits', { units: ids, target: seoul });
-    for (let t = 0; t < 90; t++) engine.stepTick();
+    // Under limited counterattacks a captured capital may be retaken by
+    // the defender before day 90. Validate the actual occupation event,
+    // not a frozen final-controller assumption.
+    let conqueredSeoul = false;
+    for (let t = 0; t < 90; t++) {
+      engine.stepTick();
+      if (engine.world.prov.controller[seoul] === PRK) conqueredSeoul = true;
+    }
     const war = engine.world.wars[0];
     expect(war).toBeDefined();
-    expect(engine.world.prov.controller[seoul]).toBe(PRK);
+    expect(conqueredSeoul).toBe(true);
     expect(war.contrib[PRK] ?? 0).toBeGreaterThan(0);
   });
 

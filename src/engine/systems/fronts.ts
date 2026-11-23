@@ -6,7 +6,7 @@ import { registerSystem, weeklyOffset } from '../core/scheduler';
 import { findPath } from './movement';
 import { TERRAIN_DATA, unitPowerFactorsPure } from './combat';
 import { aiCmd } from '../commands';
-import { operationalFrontProvinces } from '../military/fronts';
+import { AUTO_ATTACK_MIN_ORG, COUNTERATTACK_MIN_ORG, FRONT_RESERVE_MIN_ORG, operationalFrontProvinces } from '../military/fronts';
 
 function log(w: WorldState, country: number, module: string, options: string[], scores: number[], chosen: string, reason: string): void {
   const arr = (w.runtime.decisionLog[String(country)] ||= []);
@@ -70,7 +70,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
     return;
   }
 
-  if (front.stance === 'hold') {
+  if (front.stance === 'hold' || front.stance === 'counterattack') {
     // 前線州の穴埋めのみ（攻撃しない）。週4命令まで
     let orders = 0;
     for (const fp of frontProvinces) {
@@ -87,6 +87,89 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
           log(w, front.owner, 'front-hold', ['hold', 'fill:' + provName(fp)], [0, 1], 'fill', '前線駐留なし');
         }
       }
+    }
+    // Defensive reserves reinforce danger points before a limited counterattack.
+    // Do not strip the last healthy division from a neighboring threatened tile.
+    const danger = frontProvinces.filter(p => w.prov.controller[p] === front.owner).map(p => {
+      const hostile = new Set<number>();
+      for (let i = w.adj.offsets[p]; i < w.adj.offsets[p+1]; i++) {
+        if (w.adj.strait[i] || w.prov.controller[w.adj.targets[i]] !== front.enemy) continue;
+        for (const enemy of w.units) {
+          if (!enemy.destroyed && enemy.owner === front.enemy && enemy.loc === w.adj.targets[i])
+            hostile.add(enemy.id);
+        }
+      }
+      for (const enemy of w.units) {
+        if (!enemy.destroyed && enemy.owner === front.enemy &&
+          enemy.path.length > 1 && enemy.path[enemy.path.length-1] === p)
+          hostile.add(enemy.id);
+      }
+      const incoming = w.units.filter(u => hostile.has(u.id));
+      const pressure = incoming.reduce((n,u) => n + unitExpectedPower(w,u,p,'attack'),0);
+      const defenders = units.filter(u => u.loc === p && !u.destroyed);
+      const resistance = defenders.reduce((n,u) => n + unitExpectedPower(w,u,p,'defend'),0);
+      return {p,pressure,resistance};
+    }).filter(x => x.pressure > 0 && x.pressure > x.resistance * 0.85)
+      .sort((a,b) => (b.pressure / Math.max(1,b.resistance)) - (a.pressure / Math.max(1,a.resistance)) || a.p-b.p);
+    for (const {p,pressure,resistance} of danger) {
+      if (orders >= 4) break;
+      const spare = movable.filter(u => u.org >= FRONT_RESERVE_MIN_ORG &&
+        u.loc !== p && w.prov.controller[u.loc] === front.owner &&
+        !w.runtime.commandsSinceLastTick.some(c => c.type === 'frontMove' && c.p.unitId === u.id) &&
+        !(frontProvinces.includes(u.loc) && units.filter(x => x.loc===u.loc && !x.destroyed).length <= 1 &&
+          w.adj.targets.slice(w.adj.offsets[u.loc],w.adj.offsets[u.loc+1]).some(x => w.prov.controller[x]===front.enemy)))
+        .map(u => ({u,path:findPath(w,u.loc,p,front.owner,false)}))
+        .filter(x => x.path!==null)
+        .sort((a,b) => a.path!.length-b.path!.length || a.u.id-b.u.id)[0];
+      if (spare && cmd(w,front,'moveUnits',{units:[spare.u.id],target:p})) {
+        orders++;
+        log(w,front.owner,'front-reinforce',['hold','reinforce:'+provName(p)],[resistance,pressure],
+          'reinforce','敵圧力が防御戦力を超過');
+      }
+    }
+    if (front.stance === 'hold') return;
+  }
+
+  // Reactive counterattack: recapture own territory only, with recovered
+  // organization and a meaningful local advantage. This never expands a
+  // defensive front into unrelated enemy-owned provinces.
+  if (front.stance === 'counterattack') {
+    const ready = movable.filter(u=>u.org>=COUNTERATTACK_MIN_ORG &&
+      w.prov.controller[u.loc]===front.owner &&
+      !w.runtime.commandsSinceLastTick.some(c=>c.type==='frontMove'&&c.p.unitId===u.id));
+    const possibilities: {target:number;ratio:number;sources:Unit[]}[]=[];
+    const seen = new Set<number>();
+    for(const fp of frontProvinces){
+      if(w.prov.controller[fp]!==front.owner)continue;
+      for(let i=w.adj.offsets[fp];i<w.adj.offsets[fp+1];i++){
+        const p=w.adj.targets[i];
+        if(w.adj.strait[i]||seen.has(p)||w.prov.controller[p]!==front.enemy||
+          w.prov.owner[p]!==front.owner||
+          (front.targets.length>0&&!front.targets.includes(p)))continue;
+        seen.add(p);
+        const sources=ready.filter(u=>
+          w.adj.targets.slice(w.adj.offsets[u.loc],w.adj.offsets[u.loc+1])
+            .some((n,j)=>n===p&&!w.adj.strait[w.adj.offsets[u.loc]+j]));
+        if(!sources.length)continue;
+        const power=sources.reduce((n,u)=>n+unitExpectedPower(w,u,p,'attack'),0);
+        const defense=w.units.filter(u=>!u.destroyed&&u.owner===front.enemy&&u.loc===p)
+          .reduce((n,u)=>n+unitExpectedPower(w,u,p,'defend'),0);
+        possibilities.push({target:p,ratio:power/Math.max(1,defense),sources});
+      }
+    }
+    possibilities.sort((a,b)=>b.ratio-a.ratio||a.target-b.target);
+    const best=possibilities[0];
+    if(front.cap>0&&best&&best.ratio>=1.5){
+      let sent=0;
+      for(const u of best.sources){
+        if(sent>=Math.min(front.cap,4))break;
+        if(cmd(w,front,'moveUnits',{units:[u.id],target:best.target}))sent++;
+      }
+      log(w,front.owner,'front-counterattack',['hold','recapture:'+provName(best.target)],
+        [0,best.ratio],sent?'recapture':'hold',sent?'組織再編完了・奪還戦力優勢':'利用可能師団なし');
+    }else{
+      log(w,front.owner,'front-counterattack',['hold'],[best?.ratio??0],'hold',
+        '奪還対象なし・組織率または局所戦力が不足');
     }
     return;
   }
@@ -144,7 +227,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
           const v = w.adj.targets[j];
           if (w.prov.controller[v] !== front.owner || w.adj.strait[j]) continue;
           for (const u of unitsOfFront(w, front)) {
-            if (u.loc !== v || u.path.length > 0 || u.encircled || u.manualHold || u.org <= 0 || w.runtime.activeBattles.has(u.loc)) continue;
+            if (u.loc !== v || u.path.length > 0 || u.encircled || u.manualHold || u.org < AUTO_ATTACK_MIN_ORG || w.runtime.activeBattles.has(u.loc)) continue;
             localPower += unitExpectedPower(w, u, ep, 'attack');
             sources.push(u);
           }
@@ -168,12 +251,12 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       // 目標へ移動（投入上限・週4命令まで）
       // Match frontMove validation before reserving the attack command budget:
       // manually held, moving or engaged divisions must not crowd out ready ones.
-      const attackReady = movable.filter(u => u.org > 0 && w.prov.controller[u.loc] === front.owner);
+      const attackReady = movable.filter(u => u.org >= AUTO_ATTACK_MIN_ORG && w.prov.controller[u.loc] === front.owner);
       let sent = 0;
       for (const u of attackReady) {
         if (sent >= front.cap || sent >= 4) break;
         const adjacent = w.adj.targets.slice(w.adj.offsets[u.loc],w.adj.offsets[u.loc+1]).some((p,i)=>p===best.target&&!w.adj.strait[w.adj.offsets[u.loc]+i]);
-        if (adjacent && w.prov.controller[u.loc]===front.owner && u.org>0) {
+        if (adjacent && w.prov.controller[u.loc]===front.owner && u.org>=AUTO_ATTACK_MIN_ORG) {
           if (cmd(w, front, 'moveUnits', { units: [u.id], target: best.target })) sent++;
         }
       }

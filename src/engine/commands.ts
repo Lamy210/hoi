@@ -11,7 +11,7 @@ import { findPath, segmentDays, planMovementEdit } from './systems/movement';
 import { applyRelationDelta, endWar, startWar, warScoreFor } from './military/war';
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './scenario/unitCosts';
 import { autoAssignCommander, releaseCommander } from './military/commanders';
-import { autoFrontProvinces, frontOf } from './military/fronts';
+import { AUTO_ATTACK_MIN_ORG, COUNTERATTACK_MIN_ORG, autoFrontProvinces, frontOf } from './military/fronts';
 import { planFrontDeployment } from './military/frontDeployment';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
@@ -547,7 +547,7 @@ export function registerAllCommands(): void {
       const f = frontOf(w,p.frontId as number), c = actorCountry(w,issuer);
       if (!f) return 'noFront';
       if (c === null || c !== f.owner || issuer === 'frontai') return 'notYourFront';
-      if (!['hold','attack','retreat'].includes(p.stance as string)) return 'badParams';
+      if (!['hold','attack','counterattack','retreat'].includes(p.stance as string)) return 'badParams';
       if (p.cap !== undefined && (!Number.isInteger(p.cap) || (p.cap as number)<0 || (p.cap as number)>8)) return 'badParams';
       if (p.targets !== undefined && (!Array.isArray(p.targets) || new Set(p.targets).size !== p.targets.length || p.targets.some(x=>!Number.isInteger(x)||x<0||x>=w.prov.count||w.prov.controller[x]!==f.enemy))) return 'badParams';
       // An offensive can be drafted before war only while automation is paused.
@@ -557,7 +557,7 @@ export function registerAllCommands(): void {
     },
     apply(w,p) {
       const f=frontOf(w,p.frontId as number)!;
-      f.stance=p.stance as 'hold'|'attack'|'retreat';
+      f.stance=p.stance as 'hold'|'attack'|'counterattack'|'retreat';
       if(Array.isArray(p.targets)) f.targets=(p.targets as number[]).slice().sort((a,b)=>a-b);
       if(typeof p.cap==='number') f.cap=p.cap;
       f.revision=(f.revision??1)+1;
@@ -659,7 +659,12 @@ export function registerAllCommands(): void {
       if(!Number.isInteger(target)||target<0||target>=w.prov.count||target===u.loc)return 'badTarget';
       if(w.prov.controller[target]===f.enemy){
         const edge=getEdge(w,u.loc,target);
-        if(f.stance!=='attack'||f.cap<1||u.org<=0||w.prov.controller[u.loc]!==c||!edge||edge.strait||!Number.isFinite(segmentDays(w,u.loc,target,u))||(f.targets.length>0&&!f.targets.includes(target)))return 'staleFrontOrder';
+        if((f.stance!=='attack'&&f.stance!=='counterattack')||f.cap<1||
+          u.org<(f.stance==='counterattack'?COUNTERATTACK_MIN_ORG:AUTO_ATTACK_MIN_ORG)||
+          (f.stance==='counterattack'&&w.prov.owner[target]!==c)||
+          w.prov.controller[u.loc]!==c||!edge||edge.strait||
+          !Number.isFinite(segmentDays(w,u.loc,target,u))||
+          (f.targets.length>0&&!f.targets.includes(target)))return 'staleFrontOrder';
       }else if(w.prov.controller[target]!==c||!findPath(w,u.loc,target,c,false))return 'noPath';
       return null;
     },

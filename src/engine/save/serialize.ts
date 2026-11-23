@@ -321,7 +321,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
       if ((h.v < 8 && (f.paused !== undefined || f.revision !== undefined)) || (f.paused !== undefined && typeof f.paused !== 'boolean') || (f.revision !== undefined && (!Number.isSafeInteger(f.revision) || f.revision < 1))) violations.push('invalid front control');
       if (f.owner < 0 || f.owner >= ctryCount) violations.push('front owner out of range: ' + f.id);
       if (f.enemy < 0 || f.enemy >= ctryCount) violations.push('front enemy out of range: ' + f.id);
-      if (!['hold', 'attack', 'retreat'].includes(f.stance)) violations.push('front stance invalid: ' + f.id);
+      if (!['hold', 'attack', 'counterattack', 'retreat'].includes(f.stance)) violations.push('front stance invalid: ' + f.id);
       for (const p of f.provinces ?? []) if (p < 0 || p >= provCount) violations.push('front province out of range: ' + f.id);
       for (const t of f.targets ?? []) if (t < 0 || t >= provCount) violations.push('front target out of range: ' + f.id);
     }

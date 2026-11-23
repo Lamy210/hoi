@@ -21,6 +21,12 @@ test('戦線の表示・所属師団選択・拡大・非表示',async({page})=>
   const front=page.getByTestId('fronts-modal').locator('button[data-testid^="front-assign-"]').first();
   const id=(await front.getAttribute('data-testid'))!.replace('front-assign-','');
   await front.click();await page.getByTestId('apply-pending').click();
+  const cap=page.getByTestId('front-cap-'+id);
+  await cap.selectOption('0');await page.getByTestId('apply-pending').click();
+  await page.getByTestId('front-stance-counterattack').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('front-stance-counterattack')).toHaveClass(/primary/);
+  await expect(cap).toHaveValue('2');
   await page.getByTestId('front-stance-attack').click();await page.getByTestId('apply-pending').click();
   const select=page.getByTestId('front-target-'+id);
   const value=await select.locator('option').evaluateAll(o=>(o.find(x=>x.textContent?.includes('(KP-07)')) as HTMLOptionElement|undefined)?.value);

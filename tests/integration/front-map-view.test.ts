@@ -44,7 +44,7 @@ describe('front map projection',()=>{
     expect(planned[0].paused).toBe(true);
     expect(planned[0].arrows).toEqual([]);
   });
-  it('removes obsolete targets and ownership-invalid front provinces from the view',async()=>{
+  it('removes captured front provinces but shows the legitimate fallback defense line',async()=>{
     const {e,w,c,enemy,from,to,u}=await fixture();
     w.prov.controller[to]=c;
     let view=frontView(e.getUiSnapshot(0),[u.id],'all')[0];
@@ -52,7 +52,12 @@ describe('front map projection',()=>{
     expect(view.arrows).toEqual([]);
     w.prov.controller[from]=enemy;
     view=frontView(e.getUiSnapshot(0),[u.id],'all')[0];
-    expect(view.provinces).toEqual([]);
-    expect(view.links).toEqual([]);
+    // The fallen province is not incorrectly rendered as ours. A real
+    // assigned division on an adjacent controlled tile forms a fallback line.
+    expect(view.provinces).not.toContain(from);
+    expect(view.provinces).toContain(u.loc);
+    expect(view.provinces.every(p=>w.prov.controller[p]===c)).toBe(true);
+    expect(view.links.every(link=>view.provinces.includes(link.from)&&
+      w.prov.controller[link.to]===enemy)).toBe(true);
   });
 });

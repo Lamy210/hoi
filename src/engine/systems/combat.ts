@@ -206,21 +206,36 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
   }
 }
 
-/** 味方支配の隣接州へ即時撤退。撤退先が無ければ包囲状態へ移行（combat仕様）。 */
-function retreatUnit(w: WorldState, u: Unit): void {
-  let best = -1;
-  let bestEff = -1;
+/** Retreat only onto an adjacent, friendly-controlled land tile.
+ * Prefer supplied positions with fewer enemy approaches, never neutral borders,
+ * straits or an already-contested tile. Pure selection: no teleport on failure.
+ */
+export function chooseRetreatProvince(w: WorldState, u: Unit): number | null {
+  let best: number | null = null;
+  let bestScore = -Infinity;
   for (let i = w.adj.offsets[u.loc]; i < w.adj.offsets[u.loc + 1]; i++) {
-    const v = w.adj.targets[i];
-    const ctrl = w.prov.controller[v];
-    if (ctrl !== u.owner && atWar(w, u.owner, ctrl)) continue;
-    const eff = w.runtime.supplyEff[v];
-    if (eff > bestEff) {
-      bestEff = eff;
-      best = v;
+    if (w.adj.strait[i]) continue;
+    const p = w.adj.targets[i];
+    if (w.prov.controller[p] !== u.owner) continue;
+    if (w.units.some(x => !x.destroyed && x.loc === p && atWar(w, u.owner, x.owner))) continue;
+    let enemyBorders = 0;
+    for (let j = w.adj.offsets[p]; j < w.adj.offsets[p + 1]; j++) {
+      if (!w.adj.strait[j] && atWar(w, u.owner, w.prov.controller[w.adj.targets[j]])) enemyBorders++;
+    }
+    const supply = Math.max(0, Math.min(1, w.runtime.supplyEff[p] ?? 0));
+    const score = supply * 100 + w.prov.infra[p] * 3 - enemyBorders * 35;
+    if (score > bestScore || (score === bestScore && (best === null || p < best))) {
+      bestScore = score;
+      best = p;
     }
   }
-  if (best < 0) {
+  return best;
+}
+
+/** Battle loser retreats to a safe nearby controlled tile; otherwise encircled. */
+function retreatUnit(w: WorldState, u: Unit): void {
+  const best = chooseRetreatProvince(w, u);
+  if (best === null) {
     u.encircled = true;
     return;
   }
@@ -229,7 +244,7 @@ function retreatUnit(w: WorldState, u: Unit): void {
   u.segIdx = 0;
   u.segProgress = 0;
   u.segDays = 0;
-  u.org = Math.max(u.org, RETREAT_ORG + 5); // 撤退後の再編猶予
+  u.org = Math.max(u.org, RETREAT_ORG + 5); // Reorganization before the next assault.
 }
 
 function tickOccupation(w: WorldState, battles: Map<number, Sides>): void {
