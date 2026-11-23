@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true, includeIssuedEquipment = true, includeFrontlinePriority = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true, includeIssuedEquipment = true, includeFrontlinePriority = true, includePreparedness = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -310,6 +310,19 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
     includeModelProduction&&includeModelStock&&includeIssuedEquipment&&includeFrontlinePriority){
     h=mixStr(h,'frontline-priority-v19');
     for(const u of w.units)h=mixInt(h,u.frontlinePriority??5);
+  }
+  // v20 readiness is an additive hash section. Historical v4-v19 saves
+  // continue to use their exact original integrity hashes.
+  if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&
+    includeCustomTemplates&&includeCustomTraining&&includeReinforcementPriority&&
+    includeQueuedTraining&&includeProductionPlans&&includeProductionMode&&
+    includeModelProduction&&includeModelStock&&includeIssuedEquipment&&
+    includeFrontlinePriority&&includePreparedness){
+    h=mixStr(h,'combat-preparedness-v20');
+    for(const u of w.units){
+      h=mixInt(h,u.entrenchment??0);
+      h=mixInt(h,u.preparation??0);
+    }
   }
   return h >>> 0;
 }
