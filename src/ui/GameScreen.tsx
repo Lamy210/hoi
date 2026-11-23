@@ -9,7 +9,7 @@ import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
-import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, canCommitFrontEdit, frontProvinceChangeSummary, provincesAlongStroke } from './frontMapPlanning';
+import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, canCommitFrontEdit, frontProvinceChangeSummary, provincesAlongStroke, nearestProjectedProvince } from './frontMapPlanning';
 import { frontCreationCandidates, type FrontCreationSource } from './frontCreationSelection';
 import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
@@ -548,7 +548,14 @@ export function GameScreen() {
   function clickFrontDraft(e:ReactMouseEvent<HTMLDivElement>){
     e.stopPropagation();
     if(suppressDraftClick.current){suppressDraftClick.current=false;return;}
-    const prov=rendererRef.current?.pickAt(e.clientX,e.clientY);
+    const rect=mapRef.current?.getBoundingClientRect();
+    const r=rendererRef.current;
+    const requestedOwner=frontTargetId===null?gameSnap.playerCountry:
+      activeFronts.find(row=>row.id===frontTargetId)?.enemy;
+    const snapped=rect&&r&&requestedOwner!==undefined?nearestProjectedProvince(
+      gameSnap.controller,requestedOwner,p=>r.projectProvince(p),
+      {x:e.clientX-rect.left,y:e.clientY-rect.top}):null;
+    const prov=snapped??r?.pickAt(e.clientX,e.clientY);
     if(prov===null||prov===undefined)return;
     if(frontTargetId!==null){
       const f=activeFronts.find(row=>row.id===frontTargetId);
