@@ -135,7 +135,7 @@ export function ArmyManagement({snap,lang,selectedIds,pending,onSelect,focus,onF
     </div>
     <FormationCommandCenter snap={snap} lang={lang} focus={focus} pending={pending} selectedIds={selectedIds} onSelect={onSelect}/>
     <FormationAssignmentPanel snap={snap} lang={lang} focus={focus} pending={pending} selectedIds={selectedIds}/>
-    <CombatFrontageInspector snap={snap} lang={lang} selected={selected}/>
+    <CombatFrontageInspector snap={snap} lang={lang} selected={selected} pending={pending}/>
     <div className="army-quick-action" data-testid="army-quick-action">
       <div className="kv"><b>{label('選択した師団','Selected divisions')}</b><strong>{selected.length}</strong></div>
       {refitTarget && <div className="muted">#{refitTarget.id} · {refitTarget.customTemplateId!==undefined?refitTarget.customTemplateId+' v'+refitTarget.customRevision:(refitTarget.templateId??'standard-v1')}</div>}

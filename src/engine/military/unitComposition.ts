@@ -25,24 +25,39 @@ export function unitSpeedMultiplier(w:WorldState,u:Unit):number {
   return unitComposition(w,u)?.speed ?? 1;
 }
 
-/** Fit in id order; skip non-fitting formations; fallback to one over-wide unit.
+/** Explicit per-division combat priority is independent from supply reinforcement
+ * priority. Equal priorities retain the original deterministic ID-order behavior.
+ */
+export function frontlinePriority(u:Pick<Unit,'frontlinePriority'>):number {
+  const n=u.frontlinePriority??5;
+  if(!Number.isSafeInteger(n)||n<0||n>9)throw new RangeError('invalid frontline priority');
+  return n;
+}
+export function frontlineOrder(a:Unit,b:Unit):number {
+  return frontlinePriority(b)-frontlinePriority(a)||a.id-b.id;
+}
+
+/** Fit higher-priority divisions first; then lower unit IDs.
+ * Skip non-fitting formations; fallback to one over-wide unit.
  * Legacy: each 20-width division, terrain capacity == previous slots * 20.
  */
 export function selectCombatFront(w:WorldState,units:readonly Unit[],legacySlots:number):
   { units:Unit[]; penalties:number[] } {
+  if(!Number.isFinite(legacySlots)||legacySlots<=0)throw new RangeError('invalid battle width');
   const capacity=legacySlots*20;
   let used=0;
   const selected:Unit[]=[];
   const penalties:number[]=[];
-  for(const u of units){
+  const ranked=[...units].sort(frontlineOrder);
+  for(const u of ranked){
     const width=unitCombatWidth(w,u);
     if(width<=0)continue;
     if(used+width<=capacity){
       selected.push(u);penalties.push(1);used+=width;
     }
   }
-  if(!selected.length&&units.length){
-    const u=units[0],width=unitCombatWidth(w,u);
+  if(!selected.length&&ranked.length){
+    const u=ranked[0],width=unitCombatWidth(w,u);
     selected.push(u);penalties.push(Math.min(1,capacity/Math.max(width,1)));
   }
   return {units:selected,penalties};

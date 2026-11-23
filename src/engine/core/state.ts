@@ -11,6 +11,7 @@ export type TerrainId = (typeof TERRAIN)[number];
 export interface Unit {
   armyId?: number | null;
   manualHold?: boolean; // 手動命令後は自動再配置を明示的に再開するまで抑止
+  frontlinePriority?: number; // 前線投入優先度 0..9（未設定は5、同順位は師団ID順）
   templateId?: import('../military/templates').DivisionTemplateId;
   customTemplateId?: number;
   customRevision?: number;

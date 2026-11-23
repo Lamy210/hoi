@@ -4,7 +4,7 @@ import {createTestEngine,loadTestPack} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
 import {hashWorld} from '../../src/engine/core/hash';
 import {getSystems} from '../../src/engine/core/scheduler';
-import {deserializeWorld,savePayloadChecksum} from '../../src/engine/save/serialize';
+import {deserializeWorld,savePayloadChecksum,SAVE_SCHEMA_VERSION} from '../../src/engine/save/serialize';
 import {adjustWarehouse,creditModelWarehouse,typedWarehouseTotal,
   unclassifiedWarehouse,transferWarehouse,validateModelWarehouse} from '../../src/engine/systems/modelWarehouse';
 
@@ -113,7 +113,7 @@ describe('v17 model warehouse is a subset of the aggregate two-goods stock',()=>
       blob.payloadChecksum=savePayloadChecksum(blob.header,blob.stores);
       return deserializeWorld(encode(blob),pack).violations;
     };
-    expect(good.header.v).toBe(18);
+    expect(good.header.v).toBe(SAVE_SCHEMA_VERSION);
     expect(tamper(b=>{b.stores.modelStock[0].quantity=-1})).toContain('invalid v17 warehouse quantity');
     expect(tamper(b=>{b.stores.modelStock[0].modelId='invalid'})).toContain('invalid v17 warehouse model');
     expect(tamper(b=>{b.stores.modelStock.push({...b.stores.modelStock[0]})}))

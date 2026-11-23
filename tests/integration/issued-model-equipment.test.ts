@@ -3,7 +3,7 @@ import {decode,encode} from '@msgpack/msgpack';
 import {createTestEngine,loadTestPack} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
 import {hashWorld} from '../../src/engine/core/hash';
-import {savePayloadChecksum,deserializeWorld} from '../../src/engine/save/serialize';
+import {savePayloadChecksum,deserializeWorld,SAVE_SCHEMA_VERSION} from '../../src/engine/save/serialize';
 import {creditModelWarehouse} from '../../src/engine/systems/modelWarehouse';
 import {attributeEquipment,releaseEquipmentAttribution,trimUnitEquipment,
   validateIssuedEquipment} from '../../src/engine/systems/issuedEquipment';
@@ -99,7 +99,7 @@ describe('v18 identifiable equipment across training and deployed units',()=>{
     attributeEquipment(w,'unit',u.id,[{country:c,modelId:rifle,quantity:5}]);
     const original=e.serialize();
     const v18=decode(original) as any;
-    expect(v18.header.v).toBe(18);
+    expect(v18.header.v).toBe(SAVE_SCHEMA_VERSION);
     const migrated=decode(original) as any;
     migrated.header.v=17;
     delete migrated.stores.issuedEquipment;

@@ -1,4 +1,5 @@
 import type {UiSnapshot,UiUnit} from '../engine/ui';
+import {engineClient} from './engineClient';
 
 type Lang='ja'|'en';
 
@@ -6,15 +7,26 @@ interface Props {
   snap:UiSnapshot;
   selected:readonly UiUnit[];
   lang:Lang;
+  pending:number;
 }
 
 /** Current-state forecast for an existing engagement; otherwise a selected-units
  * planning estimate. Never advertises hypothetical units as deployed reserves.
  */
-export function CombatFrontageInspector({snap,selected,lang}:Props) {
+export function CombatFrontageInspector({snap,selected,lang,pending}:Props) {
   if(!selected.length)return null;
   const ja=lang==='ja';
   const label=(j:string,e:string)=>ja?j:e;
+  const priority=selected[0].frontlinePriority??5;
+  const common=selected.every(u=>(u.frontlinePriority??5)===priority);
+  const canSubmit=pending===0&&selected.length>=1&&selected.length<=256;
+  const issuePriority=(value:string)=>{
+    const next=Number(value);
+    if(!canSubmit||!Number.isSafeInteger(next)||next<0||next>9)return;
+    engineClient.command('setFrontlinePriority',{
+      unitIds:selected.map(u=>u.id),priority:next,
+    });
+  };
   const byProvince=new Map<number,UiUnit[]>();
   for(const unit of selected){
     const group=byProvince.get(unit.loc)??[];
@@ -28,6 +40,19 @@ export function CombatFrontageInspector({snap,selected,lang}:Props) {
       {label('実際の交戦がある州は現在の部隊配置から次回の戦闘参加を予測します。非交戦州は選択師団のみの見積りです。',
         'Active engagements show a forecast from the current deployment. Otherwise, only selected divisions are counted.')}
     </small>
+    <div className="move-controls" data-testid="combat-frontline-priority-controls">
+      <label>{label('選択師団の前線投入優先度','Frontline priority for selected divisions')}
+        <select data-testid="combat-frontline-priority-select"
+          disabled={!canSubmit} value={common?String(priority):''}
+          onChange={e=>issuePriority(e.target.value)}>
+          {!common&&<option value="">{label('混在（変更する値を選択）','Mixed (choose new value)')}</option>}
+          {Array.from({length:10},(_,i)=>
+            <option key={i} value={i}>{i}{i===5?' · '+label('標準','Normal'):''}</option>)}
+        </select>
+      </label>
+    </div>
+    <small>{label('優先度が高い師団から前線へ投入し、同順位なら師団番号順です。次の日次戦闘から反映されます。補給の優先度とは別です。',
+      'Higher priorities enter combat first; ties use division ID. Effective at the next daily combat resolution. Independent from supply priority.')}</small>
     {provinces.map(([province,units])=>{
       const front=frontByProvince.get(province);
       const terrainCapacity=units[0].frontageCapacity;
@@ -63,7 +88,7 @@ export function CombatFrontageInspector({snap,selected,lang}:Props) {
             reserves.has(u.id)?label('予備','Reserve'):label('対象外','Not eligible');
           const factor=penalties.get(u.id);
           return <div className="kv" key={u.id} data-testid={'combat-frontage-unit-'+u.id}>
-            <span>#{u.id} · {label('幅','Width')} {u.combatWidth}</span>
+            <span>#{u.id} · {label('幅','Width')} {u.combatWidth} · {label('優先度','Priority')} {u.frontlinePriority??5}</span>
             <span>{state}{factor!==undefined&&factor<1?(' · ×'+factor.toFixed(2)):''}</span>
           </div>;
         })}

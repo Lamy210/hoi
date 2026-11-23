@@ -3,7 +3,7 @@
  * Display this as the current-state *forecast*, not a log of past combat.
  */
 import {atWar,type Unit,type WorldState} from '../core/state';
-import {selectCombatFront,unitCombatWidth} from './unitComposition';
+import {frontlineOrder,selectCombatFront,unitCombatWidth} from './unitComposition';
 import {TERRAIN_DATA} from '../systems/combat';
 
 export interface CombatFrontSideProjection {
@@ -32,7 +32,7 @@ export function provinceCombatCapacity(w:Pick<WorldState,'prov'>,province:number
 }
 
 function projectSide(w:WorldState,units:readonly Unit[],slots:number):CombatFrontSideProjection {
-  const sorted=[...units].sort((a,b)=>a.id-b.id);
+  const sorted=[...units].sort(frontlineOrder);
   const selected=selectCombatFront(w,sorted,slots);
   const active=new Set(selected.units.map(u=>u.id));
   return {

@@ -34,6 +34,14 @@ test('通常UIで軍団・軍集団を作成し師団を編入、集計・所在
   await expect(page.getByTestId('combat-frontage-unit-'+ids[1])).toBeVisible();
   // Peace-time summaries are estimates: do not mislabel them as actual combat.
   await expect(combatPanel).toContainText('事前見積り');
+  // Set a shared combat-only priority for both selected divisions.
+  const frontlineSelect=page.getByTestId('combat-frontline-priority-select');
+  await expect(frontlineSelect).toHaveValue('5');
+  await frontlineSelect.selectOption('9');
+  await page.getByTestId('apply-pending').click();
+  await expect(frontlineSelect).toHaveValue('9');
+  await expect(page.getByTestId('combat-frontage-unit-'+ids[0])).toContainText('優先度 9');
+  await expect(page.getByTestId('combat-frontage-unit-'+ids[1])).toContainText('優先度 9');
   await expect(page.getByTestId('army-summary')).toContainText('平均補給効率');
   await expect(page.getByTestId('move-selected')).toBeEnabled();
   await page.getByTestId('roster-filter').selectOption('selected');
