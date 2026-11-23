@@ -54,11 +54,14 @@ export interface AirWing {
 export interface Lot {
   holder:'warehouse'|'division'|'garrison'|'airwing'|'repairing'; holderId:number;
   modelId:string; quantity:number;
+  /** Expected unrounded battle losses; follows the equipment when transferred. */
+  combatLossCarry?:number;
 }
 export interface Division {
   id:number; country:number; province:number; planId:number|null;
   manualHold:boolean; moving:boolean; inBattle:boolean; destroyed?:boolean;
   casualtyCarry?:number; requiredEquipment?:Record<string,number>;
+  combatWidth?:number;
   soldiers:number; organization:number; hp:number; hardness:number;
   supply:number; softAttack:number; hardAttack:number;
   defense:number; breakthrough:number;
@@ -238,6 +241,9 @@ export function assertStrategyState(w:StrategyState):void{
     lotKeys.add(key);
     if(!designs.has(l.modelId)||!Number.isSafeInteger(l.quantity)||l.quantity<0)
       throw new RangeError('lot');
+    if(l.combatLossCarry!==undefined&&(!Number.isFinite(l.combatLossCarry)||
+      l.combatLossCarry<0||l.combatLossCarry>l.quantity+1e-8))
+      throw new RangeError('lot combat loss carry');
     const model=designById.get(l.modelId)!;
     const division=w.divisions.find(d=>d.id===l.holderId);
     const wing=wingById.get(l.holderId);
@@ -255,7 +261,12 @@ export function assertStrategyState(w:StrategyState):void{
   for(const u of w.divisions){
     if(!countries.has(u.country)||!provinces.has(u.province))throw new RangeError('division reference');
     if(u.casualtyCarry!==undefined&&(u.casualtyCarry<0||u.casualtyCarry>=1||!Number.isFinite(u.casualtyCarry)))throw new RangeError('invalid casualty carry');
-    if(u.requiredEquipment && Object.values(u.requiredEquipment).some(v=>!Number.isSafeInteger(v)||v<0))throw new RangeError('equipment requirements');
+    if(u.requiredEquipment && Object.entries(u.requiredEquipment).some(([key,v])=>
+      !['infantry','artillery','tank','support'].includes(key)||!Number.isSafeInteger(v)||v<0))
+      throw new RangeError('equipment requirements');
+    if(u.combatWidth!==undefined&&
+      (!Number.isSafeInteger(u.combatWidth)||u.combatWidth<1||u.combatWidth>120))
+      throw new RangeError('invalid division combat width');
     for(const v of [u.soldiers,u.organization,u.hp,u.supply,u.hardness,u.softAttack,u.hardAttack,u.defense,u.breakthrough])
       nonnegative(v);
     if(u.hardness>1||u.supply>1)throw new RangeError('division ratio');

@@ -3,8 +3,10 @@
  */
 import {assertStrategyState,atWar,populationSize,type StrategyState,type Factory,type Lot,type Division} from './model';
 import {civilFromDays} from '../clock/date';
+import {allocateFrontline,resolveLandExchange,type LandTerrain} from './combat/land';
+import {issuedArmorPiercing} from './combat/equippedArmor';
 import {availableIC,construct,modelOutput,nextPrice,researchPerDay,studySlots,
-  allocatedResearch,researchAhead,canAutoAttack,resistanceAfterDay,combatHits,controlledFactoryFraction,
+  allocatedResearch,researchAhead,canAutoAttack,resistanceAfterDay,controlledFactoryFraction,
   equippedCombatStats,combatReady,laborForProgress} from './rules';
 
 export const STRATEGY_PHASES=[
@@ -190,16 +192,42 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   // been finalized. Aircraft/strategic bombing damage becomes effective tomorrow.
   const attacking=sorted(next.divisions.filter(combatReady),d=>d.id);
   const engaged=new Set<number>();
+  // Freeze the 6h frontage set at the beginning of the day's combat phase.
+  // A large army cannot evade terrain width by matching every defender in turn.
+  const inProvince=new Map<string,Division[]>();
+  for(const u of attacking){
+    const key=u.province+'\x1f'+u.country;
+    const group=inProvince.get(key)??[];
+    group.push(u);inProvince.set(key,group);
+  }
+  const frontage=new Map<number,number>();
+  for(const group of inProvince.values()){
+    const province=next.provinces.find(p=>p.id===group[0].province)!;
+    const type:LandTerrain=
+      province.terrain==='forest'||province.terrain==='hills'||
+      province.terrain==='mountains'||province.terrain==='urban'
+        ?province.terrain:'plains';
+    const allocated=allocateFrontline(
+      group.map(u=>({id:u.id,priority:0,width:u.combatWidth??20})),type);
+    for(const item of allocated.engaged)frontage.set(item.id,item.widthPenalty);
+  }
   const terrainAttackFactor:Record<string,number>={
     plains:1,hills:0.85,mountains:0.65,urban:0.75,forest:0.85,desert:0.95,
   };
-  const battleStats=(unit:Division,targetTerrain:string,attacker:boolean)=>{
-    const modelStats=equippedCombatStats(baseline,unit);
+  const battleStats=(unit:Division,targetTerrain:string,attacker:boolean,widthPenalty:number)=>{
+    const modelStats=equippedCombatStats(next,unit);
+    const protection=issuedArmorPiercing(next,unit);
     const associated=next.plans.find(p=>p.id===unit.planId&&p.country===unit.country);
     const planning=attacker&&associated?.authorized&&!associated.paused&&
       associated.kind==='OFFENSIVE'&&associated.targets.includes(unit.province)?
       associated.planning:0;
-    return {...unit,...modelStats,terrain:attacker?(terrainAttackFactor[targetTerrain]??1):1,
+    return {...unit,...modelStats,
+      softAttack:modelStats.softAttack*widthPenalty,
+      hardAttack:modelStats.hardAttack*widthPenalty,
+      defense:modelStats.defense*widthPenalty,
+      breakthrough:modelStats.breakthrough*widthPenalty,
+      armor:protection.armor,piercing:protection.piercing,
+      terrain:attacker?(terrainAttackFactor[targetTerrain]??1):1,
       weather:1,commander:1,doctrine:1,planning};
   };
   const recordCasualties=(u:Division,hpLoss:number)=>{
@@ -216,10 +244,14 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
       u.soldiers-=loss;nation.population.soldiers-=loss;home.population-=loss;
       casualties+=loss;
     }
-    // Equipment attrition removes actual issued lots, never cloned warehouse stock.
+    // Preserve fractional equipment damage across the 6h phases AND following
+    // days. Without this carry, four losses of 0.95 are incorrectly rounded to 0.
     for(const l of next.lots.filter(l=>l.holder==='division'&&l.holderId===u.id)){
-      const lost=Math.min(l.quantity,Math.floor(l.quantity*Math.min(1,hpLoss/100)+1e-9));
+      const rawLoss=l.quantity*Math.min(1,hpLoss/100)+(l.combatLossCarry??0);
+      const whole=Math.floor(rawLoss+1e-10);
+      const lost=Math.min(l.quantity,whole);
       l.quantity-=lost;equipmentLoss+=lost;
+      l.combatLossCarry=l.quantity?Math.max(0,rawLoss-whole):0;
     }
     if(u.hp===0){
       // Remaining soldiers rout into reserves; the formation stops fighting.
@@ -228,30 +260,39 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
       nation.population.reserves+=u.soldiers;
       u.soldiers=0;u.destroyed=true;u.casualtyCarry=0;
       for(const l of next.lots.filter(l=>l.holder==='division'&&l.holderId===u.id)){
-        equipmentLoss+=l.quantity;l.quantity=0;
+        equipmentLoss+=l.quantity;l.quantity=0;l.combatLossCarry=0;
       }
     }
   };
   for(const a of attacking){
+    const attackerWidthFactor=frontage.get(a.id);
+    if(attackerWidthFactor===undefined)continue; // reserved behind a filled front
     const province=next.provinces.find(p=>p.id===a.province);
     if(!province||a.country===province.controller||!atWar(next,a.country,province.controller))continue;
     const defender=attacking.find(x=>x.country===province.controller&&x.province===a.province&&
-      !engaged.has(x.id)&&combatReady(x));
+      frontage.has(x.id)&&!engaged.has(x.id)&&combatReady(x));
     if(!defender||engaged.has(a.id))continue;
     engaged.add(a.id);engaged.add(defender.id);
-    const attackerStats=battleStats(a,province.terrain,true);
-    const defenderStats=battleStats(defender,province.terrain,false);
-    const toDef=combatHits(attackerStats,defenderStats,true)*4;
-    const toAtt=combatHits(defenderStats,attackerStats,false)*4;
-    const defenderHpLoss=Math.min(defender.hp,toDef*0.25);
-    const attackerHpLoss=Math.min(a.hp,toAtt*0.25);
-    defender.organization=Math.max(0,defender.organization-toDef*2);
-    defender.hp=Math.max(0,defender.hp-defenderHpLoss);
-    a.organization=Math.max(0,a.organization-toAtt*2);
-    a.hp=Math.max(0,a.hp-attackerHpLoss);
-    recordCasualties(defender,defenderHpLoss);
-    recordCasualties(a,attackerHpLoss);
-    battleOrgLoss+=toDef*2+toAtt*2;
+    const defenderWidthFactor=frontage.get(defender.id)!;
+    // Four true 6h subphases: recompute with the remaining issued equipment.
+    // Both sides fire from the same pre-damage snapshot inside each subphase.
+    for(let subphase=0;subphase<4;subphase++){
+      if(!combatReady(a)||!combatReady(defender))break;
+      const attackerStats=battleStats(a,province.terrain,true,attackerWidthFactor);
+      const defenderStats=battleStats(defender,province.terrain,false,defenderWidthFactor);
+      const outcome=resolveLandExchange(attackerStats,defenderStats);
+      const defenderHpLoss=Math.min(defender.hp,outcome.defenderHpLoss);
+      const attackerHpLoss=Math.min(a.hp,outcome.attackerHpLoss);
+      const defenderOrgLoss=Math.min(defender.organization,outcome.defenderOrgLoss);
+      const attackerOrgLoss=Math.min(a.organization,outcome.attackerOrgLoss);
+      defender.organization=Math.max(0,defender.organization-defenderOrgLoss);
+      defender.hp=Math.max(0,defender.hp-defenderHpLoss);
+      a.organization=Math.max(0,a.organization-attackerOrgLoss);
+      a.hp=Math.max(0,a.hp-attackerHpLoss);
+      recordCasualties(defender,defenderHpLoss);
+      recordCasualties(a,attackerHpLoss);
+      battleOrgLoss+=defenderOrgLoss+attackerOrgLoss;
+    }
   }
   for(const s of [...strikes].sort((a,b)=>a.factoryId-b.factoryId)){
     if(!Number.isFinite(s.damage)||s.damage<0)throw new RangeError('airstrike');
