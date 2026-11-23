@@ -1,0 +1,37 @@
+import {test,expect} from '@playwright/test';
+test.use({deviceScaleFactor:2});
+
+test('地図上の戦線作成と軍未所属師団の紐づけを一度に実行する',async({page})=>{
+  const errors:string[]=[];
+  page.on('pageerror',e=>errors.push(e.message));
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-KOR').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('map-zoom-in')).toBeEnabled({timeout:30000});
+  await page.getByTestId('btn-province-search').click();
+  await page.getByTestId('province-search').fill('KR-41');
+  await page.getByTestId('search-result-KR-41').click();
+  const marker=page.getByTestId('unit-marker-KR-41');
+  const box=await marker.boundingBox();
+  if(!box)throw Error('KR-41 unit marker missing');
+  await page.getByTestId('map-front-draw').click();
+  await page.getByTestId('map-front-enemy').selectOption({label:'朝鮮民主主義人民共和国'});
+  await page.getByTestId('map-front-assignment-source').selectOption('unassigned');
+  await expect(page.getByTestId('map-front-assignment-preview')).toContainText('5');
+  await expect(page.getByTestId('map-front-create')).toBeDisabled();
+  await page.mouse.click(box.x+box.width/2,box.y+box.height/2);
+  await expect(page.getByTestId('map-front-draft-count')).toContainText('1');
+  await expect(page.getByTestId('map-front-create')).toBeEnabled();
+  await page.getByTestId('map-front-create').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('map-front-planner')).toHaveCount(0);
+  await page.getByTestId('btn-fronts-top').click();
+  const modal=page.getByTestId('fronts-modal');
+  const row=modal.locator('[data-testid^="front-"]').filter({has:page.locator('button[data-testid^="front-pause-"]')}).first();
+  await expect(row).toContainText('5');
+  await expect(row).toContainText('事前計画');
+  await page.getByTestId('close-fronts').click();
+  expect(errors).toEqual([]);
+});

@@ -41,6 +41,7 @@ jobs:
       - run: npx openspec validate map-marquee-formation-selection --strict
       - run: npx openspec validate map-frontline-draft-objective --strict
       - run: npx openspec validate prewar-front-and-offensive-line --strict
+      - run: npx openspec validate atomic-map-front-formation --strict
       - name: Upload verified production build
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5

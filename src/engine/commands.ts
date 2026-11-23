@@ -482,6 +482,14 @@ export function registerAllCommands(): void {
         }
       }
       if (p.targets !== undefined && (!Array.isArray(p.targets) || new Set(p.targets).size !== p.targets.length || p.targets.some(x=>!Number.isInteger(x)||x<0||x>=w.prov.count||w.prov.controller[x]!==enemy))) return 'badParams';
+      // Optional atomic front + division assignment: validate the entire batch first.
+      // Never create an orphaned front if even one unit is foreign, destroyed, duplicated, or invalid.
+      const ids = p.units;
+      if (ids !== undefined) {
+        if (!Array.isArray(ids) || ids.length === 0 || ids.length > 256 ||
+          new Set(ids).size !== ids.length || ids.some(id => !Number.isSafeInteger(id))) return 'badParams';
+        if (ids.some(id => !w.units.some(u => u.id === id && u.owner === country && !u.destroyed))) return 'notYourUnit';
+      }
       const cap = p.cap as number | undefined;
       if (cap !== undefined && (!Number.isInteger(cap) || cap < 1 || cap > 8)) return 'badParams';
       return null;
@@ -495,6 +503,14 @@ export function registerAllCommands(): void {
       const front = { id: w.nextFrontId++, owner: country, enemy, stance: 'hold' as const, provinces, targets, cap,
         revision: 1, paused: !atWar(w, country, enemy) };
       w.fronts.push(front);
+      if (Array.isArray(p.units)) {
+        const ids = new Set(p.units as number[]);
+        for (const u of w.units) if (ids.has(u.id)) {
+          u.frontId = front.id;
+          // Even during war, atomic creation must not silently undo manual hold.
+          // Explicit manual-resume remains a separate command.
+        }
+      }
       void issuer;
     },
   });
