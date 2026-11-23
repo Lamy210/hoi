@@ -22,7 +22,7 @@ export function strategyFixture():StrategyState{
       {id:2,regionId:0,country:0,kind:'military',baseIC:10,damage:0,workerDemand:10},
       {id:3,regionId:1,country:1,kind:'military',baseIC:6,damage:0,workerDemand:10},
     ],
-    construction:[{id:1,country:0,factoryId:1,remainingIC:20,cashPerIC:2,
+    construction:[{id:1,country:0,factoryId:1,kind:'build',remainingIC:20,cashPerIC:2,
       material:'concrete',materialPerIC:1}],
     designs:[{id:'rifle',category:'infantry',year:2026,softAttack:10,hardAttack:2,
       defense:8,breakthrough:2,armor:0,piercing:2,reliability:0.95,ic:2,materials:{steel:1}}],
