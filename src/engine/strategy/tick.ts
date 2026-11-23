@@ -186,22 +186,69 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
 
   // 4. Deterministic expected-value reference combat. Production has already
   // been finalized. Aircraft/strategic bombing damage becomes effective tomorrow.
-  const attacking=sorted(next.divisions.filter(d=>!d.moving),d=>d.id);
+  const attacking=sorted(next.divisions.filter(combatReady),d=>d.id);
   const engaged=new Set<number>();
+  const terrainAttackFactor:Record<string,number>={
+    plains:1,hills:0.85,mountains:0.65,urban:0.75,forest:0.85,desert:0.95,
+  };
+  const battleStats=(unit:Division,targetTerrain:string,attacker:boolean)=>{
+    const modelStats=equippedCombatStats(baseline,unit);
+    const associated=next.plans.find(p=>p.id===unit.planId&&p.country===unit.country);
+    const planning=attacker&&associated?.authorized&&!associated.paused&&
+      associated.kind==='OFFENSIVE'&&associated.targets.includes(unit.province)?
+      associated.planning:0;
+    return {...unit,...modelStats,terrain:attacker?(terrainAttackFactor[targetTerrain]??1):1,
+      weather:1,commander:1,doctrine:1,planning};
+  };
+  const recordCasualties=(u:Division,hpLoss:number)=>{
+    if(hpLoss<=0)return;
+    const loss=Math.min(u.soldiers,Math.floor(u.soldiers*Math.min(1,hpLoss/100)*0.65+
+      (u.casualtyCarry??0)+1e-9));
+    u.casualtyCarry=Math.max(0,u.soldiers*Math.min(1,hpLoss/100)*0.65+
+      (u.casualtyCarry??0)-loss);
+    if(loss>0){
+      const nation=next.nations.find(n=>n.id===u.country)!;
+      const home=next.regions.filter(r=>r.owner===u.country).sort((x,y)=>x.id-y.id)
+        .find(r=>r.population>=loss);
+      if(!home||nation.population.soldiers<loss)throw new RangeError('casualty POP overdraw');
+      u.soldiers-=loss;nation.population.soldiers-=loss;home.population-=loss;
+      casualties+=loss;
+    }
+    // Equipment attrition removes actual issued lots, never cloned warehouse stock.
+    for(const l of next.lots.filter(l=>l.holder==='division'&&l.holderId===u.id)){
+      const lost=Math.min(l.quantity,Math.floor(l.quantity*Math.min(1,hpLoss/100)+1e-9));
+      l.quantity-=lost;equipmentLoss+=lost;
+    }
+    if(u.hp===0){
+      // Remaining soldiers rout into reserves; the formation stops fighting.
+      const nation=next.nations.find(n=>n.id===u.country)!;
+      nation.population.soldiers-=u.soldiers;
+      nation.population.reserves+=u.soldiers;
+      u.soldiers=0;u.destroyed=true;u.casualtyCarry=0;
+      for(const l of next.lots.filter(l=>l.holder==='division'&&l.holderId===u.id)){
+        equipmentLoss+=l.quantity;l.quantity=0;
+      }
+    }
+  };
   for(const a of attacking){
     const province=next.provinces.find(p=>p.id===a.province);
     if(!province||a.country===province.controller||!atWar(next,a.country,province.controller))continue;
-    const defender=attacking.find(x=>x.country===province.controller&&x.province===a.province&&!engaged.has(x.id));
+    const defender=attacking.find(x=>x.country===province.controller&&x.province===a.province&&
+      !engaged.has(x.id)&&combatReady(x));
     if(!defender||engaged.has(a.id))continue;
     engaged.add(a.id);engaged.add(defender.id);
-    const attackerStats={...a,terrain:1,weather:1,commander:1,doctrine:1,planning:0};
-    const defenderStats={...defender,terrain:1,weather:1,commander:1,doctrine:1,planning:0};
+    const attackerStats=battleStats(a,province.terrain,true);
+    const defenderStats=battleStats(defender,province.terrain,false);
     const toDef=combatHits(attackerStats,defenderStats,true)*4;
     const toAtt=combatHits(defenderStats,attackerStats,false)*4;
+    const defenderHpLoss=Math.min(defender.hp,toDef*0.25);
+    const attackerHpLoss=Math.min(a.hp,toAtt*0.25);
     defender.organization=Math.max(0,defender.organization-toDef*2);
-    defender.hp=Math.max(0,defender.hp-toDef*0.25);
+    defender.hp=Math.max(0,defender.hp-defenderHpLoss);
     a.organization=Math.max(0,a.organization-toAtt*2);
-    a.hp=Math.max(0,a.hp-toAtt*0.25);
+    a.hp=Math.max(0,a.hp-attackerHpLoss);
+    recordCasualties(defender,defenderHpLoss);
+    recordCasualties(a,attackerHpLoss);
     battleOrgLoss+=toDef*2+toAtt*2;
   }
   for(const s of [...strikes].sort((a,b)=>a.factoryId-b.factoryId)){
@@ -227,8 +274,8 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   // Prevent partial commits; failures leave initial world untouched.
   assertStrategyState(next);
   if(Math.abs(sumCash(next)-sumCash(baseline))>1e-6)throw new RangeError('money conservation');
-  if(sumPopulation(next)!==sumPopulation(baseline))throw new RangeError('population conservation');
+  if(sumPopulation(baseline)-sumPopulation(next)!==casualties)throw new RangeError('population casualty balance');
   const productionTotal=production.reduce((s,p)=>s+p.quantity,0);
-  if(lotTotal(next)-lotTotal(baseline)!==productionTotal)throw new RangeError('equipment conservation');
-  return {next,phases,orders,production,reports:{battleOrgLoss,factoryDamage}};
+  if(lotTotal(next)-lotTotal(baseline)!==productionTotal-equipmentLoss)throw new RangeError('equipment conservation');
+  return {next,phases,orders,production,reports:{battleOrgLoss,factoryDamage,casualties,equipmentLoss}};
 }
