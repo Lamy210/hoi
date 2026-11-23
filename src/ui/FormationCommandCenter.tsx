@@ -118,7 +118,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
         {label('戦線割当','Assign front')}: {assign.ids.length} ·
         {label('戦線解除','Unassign front')}: {unassign.ids.length}
       </small>
-      {front&&assign.releasesManualHold>0&&<label className="formation-command-warning" data-testid="formation-release-warning">
+      {front&&releasingIds.length>0&&<label className="formation-command-warning" data-testid="formation-release-warning">
         <input type="checkbox" data-testid="formation-confirm-release"
           checked={confirmedRelease} onChange={e=>setAcknowledgedSignature(e.target.checked?targetSignature:null)}/>
         {label(
