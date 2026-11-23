@@ -82,7 +82,7 @@ export function previewAircraft(blueprint:AircraftBlueprint,unlockedTechs:readon
   const strategicBomb=weapons.reduce((sum,w)=>sum+w.strategic,0);
   const navalAttack=weapons.reduce((sum,w)=>sum+w.naval,0);
   const rangeKm=between(frame.range*(1+rangeBonus)/(1+.1*(drag-1)),100,10000);
-  const missions:AircraftPreview['missions']=[];
+  const missions:Array<AircraftPreview['missions'][number]>=[];
   if(airAttack>0)missions.push('air-superiority','interception');
   if(groundAttack>0)missions.push('close-air-support');
   if(strategicBomb>0)missions.push('strategic-bombing');
