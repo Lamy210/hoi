@@ -81,7 +81,17 @@ describe('battle loss defense and breakthrough capacity',()=>{
   });
 
   it('retains deterministic combat losses after saving and reloading a live battle',async()=>{
-    const {e,w}=await battle(4,4);
+    // Keep all actual divisions and their commander/equipment references: the
+    // save loader must validate a realistic game, not a stripped test fixture.
+    const e=await createTestEngine(1,7402,'KOR'),w=e.world,c=w.playerCountry;
+    const enemy=w.countries.id.indexOf('PRK'),target=w.prov.id.indexOf('KP-07');
+    startWar(w,c,enemy,false);
+    const att=w.units.find(u=>u.owner===c&&!u.destroyed)!;
+    const def=w.units.find(u=>u.owner===enemy&&u.loc===target&&!u.destroyed)!;
+    Object.assign(att,{loc:target,path:[],segIdx:0,segDays:0,segProgress:0,
+      org:100,entrenchment:0,preparation:4});
+    Object.assign(def,{entrenchment:4,preparation:0});
+    w.runtime.supplyDirty=true;
     const original=hashWorld(w);
     const restored=await createTestEngine(1,7402,'KOR');
     expect(restored.loadFrom(e.serialize()).ok).toBe(true);
