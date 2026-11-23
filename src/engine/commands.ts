@@ -2,7 +2,7 @@
 // UI（issuer='player'）とAI（issuer='ai:<id>'）は同一の検証を通る。
 import { BATTALION_CATALOG_VERSION, previewTemplate } from './military/templateStats';
 import { MAX_CUSTOM_TEMPLATES, MAX_CUSTOM_REVISIONS, latestTemplate, latestTemplates, validTemplateName, trainingSpec } from './military/customTemplates';
-import { MAX_ARMIES, MAX_GROUPS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES, validName, validColor } from './military/armies';
+import { MAX_ARMIES, MAX_GROUPS, MAX_ARMY_UNITS, MAX_GROUP_ARMIES, validName, validColor, nextFormationName } from './military/armies';
 import { allocateAiSequence } from './core/sequence';
 import { issuerCountry, registerCommand } from './core/command';
 import { addAlert, atWar, type Cmd, type TreatyType, type WorldState } from './core/state';
@@ -965,21 +965,75 @@ export function registerAllCommands(): void {
     validate(w,p,issuer) {
       const c = actorCountry(w,issuer);
       if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
-      if (!validName(p.name) || !validColor(p.color)) return 'badParams';
+      if ((p.name!==undefined&&!validName(p.name)) || !validColor(p.color)) return 'badParams';
       if (w.armies.filter(a => a.owner === c).length >= MAX_ARMIES || w.nextArmyId >= Number.MAX_SAFE_INTEGER) return 'limitExceeded';
+      // Optional atomic creation+assignment: no orphan formation on failure.
+      if(p.unitIds!==undefined){
+        const ids=p.unitIds;
+        if(!Array.isArray(ids)||!ids.length||ids.length>MAX_ARMY_UNITS||
+          new Set(ids).size!==ids.length||
+          !ids.every(id=>Number.isSafeInteger(id)&&id>0))return 'badParams';
+        if(ids.some(id=>!w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed)))
+          return 'notYourUnit';
+      }
       return null;
     },
-    apply(w,p,issuer) { w.armies.push({id:w.nextArmyId++,owner:actorCountry(w,issuer)!,name:p.name as string,color:p.color as string,groupId:null}); },
+    apply(w,p,issuer) {
+      const c=actorCountry(w,issuer)!;
+      const name=p.name===undefined
+        ? nextFormationName('army',w.armies.filter(a=>a.owner===c).map(a=>a.name))
+        : p.name as string;
+      const id=w.nextArmyId++;
+      w.armies.push({id,owner:c,name,color:p.color as string,groupId:null});
+      if(Array.isArray(p.unitIds)){
+        const ids=new Set(p.unitIds as number[]);
+        for(const u of w.units)if(ids.has(u.id))u.armyId=id;
+      }
+    },
   });
   registerCommand('createArmyGroup', {
     validate(w,p,issuer) {
       const c = actorCountry(w,issuer);
       if (c === null || !w.countries.alive[c] || issuer === 'frontai') return 'badIssuer';
-      if (!validName(p.name) || !validColor(p.color)) return 'badParams';
+      if ((p.name!==undefined&&!validName(p.name)) || !validColor(p.color)) return 'badParams';
       if (w.armyGroups.filter(a => a.owner === c).length >= MAX_GROUPS || w.nextArmyGroupId >= Number.MAX_SAFE_INTEGER) return 'limitExceeded';
+      if(p.armyIds!==undefined){
+        const ids=p.armyIds;
+        if(!Array.isArray(ids)||!ids.length||ids.length>MAX_GROUP_ARMIES||
+          new Set(ids).size!==ids.length||
+          !ids.every(id=>Number.isSafeInteger(id)&&id>0))return 'badParams';
+        if(ids.some(id=>!w.armies.some(a=>a.id===id&&a.owner===c)))
+          return 'notYourArmy';
+      }
       return null;
     },
-    apply(w,p,issuer) { w.armyGroups.push({id:w.nextArmyGroupId++,owner:actorCountry(w,issuer)!,name:p.name as string,color:p.color as string}); },
+    apply(w,p,issuer) {
+      const c=actorCountry(w,issuer)!;
+      const name=p.name===undefined
+        ? nextFormationName('group',w.armyGroups.filter(a=>a.owner===c).map(a=>a.name))
+        : p.name as string;
+      const id=w.nextArmyGroupId++;
+      w.armyGroups.push({id,owner:c,name,color:p.color as string});
+      if(Array.isArray(p.armyIds)){
+        const ids=new Set(p.armyIds as number[]);
+        for(const a of w.armies)if(ids.has(a.id))a.groupId=id;
+      }
+    },
+  });
+  registerCommand('renameFormation', {
+    validate(w,p,issuer){
+      const c=actorCountry(w,issuer);
+      if(c===null||!w.countries.alive[c]||issuer==='frontai')return 'badIssuer';
+      if((p.kind!=='army'&&p.kind!=='group')||!Number.isSafeInteger(p.id)||
+        !validName(p.name))return 'badParams';
+      const formations=p.kind==='army'?w.armies:w.armyGroups;
+      return formations.some(f=>f.id===p.id&&f.owner===c)?null:'notYourArmy';
+    },
+    apply(w,p){
+      const formations=p.kind==='army'?w.armies:w.armyGroups;
+      const formation=formations.find(f=>f.id===p.id)!;
+      formation.name=p.name as string;
+    },
   });
   registerCommand('setArmyReinforcementPriority', {
     validate(w,p,issuer){
