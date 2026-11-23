@@ -9,6 +9,7 @@ import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
+import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft } from './frontMapPlanning';
 import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
@@ -53,6 +54,9 @@ export function GameScreen() {
   const [rosterQuery, setRosterQuery] = useState('');
   const [rosterFilter, setRosterFilter] = useState('all');
   const [marqueeMode,setMarqueeMode]=useState(false);
+  const [frontDraft,setFrontDraft]=useState<{enemy:number;provinces:number[]}|null>(null);
+  const [frontTargetId,setFrontTargetId]=useState<number|null>(null);
+  const suppressDraftClick=useRef(false);
   const [marquee,setMarquee]=useState<ScreenRect|null>(null);
   const marqueePointer=useRef<{id:number;origin:{x:number;y:number}}|null>(null);
   const rosterRangeAnchor=useRef<number|null>(null);
@@ -224,8 +228,13 @@ export function GameScreen() {
   }, [mapReady, snap, meta, st.selection, lang]);
 
   useEffect(()=>{
-    if(mapReady&&snap)rendererRef.current?.setFrontOverlay(frontView(snap,selectedIds,frontVisibility));
-  },[mapReady,snap,st.selection,frontVisibility]);
+    if(!mapReady||!snap)return;
+    const layers=frontView(snap,selectedIds,frontVisibility)
+      .map(layer=>layer.id===frontTargetId?{...layer,highlighted:true}:layer);
+    if(frontDraft)layers.push({id:-1,provinces:frontDraft.provinces.filter(p=>snap.controller[p]===snap.playerCountry),
+      links:[],targets:[],arrows:[],stance:'draft',paused:false,highlighted:true});
+    rendererRef.current?.setFrontOverlay(layers);
+  },[mapReady,snap,st.selection,frontVisibility,frontDraft,frontTargetId]);
 
   // Selecting a deployed division from recruitment or the context panel also centers the map.
   useEffect(() => {
@@ -248,6 +257,10 @@ export function GameScreen() {
     setSearch(null);
   }
   const player = snap.countries[snap.playerCountry];
+  const activeFronts=snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy));
+  const targetFront=activeFronts.find(f=>f.id===frontTargetId);
+  const draftReady=frontDraft!==null&&canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,
+    snap.playerCountry,snap.controller,player.atWar,st.pendingCommands>0);
   const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
 
@@ -280,6 +293,7 @@ export function GameScreen() {
     if (focus && first) rendererRef.current?.focusProvince(first.loc);
   }
   function toggleMoveSelection() {
+    setFrontDraft(null);setFrontTargetId(null);
     setMarqueeMode(false);
     setMarquee(null);
     marqueePointer.current=null;
@@ -288,6 +302,7 @@ export function GameScreen() {
     setMoveMode(!moveMode);
   }
   function toggleAttackSelection() {
+    setFrontDraft(null);setFrontTargetId(null);
     setMarqueeMode(false);
     setMarquee(null);
     marqueePointer.current=null;
@@ -329,6 +344,7 @@ export function GameScreen() {
       { prov: rendererRef.current?.pickAt(e.clientX, e.clientY) ?? null, marker: false };
   }
   function handleMapContext(e: React.MouseEvent) {
+    if(frontDraft||frontTargetId!==null){e.preventDefault();return;}
     if (!chosen.length) return;
     e.preventDefault();
     const { prov } = provinceFromEvent(e);
@@ -340,6 +356,20 @@ export function GameScreen() {
   function handleMapClick(e: React.MouseEvent): void {
     const { prov, marker } = provinceFromEvent(e);
     if (prov === null) return;
+    if(frontTargetId!==null){
+      const f=activeFronts.find(row=>row.id===frontTargetId);
+      if(!f){setFrontTargetId(null);return;}
+      if(snap.controller[prov]!==f.enemy){
+        appStore.set({statusMessage:lang==='ja'?'指定戦線の敵支配州をクリックしてください':'Choose a province controlled by the front enemy'});
+        return;
+      }
+      if(st.pendingCommands>0)return;
+      const targets=e.altKey?f.targets.filter(p=>p!==prov):
+        e.ctrlKey||e.metaKey||e.shiftKey?[...new Set([...f.targets,prov])].sort((a,b)=>a-b):[prov];
+      engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,targets});
+      setFrontTargetId(null);
+      return;
+    }
     if (attackMode) { sendAttack(prov); return; }
     if (moveMode) { sendMove(prov); return; }
     if (marker) {
@@ -400,13 +430,23 @@ export function GameScreen() {
     const r=rendererRef.current;
     if(!r)return;
     const box={x1:current.origin.x,y1:current.origin.y,x2:p.x,y2:p.y};
-    const incoming=divisionsInRectangle(ownUnits,province=>r.projectProvince(province),box);
     const mode:SelectionMergeMode=e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'replace';
+    if(frontDraft){
+      suppressDraftClick.current=true;
+      const incoming=provincesInRectangle(snap.controller,snap.playerCountry,
+        province=>r.projectProvince(province),box);
+      const next=updateFrontDraftProvinces(frontDraft.provinces,incoming,snap.controller,snap.playerCountry,mode);
+      if(next===null)appStore.set({statusMessage:lang==='ja'?'戦線州は最大256件まで':'Maximum 256 front provinces'});
+      else setFrontDraft({...frontDraft,provinces:next});
+      return;
+    }
+    const incoming=divisionsInRectangle(ownUnits,province=>r.projectProvince(province),box);
     const next=mergeDivisionSelection(selectedIds,incoming,ownUnits.map(u=>u.id),mode);
     if(next===null)appStore.set({statusMessage:t(lang,'units.limit')});
     else selectUnits(next,false);
   }
   function toggleMarquee(){
+    setFrontDraft(null);setFrontTargetId(null);
     marqueePointer.current=null;
     setMarquee(null);
     setMarqueeMode(!marqueeMode);
@@ -415,8 +455,47 @@ export function GameScreen() {
     setDestination('');
   }
 
+  function startFrontDraft(){
+    if(!mapReady||!player.atWar.length)return;
+    setFrontDraft({enemy:player.atWar[0],provinces:[]});
+    setFrontTargetId(null);
+    setMarqueeMode(false);
+    setMoveMode(false);setAttackMode(false);setDestination('');
+    setFrontVisibility('all');
+    setHoverProv(null);
+  }
+  function startFrontTarget(){
+    if(!mapReady||!activeFronts.length)return;
+    setFrontTargetId(activeFronts[0].id);
+    setFrontDraft(null);
+    setMarqueeMode(false);
+    setMoveMode(false);setAttackMode(false);setDestination('');
+    setFrontVisibility('all');
+  }
+  function clickFrontDraft(e:ReactMouseEvent<HTMLDivElement>){
+    e.stopPropagation();
+    if(suppressDraftClick.current){suppressDraftClick.current=false;return;}
+    if(!frontDraft)return;
+    const prov=rendererRef.current?.pickAt(e.clientX,e.clientY);
+    if(prov===null||prov===undefined)return;
+    if(snap.controller[prov]!==snap.playerCountry){
+      appStore.set({statusMessage:lang==='ja'?'自国支配州のみ戦線に指定できます':'Only controlled provinces may be drafted'});
+      return;
+    }
+    const mode:SelectionMergeMode=e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'toggle';
+    const next=updateFrontDraftProvinces(frontDraft.provinces,[prov],snap.controller,snap.playerCountry,mode);
+    if(next===null)appStore.set({statusMessage:lang==='ja'?'戦線州は最大256件まで':'Maximum 256 front provinces'});
+    else setFrontDraft({...frontDraft,provinces:next});
+  }
+  function commitFrontDraft(){
+    if(!frontDraft||!canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,snap.playerCountry,
+      snap.controller,player.atWar,st.pendingCommands>0))return;
+    engineClient.command('createFront',{enemy:frontDraft.enemy,provinces:frontDraft.provinces});
+    setFrontDraft(null);
+  }
+
   function handleMapMove(e: React.MouseEvent): void {
-    if(marqueeMode)return;
+    if(marqueeMode||frontDraft)return;
     const r = rendererRef.current;
     if (!r) return;
     setHoverPos({ x: e.clientX, y: e.clientY });
