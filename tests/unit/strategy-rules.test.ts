@@ -83,6 +83,7 @@ describe('integrated strategy rules invariants',()=>{
     expect(r.nation.researchSlotBonus).toBe(1);
     expect(()=>applyFocus(r.nation,f,w.focuses,r.spirits)).toThrow();
     expect(()=>assertStrategyState({...w,lines:[...w.lines,w.lines[0]]})).toThrow();
+    expect(()=>assertStrategyState({...w,divisions:[{...w.divisions[0],soldiers:21},w.divisions[1]]})).toThrow();
     expect(()=>assertStrategyState({...w,occupations:[...w.occupations,{...w.occupations[0],share:0.7}]})).toThrow();
   });
 });
