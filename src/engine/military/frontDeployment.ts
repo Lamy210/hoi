@@ -74,11 +74,13 @@ export function planFrontDeployment(
       const load=loads.get(p)!;
       const d=projectedDistance(w,unit,p);
       const weight=weights.get(p)!;
-      const score=mode==='even'?load*1000+d:
-        mode==='strategic'?(load+0.5)*1000/weight+d:
-        d*1000+load;
-      return {p,score};
-    }).sort((a,b)=>a.score-b.score||a.p-b.p);
+      // Use lexicographic ranking so distance cannot outweigh even distribution
+      // on a geographically large map. Tie-break by stable province index.
+      const score=mode==='even'?load:
+        mode==='strategic'?(load+0.5)/weight:d;
+      const tie=mode==='nearest'?load:d;
+      return {p,score,tie};
+    }).sort((a,b)=>a.score-b.score||a.tie-b.tie||a.p-b.p);
     let chosen:FrontDeploymentOrder|null=null;
     for(const {p} of ranked){
       const key=unit.loc+':'+p;
