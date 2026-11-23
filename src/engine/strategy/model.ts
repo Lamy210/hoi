@@ -150,6 +150,10 @@ export function assertStrategyState(w:StrategyState):void{
   if(assignedProvinces.size!==w.provinces.length)throw new RangeError('unassigned province');
   for(const f of w.factories){
     if(!regions.has(f.regionId)||!countries.has(f.country))throw new RangeError('factory references');
+    const home=w.regions.find(r=>r.id===f.regionId)!;
+    if(home.owner!==f.country&&!w.occupations.some(o=>
+      o.regionId===home.id&&o.occupier===f.country&&o.share>=0.5))
+      throw new RangeError('factory operated without occupied-area authorization');
     nonnegative(f.baseIC);nonnegative(f.workerDemand);
     if(f.damage<0||f.damage>1||!Number.isFinite(f.damage))throw new RangeError('factory damage');
   }
@@ -250,7 +254,8 @@ export function assertStrategyState(w:StrategyState):void{
       const build=pr.newFactory;
       if(!build||buildIds.has(build.id)||factories.has(build.id)||
         !Number.isSafeInteger(build.id)||build.id<1||!regions.has(build.regionId)||
-        w.regions.find(r=>r.id===build.regionId)?.owner!==pr.country)
+        (w.regions.find(r=>r.id===build.regionId)?.owner!==pr.country &&
+          !w.occupations.some(o=>o.regionId===build.regionId&&o.occupier===pr.country&&o.share>=0.5)))
         throw new RangeError('invalid new factory');
       nonnegative(build.baseIC);nonnegative(build.workerDemand);
       buildIds.add(build.id);
