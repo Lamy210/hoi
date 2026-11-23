@@ -122,7 +122,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
         <input type="checkbox" data-testid="formation-confirm-release"
           checked={confirmedRelease} onChange={e=>setAcknowledgedSignature(e.target.checked?targetSignature:null)}/>
         {label(
-          'この戦線割当で'+assign.releasesManualHold+'師団の手動固定が解除され、自動作戦が再開します。確認して実行',
+          'この戦線割当で'+releasingIds.length+'師団の手動固定が解除され、自動作戦が再開します。確認して実行',
           'Assigning this front clears manual hold for '+assign.releasesManualHold+' divisions and resumes automated orders. Confirm to proceed'
         )}
       </label>}
