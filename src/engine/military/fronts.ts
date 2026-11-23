@@ -32,7 +32,7 @@ export function operationalFrontProvinces(w:WorldState,front:Front):number[] {
   const active=new Set(front.provinces.filter(p=>w.prov.controller[p]===front.owner));
   for(const u of w.units){
     if(u.destroyed||u.owner!==front.owner||u.frontId!==front.id||u.path.length||
-      w.prov.controller[u.loc]!==front.owner||w.prov.owner[u.loc]!==front.enemy)continue;
+      w.prov.controller[u.loc]!==front.owner)continue;
     // The line may also fall back one tile behind a captured part of its
     // original drawn border. The unit must be adjacent to THAT lost border:
     // unrelated theaters remain outside this front.
