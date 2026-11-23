@@ -9,7 +9,7 @@ import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
-import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft } from './frontMapPlanning';
+import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, provincesAlongStroke } from './frontMapPlanning';
 import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
@@ -56,6 +56,8 @@ export function GameScreen() {
   const [marqueeMode,setMarqueeMode]=useState(false);
   const [frontDraft,setFrontDraft]=useState<{enemy:number;provinces:number[]}|null>(null);
   const [frontTargetId,setFrontTargetId]=useState<number|null>(null);
+  const [targetStroke,setTargetStroke]=useState<{x:number;y:number}[]>([]);
+  const targetStrokeRef=useRef<{x:number;y:number}[]>([]);
   const suppressDraftClick=useRef(false);
   const [marquee,setMarquee]=useState<ScreenRect|null>(null);
   const marqueePointer=useRef<{id:number;origin:{x:number;y:number}}|null>(null);
@@ -257,10 +259,12 @@ export function GameScreen() {
     setSearch(null);
   }
   const player = snap.countries[snap.playerCountry];
-  const activeFronts=snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy));
+  const frontEnemyOptions=snap.countries.flatMap((country,index)=>
+    country.alive&&index!==snap.playerCountry?[index]:[]);
+  const activeFronts=snap.fronts.filter(f=>f.owner===snap.playerCountry&&snap.countries[f.enemy]?.alive);
   const targetFront=activeFronts.find(f=>f.id===frontTargetId);
   const draftReady=frontDraft!==null&&canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,
-    snap.playerCountry,snap.controller,player.atWar,st.pendingCommands>0);
+    snap.playerCountry,snap.controller,frontEnemyOptions,st.pendingCommands>0);
   const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
 
@@ -456,8 +460,8 @@ export function GameScreen() {
   }
 
   function startFrontDraft(){
-    if(!mapReady||!player.atWar.length)return;
-    setFrontDraft({enemy:player.atWar[0],provinces:[]});
+    if(!mapReady||!frontEnemyOptions.length)return;
+    setFrontDraft({enemy:player.atWar[0]??frontEnemyOptions[0],provinces:[]});
     setFrontTargetId(null);
     setMarqueeMode(false);
     setMoveMode(false);setAttackMode(false);setDestination('');
@@ -489,7 +493,7 @@ export function GameScreen() {
   }
   function commitFrontDraft(){
     if(!frontDraft||!canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,gameSnap.playerCountry,
-      gameSnap.controller,player.atWar,st.pendingCommands>0))return;
+      gameSnap.controller,frontEnemyOptions,st.pendingCommands>0))return;
     engineClient.command('createFront',{enemy:frontDraft.enemy,provinces:frontDraft.provinces});
     setFrontDraft(null);
   }
@@ -585,7 +589,7 @@ export function GameScreen() {
           <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
           <button type="button" data-testid="map-box-select" aria-pressed={marqueeMode} disabled={!mapReady}
             onClick={toggleMarquee}>{marqueeMode?(lang==='ja'?'範囲選択を終了':'Exit box select'):(lang==='ja'?'▱ 範囲選択':'▱ Box select')}</button>
-          <button type="button" data-testid="map-front-draw" disabled={!mapReady||!player.atWar.length}
+          <button type="button" data-testid="map-front-draw" disabled={!mapReady||!frontEnemyOptions.length}
             aria-pressed={frontDraft!==null} onClick={()=>frontDraft?setFrontDraft(null):startFrontDraft()}>
             {frontDraft?(lang==='ja'?'戦線指定終了':'Exit front draft'):(lang==='ja'?'✎ 戦線指定':'Draw front')}</button>
           <button type="button" data-testid="map-front-target-mode" disabled={!mapReady||!activeFronts.length}
@@ -597,7 +601,7 @@ export function GameScreen() {
           <label>{lang==='ja'?'交戦相手':'Enemy'}
             <select data-testid="map-front-enemy" value={frontDraft.enemy} onChange={e=>
               setFrontDraft({enemy:Number(e.target.value),provinces:[]})}>
-              {player.atWar.map(enemy=><option value={enemy} key={enemy}>
+              {frontEnemyOptions.map(enemy=><option value={enemy} key={enemy}>
                 {lang==='ja'?snap.countries[enemy].nameJa:snap.countries[enemy].nameEn}
               </option>)}
             </select>
@@ -612,7 +616,7 @@ export function GameScreen() {
               setFrontDraft({...frontDraft,provinces:[]})}>{lang==='ja'?'指定解除':'Clear'}</button>
             <button data-testid="map-front-cancel" onClick={()=>setFrontDraft(null)}>{lang==='ja'?'キャンセル':'Cancel'}</button>
           </div>
-          <small className="muted">{lang==='ja'?'作成後の師団割当・作戦開始は戦線画面で操作します。':'Assign divisions and start operations from the front panel.'}</small>
+          <small className="muted">{lang==='ja'?'開戦前の戦線は一時停止で保存されます。師団の一括割当は戦線画面で実行できます。':'Pre-war fronts are saved paused. Assign divisions in the fronts panel.'}</small>
         </div>}
         {frontTargetId!==null&&<div className="map-front-planner" data-testid="map-front-target-planner">
           <b>{lang==='ja'?'地図で攻勢目標を指定':'Pick offensive objective'}</b>
@@ -621,8 +625,8 @@ export function GameScreen() {
               {activeFronts.map(f=><option value={f.id} key={f.id}>#{f.id} {lang==='ja'?snap.countries[f.enemy].nameJa:snap.countries[f.enemy].nameEn}</option>)}
             </select>
           </label>
-          <div className="muted">{lang==='ja'?'敵支配州をクリックして目標を登録。Ctrl/Shift:追加、Alt:除外。戦線のスタンスは変わりません。':
-            'Click an enemy-controlled province. Ctrl/Shift: add, Alt: remove. Stance is unchanged.'}</div>
+          <div className="muted">{lang==='ja'?'敵国州をクリック、またはドラッグで攻勢線を描く。Shift/Ctrl:追加、Alt:除外。計画だけでは攻撃しません。':
+            'Click an enemy province or drag an offensive line. Shift/Ctrl: add, Alt: remove. Planning never launches attacks.'}</div>
           <div className="row">
             <button data-testid="map-target-clear" disabled={!targetFront?.targets.length||st.pendingCommands>0}
               onClick={()=>{
