@@ -28,7 +28,7 @@ export function createUnitOverlay(container: HTMLElement, project: (province: nu
       return node;
     };
     for(const f of fronts){
-      const group=el('g',{'data-testid':f.id<0?'map-front-draft':'map-front-'+f.id,'data-state':f.paused?'paused':'active','data-highlighted':String(f.highlighted),class:'front-plan '+(f.paused?'paused ': '')+(f.highlighted?'highlighted ':'')+f.stance});
+      const group=el('g',{'data-testid':f.id<0?'map-front-draft':'map-front-'+f.id,'data-state':f.paused?'paused':'active','data-highlighted':String(f.highlighted),class:'front-plan '+(f.paused?'paused ': '')+(f.highlighted?'highlighted ':'')+(f.planned?'prewar ':'')+f.stance});
       for(const p of f.provinces){
         const xy=point(p);if(!valid(xy))continue;
         group.appendChild(el('circle',{cx:xy[0],cy:xy[1],r:15,class:'front-province'}));
