@@ -41,3 +41,14 @@
 - [ ] 目的: 命令・UI連携 / 対象: command bus/React UI / 内容: デザイナー編集、研究/MIO画面、空域・戦闘幅のpreview、無効理由表示 / テスト: command revision conflictとPlaywright / 期待: 不正/平時攻撃をUIからも排除
 - [ ] 目的: AI設計・補給連携 / 対象: AI planner/logistics / 内容: 評価予算内の設計候補、燃料/弾薬/空域/防空 / テスト: AI無限ループ、予算枯渇、停止復帰 / 期待: maxAIWorkを超えない
 - [ ] 目的: 主要性能・バランスPoC / 対象: tools/bench.ts, tests/integration/* / 内容: 20 tank/20 air、500 division/200 wing/20 zone、3650日、10seed比較 / テスト: CPU/メモリ・TCO・ゲームスノーボール / 期待: 数値根拠が得られるまでp95未確認と表示
+
+
+## DESIGN-02a / COMBAT-01a：参照計算スライス（実装PR、UI/本番接続前）
+- [x] 目的: 型付き部品カタログ / 対象: src/engine/strategy/designer/catalog.ts / 内容: シャーシ4種・機体3種・戦車/航空主要モジュール、技術IDとmaterial billを実装 / テスト: 中戦車と小型機の合法・無効構成 / 期待: runtime ID検証・技術未研究拒否
+- [x] 目的: 戦車設計の純計算 / 対象: src/engine/strategy/designer/tank.ts / 内容: 重量・出力・速度・装甲・信頼性・IC・燃料・資材 / テスト: 中戦車26.7t/31.8kmh/R82%/29.46IC / 期待: 設計で在庫増殖なし
+- [x] 目的: 航空機設計の純計算 / 対象: src/engine/strategy/designer/aircraft.ts / 内容: 搭載重量・推力/重量・武装/任務・速度・航続半径・IC・信頼性 / テスト: 小型機461.23kmh/893.91km/402.26km/R88%/18IC / 期待: 非合法出力・重量・未解禁拒否
+- [x] 目的: 非戦闘故障の決定論的な損失計算 / 対象: src/engine/strategy/combat/attrition.ts / 内容: 6h環境・PCG32派生ストリーム、原因別eventId / テスト: R80%対95%・1000両・圏外の航空機拒否 / 期待: 損失は整数/保有量以下、stateは不変
+- [x] 目的: 陸戦戦闘幅・装甲/貫通の参照計算 / 対象: src/engine/strategy/combat/land.ts / 内容: 大隊加重・地形上限・装甲半減・ORG増 / テスト: 山岳幅50で30幅2師団・Piercing70境界 / 期待: 予備師団除外・決定論
+- [ ] 目的: 設計カタログのシナリオpack化 / 対象: data/packs/.../modules.json / 内容: バージョン付き外部カタログ・source validation・ゲームへ接続 / テスト: malformed packと旧model revision / 期待: 無効データ拒否、後方カタログsnapshotに対応
+- [ ] 目的: 設計版永続化/実ゲーム装備の導出 / 対象: strategy/model.ts, designer/revisions.ts, save.ts, command bus / 内容: modelId+revisionと実際の国別techDone・MIO快照による承認、Lot/Lineへ紐付け / テスト: 旧型番が設計変更で自動強化されない / 期待: 生産・装備移転は単一資産台帳で確定
+- [ ] 目的: 4×6時間戦闘への接続 / 対象: strategy/tick.ts と本番戦闘 / 内容: pure preview→現場戦闘/airwingsへ統合、非戦闘損耗をeventIdで重複排除 / テスト: 同時戦闘・故障・修理の数量差分 / 期待: 机上のpreviewを実戦結果と取り違えない
