@@ -172,3 +172,16 @@ export function applyFocus(n:Nation,focus:Focus,all:readonly Focus[],spirits:rea
   }
   return {nation:{...n,researchSlotBonus:bonus,focusDone:[...n.focusDone,focus.id]},spirits:effects};
 }
+
+/** Exclusive physical operation rights: the owner and occupiers must never
+ * collectively operate more than 100% of a factory's intact IC.
+ */
+export function controlledFactoryFraction(regionOwner:number,operator:number,records:readonly Occupation[]):number{
+  const occupied=records.reduce((sum,o)=>sum+clamp(o.share,0,1),0);
+  if(occupied>1+1e-8)throw new RangeError('overallocated occupation');
+  if(operator===regionOwner)return Math.max(0,1-occupied);
+  return Math.min(1,records.filter(o=>o.occupier===operator).reduce((sum,o)=>{
+    const raw=clamp(o.share,0,1),policy=o.policy==='lenient'?0.7:o.policy==='exploit'?1.25:1;
+    return sum+Math.min(raw,raw*policy*(1-o.resistance*0.004));
+  },0));
+}
