@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true, includeIssuedEquipment = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true, includeIssuedEquipment = true, includeFrontlinePriority = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -301,6 +301,15 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
       h=mixStr(h,rec.modelId);
       h=mixFloat(h,rec.quantity);
     }
+  }
+  // Only v19+ mixes front-line placement priority. Older save integrity
+  // must remain bit-identical even when the current engine understands it.
+  if(!legacy&&includeHierarchy&&includeFrontControl&&includeFormationCommanders&&
+    includeCustomTemplates&&includeCustomTraining&&includeReinforcementPriority&&
+    includeQueuedTraining&&includeProductionPlans&&includeProductionMode&&
+    includeModelProduction&&includeModelStock&&includeIssuedEquipment&&includeFrontlinePriority){
+    h=mixStr(h,'frontline-priority-v19');
+    for(const u of w.units)h=mixInt(h,u.frontlinePriority??5);
   }
   return h >>> 0;
 }
