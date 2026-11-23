@@ -39,6 +39,8 @@ export function ArmyCommandDock({
   const deployable=targetUnits.length>0&&targetUnits.length<=256&&
     targetUnits.every(u=>!u.moving&&!u.inBattle&&!u.encircled&&!u.manualHold);
   const busy=pending!==0;
+  const atWar=!!currentFront&&snap.countries[country].atWar.includes(currentFront.enemy);
+  const heldUnits=targetUnits.filter(u=>u.manualHold);
   const activeName=edit?(edit.kind==='army'?armies:groups).find(f=>f.id===edit.id)?.name:null;
   const createArmy=()=>{
     if(busy||armies.length>=MAX_ARMIES)return;
@@ -141,13 +143,27 @@ export function ArmyCommandDock({
         onClick={()=>currentFront&&onDrawObjective(currentFront.id)}>
         {label('地図で進軍方向指定','Draw offensive direction')}
       </button>
+      <button data-testid="dock-start-offensive" disabled={busy||!currentFront||!atWar||currentFront.paused}
+        onClick={()=>currentFront&&engineClient.command('setFrontStance',{
+          frontId:currentFront.id,stance:'attack',cap:Math.max(1,currentFront.cap),
+        })}>{label('攻勢開始','Start offensive')}</button>
+      <button data-testid="dock-toggle-front-pause" disabled={busy||!currentFront||(currentFront.paused&&!atWar)}
+        onClick={()=>currentFront&&engineClient.command('setFrontPaused',{
+          frontId:currentFront.id,paused:!currentFront.paused,
+        })}>{currentFront?.paused?label('戦線を再開','Resume front'):label('戦線を停止','Pause front')}</button>
       <button data-testid="dock-defend-front" disabled={busy||!currentFront}
         onClick={()=>currentFront&&engineClient.command('setFrontStance',{
           frontId:currentFront.id,stance:'hold',cap:0,
         })}>{label('戦線を防衛','Defend frontline')}</button>
+      <button data-testid="dock-release-hold" disabled={busy||!heldUnits.length}
+        onClick={()=>heldUnits.length&&engineClient.command('setManualHold',{
+          units:heldUnits.map(u=>u.id),hold:false,
+        })}>{label('選択師団の手動固定解除','Release manual holds')} ({heldUnits.length})</button>
       <small className="muted">{targetUnits.some(u=>u.manualHold)
-        ?label('手動固定の師団は自動配置できません。先に手動固定を解除してください。','Release manual holds before automatic deployment.')
-        :label('自動配置は地上経路のみ。進軍方向の変更は地図で敵支配州を指定します。','Deployment uses land paths; choose the enemy destination on the map.')}</small>
+        ?label('手動固定の師団は自動配置できません。手動固定解除後、改めて自動配置してください。','Release manual holds, then deploy again.')
+        :currentFront?.paused
+          ?label('停止中は攻勢を実行しません。開戦後に戦線を再開してください。','A paused front does not attack. Resume it after war starts.')
+          :label('進軍方向を地図で指定してから攻勢開始。敵支配州に向けて戦線AIが毎週命令します。','Draw an offensive destination, then start the offensive. Front AI issues orders weekly.')}</small>
     </div>
   </section>;
 }
