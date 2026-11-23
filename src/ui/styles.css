@@ -145,6 +145,11 @@ input, select {
 .front-plan.retreat { color:#c3b3eb; }
 .front-plan.highlighted { opacity:1; color:#ffe29a; }
 .front-plan.paused { opacity:.48; color:#c1c5cd; }
+.front-plan.prewar { opacity:.84; color:#82b4df; }
+.front-intent-line { stroke:#8ed4f5; stroke-width:2.5; stroke-dasharray:9 6; fill:none; opacity:.88; }
+.front-intent-arrow { fill:#8ed4f5; opacity:.92; }
+.front-plan.prewar .front-intent-line {stroke:#a4dcff;}
+.front-plan.prewar .front-intent-arrow {fill:#a4dcff;}
 .front-province,.front-target { stroke:currentColor; stroke-width:2; fill:none; stroke-dasharray:4 3; }
 .front-link { stroke:currentColor; stroke-width:4; stroke-linecap:round; }
 .front-arrow { stroke:currentColor; stroke-width:3; stroke-dasharray:6 4; }
