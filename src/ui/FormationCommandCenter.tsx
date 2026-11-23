@@ -3,6 +3,7 @@ import type {UiSnapshot} from '../engine/ui';
 import type {FormationScope,FormationTargetScope} from '../engine/military/formationOverview';
 import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview} from '../engine/military/formationOverview';
 import {engineClient} from './engineClient';
+import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 
 type Lang='ja'|'en';
 type Props={snap:UiSnapshot;lang:Lang;focus:FormationScope|null;pending:number;
@@ -10,6 +11,7 @@ type Props={snap:UiSnapshot;lang:Lang;focus:FormationScope|null;pending:number;
 
 export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSelect}:Props){
   const [chosenFront,setChosenFront]=useState('');
+  const [deploymentMode,setDeploymentMode]=useState<FrontDeploymentMode>('even');
   const [targetScope,setTargetScope]=useState<FormationTargetScope>('all');
   const [acknowledgedSignature,setAcknowledgedSignature]=useState<string|null>(null);
   const ja=lang==='ja';
@@ -28,6 +30,8 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const scoped=scopedFormationUnits(units,targetScope,selectedIds);
   const ids=scoped.map(u=>u.id);
   const enabled=!!formation&&scoped.length>0&&scoped.length<=256&&pending===0;
+  const deploymentBusy=scoped.some(u=>u.manualHold||u.moving||u.inBattle||u.encircled);
+  const deployEnabled=enabled&&!!front&&!deploymentBusy&&front.provinces.some(p=>snap.controller[p]===country);
   const hold=formationOperationPreview(scoped,'hold');
   const resume=formationOperationPreview(scoped,'resume');
   const assign=formationOperationPreview(scoped,'assignFront',front?.id);
@@ -111,6 +115,30 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           onClick={()=>send('unassignFromFront',{units:unassign.ids},unassign.ids)}>
           {label('戦線割当を解除','Remove from fronts')} ({unassign.ids.length})
         </button>
+      </div>
+      <div className="formation-command-target" data-testid="formation-deployment-controls">
+        <label htmlFor="formation-deployment-mode">{label('戦線への自動配置','Deploy along the front')}</label>
+        <div className="formation-command-center-actions">
+          <select id="formation-deployment-mode" data-testid="formation-deployment-mode"
+            value={deploymentMode} onChange={e=>setDeploymentMode(e.target.value as FrontDeploymentMode)}>
+            <option value="even">{label('均等配置：州ごとの師団数を均す','Even: balance divisions across provinces')}</option>
+            <option value="strategic">{label('戦略配置：国境・補給・インフラの要所を優先','Strategic: reinforce threatened, supplied positions')}</option>
+            <option value="nearest">{label('最短移動：近い戦線州を優先','Nearest: shortest frontline moves')}</option>
+          </select>
+          <button data-testid="formation-deploy-front" disabled={!deployEnabled}
+            onClick={()=>front&&send('deployToFront',{
+              frontId:front.id,expectedRevision:front.revision,units:ids,strategy:deploymentMode,
+            },ids)}>
+            {label('配置を実行','Deploy')} ({ids.length})
+          </button>
+        </div>
+        <small data-testid="formation-deployment-hint">
+          {deploymentBusy
+            ? label('移動中・戦闘中・包囲中・手動固定中の師団を含みます。全員が待機状態になってから実行してください。',
+              'Contains moving, engaged, encircled or manually held units. All must be idle before deployment.')
+            : label('移動経路は事前検証され、一括成功または全件拒否されます。移動は瞬間移動ではありません。',
+              'All routes are checked atomically. Divisions travel normally rather than teleporting.')}
+        </small>
       </div>
       <small className="formation-command-preview" data-testid="formation-command-preview" aria-live="polite">
         {label('実際に変更する師団','Divisions to change')} — {label('保留','Hold')}: {hold.ids.length} ·

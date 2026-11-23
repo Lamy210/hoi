@@ -39,6 +39,8 @@ test('軍集団指揮画面で2師団を集計し自動作戦の保留と再開�
   await expect(page.getByTestId('formation-equipment-deficit')).toContainText('歩兵装備');
   await expect(page.getByTestId('formation-front-select')).toBeEnabled();
   await expect(page.getByTestId('formation-assign-front')).toBeDisabled();
+  await expect(page.getByTestId('formation-deployment-mode')).toBeVisible();
+  await expect(page.getByTestId('formation-deploy-front')).toBeDisabled();
   await expect(page.getByTestId('formation-no-fronts')).toBeVisible();
   await page.getByTestId('formation-manual-hold').click();await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('formation-manual-hold')).toBeDisabled();
@@ -96,6 +98,8 @@ test('戦線割当による手動固定の解除確認を必須にし、対象�
   await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('formation-manual-hold-count')).toHaveText('2');
   await page.getByTestId('formation-front-select').selectOption(frontId);
+  await expect(page.getByTestId('formation-deploy-front')).toBeDisabled();
+  await expect(page.getByTestId('formation-deployment-hint')).toContainText('手動固定中');
   await expect(page.getByTestId('formation-release-warning')).toContainText('2師団');
   await expect(page.getByTestId('formation-assign-front')).toBeDisabled();
   await page.getByTestId('formation-confirm-release').check();
@@ -108,4 +112,12 @@ test('戦線割当による手動固定の解除確認を必須にし、対象�
   await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('formation-front-assigned')).toHaveText('2');
   await expect(page.getByTestId('formation-manual-hold-count')).toHaveText('0');
+  // Previous assertion used "withoutFront"; the assigned units are now excluded by that filter.
+  await page.getByTestId('formation-target-scope').selectOption('all');
+  await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
+  await page.getByTestId('formation-deployment-mode').selectOption('even');
+  await expect(page.getByTestId('formation-deploy-front')).toBeEnabled();
+  await page.getByTestId('formation-deploy-front').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('formation-front-assigned')).toHaveText('2');
 });

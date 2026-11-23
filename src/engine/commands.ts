@@ -12,6 +12,7 @@ import { applyRelationDelta, endWar, startWar, warScoreFor } from './military/wa
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './scenario/unitCosts';
 import { autoAssignCommander, releaseCommander } from './military/commanders';
 import { autoFrontProvinces, frontOf } from './military/fronts';
+import { planFrontDeployment } from './military/frontDeployment';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
 import { MAX_ART_SHARE } from './systems/production';
@@ -600,6 +601,28 @@ export function registerAllCommands(): void {
     validate(w,p,issuer){const c=actorCountry(w,issuer),ids=p.units;if(c===null||issuer==='frontai')return 'badIssuer';if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))?null:'notYourUnit';},
     apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id))u.frontId=-1;},
   });
+  // One-shot automatic formation deployment. Validate every path before any unit changes.
+  // A manual hold/movement must be resumed explicitly; front assignment alone is not consent.
+  registerCommand('deployToFront', {
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai'||!w.countries.alive[country])return 'badIssuer';
+      return planFrontDeployment(w,country,p.frontId,p.expectedRevision,p.units,p.strategy).reason;
+    },
+    apply(w,p,issuer){
+      const country=actorCountry(w,issuer)!;
+      const result=planFrontDeployment(w,country,p.frontId,p.expectedRevision,p.units,p.strategy);
+      if(result.reason)throw new Error('validated front deployment plan no longer valid: '+result.reason);
+      for(const order of result.orders){
+        const unit=w.units.find(u=>u.id===order.unitId)!;
+        unit.frontId=p.frontId as number;
+        unit.path=order.path;
+        unit.segIdx=0;unit.segProgress=0;
+        unit.segDays=order.path.length>1?segmentDays(w,order.path[0],order.path[1],unit):0;
+      }
+    },
+  });
+
   registerCommand('setManualHold', {
     validate(w,p,issuer){const c=actorCountry(w,issuer),ids=p.units;if(c===null||issuer==='frontai')return 'badIssuer';if(typeof p.hold!=='boolean'||!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))?null:'notYourUnit';},
     apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id))u.manualHold=p.hold as boolean;},
