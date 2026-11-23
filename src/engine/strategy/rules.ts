@@ -110,7 +110,7 @@ export function combatHits(attacker:BattleStats,defender:BattleStats,attacking=t
 export function canAutoAttack(w:Pick<StrategyState,'wars'>,plan:Plan,unit:Division):boolean{
   return plan.authorized&&!plan.paused&&plan.autonomy==='AUTO'&&
     plan.kind==='OFFENSIVE'&&atWar(w,plan.country,plan.enemy)&&
-    unit.country===plan.country&&!unit.manualHold&&!unit.moving&&!unit.inBattle;
+    unit.country===plan.country&&!unit.manualHold&&!unit.inBattle&&combatReady(unit);
 }
 export function resistanceAfterDay(o:Occupation,atWarNow:boolean,grievance=0):{resistance:number;compliance:number}{
   const policy={lenient:{unrest:-8,compliance:1.5},military:{unrest:-12,compliance:0.65},
