@@ -144,14 +144,18 @@ export function aiThink(w: WorldState, c: number): void {
     if (front) {
       const ratio = aggregateFrontRatio(w, front);
       const threshold = [1.6, 1.3, 1.1][w.difficulty] + (rng.nextFloat() - 0.5) * noise * 0.3;
-      const options = ['hold', 'attack'];
-      const scores = [0, ratio];
+      const options = ['hold', 'counterattack', 'attack'];
+      const scores = [0, 0.5, ratio];
       if (ratio > threshold) {
         aiCmd(w, 'ai:' + c, 'setFrontStance', { frontId: front.id, stance: 'attack', cap: 3 });
         log(w, c, 'front-stance', options, scores, 'attack', 'ratio=' + ratio.toFixed(2));
       } else {
-        aiCmd(w, 'ai:' + c, 'setFrontStance', { frontId: front.id, stance: 'hold', cap: 0 });
-        log(w, c, 'front-stance', options, scores, 'hold', 'ratio=' + ratio.toFixed(2));
+        // Defend while weak, but prepare a limited counteroffensive if our
+        // own provinces are under enemy control. Never turn the entire front
+        // into a blind full attack while reorganizing.
+        const lostLand=w.prov.owner.some((owner,p)=>owner===c&&w.prov.controller[p]===front.enemy);
+        aiCmd(w, 'ai:' + c, 'setFrontStance', { frontId: front.id, stance: lostLand?'counterattack':'hold', cap: lostLand?2:0 });
+        log(w, c, 'front-stance', options, scores, lostLand?'counterattack':'hold', 'ratio=' + ratio.toFixed(2));
       }
     }
   } else {
