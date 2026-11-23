@@ -9,7 +9,7 @@ import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
-import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, provincesAlongStroke } from './frontMapPlanning';
+import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, canCommitFrontEdit, frontProvinceChangeSummary, provincesAlongStroke } from './frontMapPlanning';
 import { frontCreationCandidates, type FrontCreationSource } from './frontCreationSelection';
 import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
@@ -55,7 +55,7 @@ export function GameScreen() {
   const [rosterQuery, setRosterQuery] = useState('');
   const [rosterFilter, setRosterFilter] = useState('all');
   const [marqueeMode,setMarqueeMode]=useState(false);
-  const [frontDraft,setFrontDraft]=useState<{enemy:number;provinces:number[]}|null>(null);
+  const [frontDraft,setFrontDraft]=useState<{enemy:number;provinces:number[];edit?:{id:number;revision:number;before:number[]}}|null>(null);
   const [frontDraftSource,setFrontDraftSource]=useState<FrontCreationSource>('none');
   const [frontTargetId,setFrontTargetId]=useState<number|null>(null);
   const [targetStroke,setTargetStroke]=useState<{x:number;y:number}[]>([]);
@@ -234,6 +234,7 @@ export function GameScreen() {
   useEffect(()=>{
     if(!mapReady||!snap)return;
     const layers=frontView(snap,selectedIds,frontVisibility)
+      .filter(layer=>layer.id!==frontDraft?.edit?.id)
       .map(layer=>layer.id===frontTargetId?{...layer,highlighted:true}:layer);
     if(frontDraft)layers.push({id:-1,provinces:frontDraft.provinces.filter(p=>snap.controller[p]===snap.playerCountry),
       links:[],targets:[],arrows:[],stance:'draft',paused:false,highlighted:true});
@@ -267,6 +268,13 @@ export function GameScreen() {
   const targetFront=activeFronts.find(f=>f.id===frontTargetId);
   const draftReady=frontDraft!==null&&canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,
     snap.playerCountry,snap.controller,frontEnemyOptions,st.pendingCommands>0);
+  const editCurrent=frontDraft?.edit?activeFronts.find(f=>f.id===frontDraft.edit?.id):undefined;
+  const editDiff=frontDraft?.edit?frontProvinceChangeSummary(frontDraft.edit.before,frontDraft.provinces):null;
+  const editReady=frontDraft?.edit!==undefined&&editCurrent!==undefined&&
+    editCurrent.enemy===frontDraft.enemy&&
+    canCommitFrontEdit(frontDraft.edit.before,frontDraft.provinces,
+      frontDraft.edit.revision,editCurrent.revision,frontDraft.enemy,
+      snap.playerCountry,snap.controller,frontEnemyOptions,st.pendingCommands>0);
   const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
 
@@ -512,6 +520,23 @@ export function GameScreen() {
     setFrontVisibility('all');
     setHoverProv(null);
   }
+  function selectFrontForEdit(frontId:number){
+    const existing=activeFronts.find(f=>f.id===frontId);
+    if(!existing||!mapReady)return;
+    setFrontDraft({enemy:existing.enemy,provinces:[...new Set(existing.provinces)].sort((a,b)=>a-b),
+      edit:{id:existing.id,revision:existing.revision,before:[...existing.provinces]}});
+    setFrontDraftSource('none');
+    setFrontTargetId(null);
+    setMarqueeMode(false);
+    setMoveMode(false);setAttackMode(false);setDestination('');
+    setFrontVisibility('all');
+    setMarquee(null);
+  }
+  function startFrontEdit(){
+    if(!mapReady||!activeFronts.length)return;
+    selectFrontForEdit(activeFronts[0].id);
+  }
+
   function startFrontTarget(){
     if(!mapReady||!activeFronts.length)return;
     setFrontTargetId(activeFronts[0].id);
@@ -548,6 +573,13 @@ export function GameScreen() {
   function commitFrontDraft(){
     if(!frontDraft||!canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,gameSnap.playerCountry,
       gameSnap.controller,frontEnemyOptions,st.pendingCommands>0))return;
+    if(frontDraft.edit){
+      if(!editReady)return;
+      engineClient.command('updateFrontProvinces',{frontId:frontDraft.edit.id,
+        expectedRevision:frontDraft.edit.revision,provinces:frontDraft.provinces});
+      setFrontDraft(null);
+      return;
+    }
     if(draftHasInvalidBatch)return;
     engineClient.command('createFront',{enemy:frontDraft.enemy,provinces:frontDraft.provinces,
       ...(frontDraftSource==='none'?{}:{units:frontCreation.ids})});
@@ -651,22 +683,42 @@ export function GameScreen() {
           <button type="button" data-testid="map-front-draw" disabled={!mapReady||!frontEnemyOptions.length}
             aria-pressed={frontDraft!==null} onClick={()=>frontDraft?setFrontDraft(null):startFrontDraft()}>
             {frontDraft?(lang==='ja'?'戦線指定終了':'Exit front draft'):(lang==='ja'?'✎ 戦線指定':'Draw front')}</button>
+          <button type="button" data-testid="map-front-edit" disabled={!mapReady||!activeFronts.length}
+            aria-pressed={frontDraft?.edit!==undefined}
+            onClick={()=>frontDraft?.edit?setFrontDraft(null):startFrontEdit()}>
+            {frontDraft?.edit?(lang==='ja'?'編集終了':'Exit edit'):(lang==='ja'?'✎ 戦線を修正':'Edit frontline')}</button>
           <button type="button" data-testid="map-front-target-mode" disabled={!mapReady||!activeFronts.length}
             aria-pressed={frontTargetId!==null} onClick={()=>frontTargetId!==null?setFrontTargetId(null):startFrontTarget()}>
             {frontTargetId!==null?(lang==='ja'?'目標指定終了':'Exit objective'):(lang==='ja'?'◇ 攻勢目標':'Set objective')}</button>
         </div>
         {frontDraft&&<div className="map-front-planner" data-testid="map-front-planner">
-          <b>{lang==='ja'?'地図で戦線を指定':'Draft frontline on map'}</b>
-          <label>{lang==='ja'?'交戦相手':'Enemy'}
+          <b>{frontDraft.edit?(lang==='ja'?'既存戦線の州範囲を修正':'Edit existing front provinces'):
+            (lang==='ja'?'地図で戦線を指定':'Draft frontline on map')}</b>
+          {frontDraft.edit&&<label>{lang==='ja'?'編集する戦線':'Front to edit'}
+            <select data-testid="map-front-edit-select" value={frontDraft.edit.id}
+              onChange={e=>selectFrontForEdit(Number(e.target.value))}>
+              {activeFronts.map(f=><option key={f.id} value={f.id}>
+                #{f.id} {lang==='ja'?snap.countries[f.enemy].nameJa:snap.countries[f.enemy].nameEn}
+              </option>)}
+            </select>
+          </label>}
+          {!frontDraft.edit&&<label>{lang==='ja'?'交戦相手':'Enemy'}
             <select data-testid="map-front-enemy" value={frontDraft.enemy} onChange={e=>
               setFrontDraft({enemy:Number(e.target.value),provinces:[]})}>
               {frontEnemyOptions.map(enemy=><option value={enemy} key={enemy}>
                 {lang==='ja'?snap.countries[enemy].nameJa:snap.countries[enemy].nameEn}
               </option>)}
             </select>
-          </label>
+          </label>}
           <span data-testid="map-front-draft-count">{lang==='ja'?'指定州':'Provinces'}: {frontDraft.provinces.length}</span>
-          <label>{lang==='ja'?'戦線に紐づける部隊':'Assign divisions on creation'}
+          {frontDraft.edit&&<div data-testid="map-front-edit-preview">
+            {lang==='ja'?'追加':'Added'}: {editDiff?.added??0} · {lang==='ja'?'削除':'Removed'}: {editDiff?.removed??0}
+            {editCurrent?.revision!==frontDraft.edit.revision&&<div role="alert" className="muted">
+              {lang==='ja'?'戦線の内容が更新されています。再選択して編集し直してください。':'Front changed. Reselect it to edit the latest version.'}
+            </div>}
+            <small className="muted">{lang==='ja'?'既存の編入師団・攻勢目標・攻撃スタンスを維持します。':'Assigned divisions, targets and stance are preserved.'}</small>
+          </div>}
+          {!frontDraft.edit&&<label>{lang==='ja'?'戦線に紐づける部隊':'Assign divisions on creation'}
             <select data-testid="map-front-assignment-source" value={frontDraftSource}
               onChange={e=>setFrontDraftSource(e.target.value as FrontCreationSource)}>
               <option value="none">{lang==='ja'?'戦線のみ作成（後で編入）':'Create front only'}</option>
@@ -679,8 +731,8 @@ export function GameScreen() {
                 {lang==='ja'?'軍':'Army'}: {a.name}
               </option>)}
             </select>
-          </label>
-          {frontDraftSource!=='none'&&<div data-testid="map-front-assignment-preview">
+          </label>}
+          {!frontDraft.edit&&frontDraftSource!=='none'&&<div data-testid="map-front-assignment-preview">
             {lang==='ja'?'同時編入':'Atomic assignment'}: {frontCreation.ids.length}
             {frontCreation.alreadyAssigned>0&&<span> · {lang==='ja'?'既存戦線の所属を維持':'Already assigned'}: {frontCreation.alreadyAssigned}</span>}
             {frontCreation.manualHold>0&&<span> · {lang==='ja'?'手動固定を維持':'Manual hold preserved'}: {frontCreation.manualHold}</span>}
@@ -689,14 +741,18 @@ export function GameScreen() {
           <div className="muted">{lang==='ja'?'クリック:追加・解除 / 矩形ドラッグ:置換 / Shift・Ctrl:追加 / Alt:除外':
             'Click: toggle / drag: replace / Shift or Ctrl: add / Alt: remove'}</div>
           <div className="row">
-            <button data-testid="map-front-create" className="primary" disabled={!draftReady||draftHasInvalidBatch} onClick={commitFrontDraft}>
-              {lang==='ja'?(frontDraftSource==='none'?'戦線を作成':'戦線作成と部隊編入'):(frontDraftSource==='none'?'Create front':'Create and assign')}</button>
+            <button data-testid={frontDraft.edit?'map-front-save':'map-front-create'} className="primary"
+              disabled={frontDraft.edit?!editReady:!draftReady||draftHasInvalidBatch} onClick={commitFrontDraft}>
+              {frontDraft.edit?(lang==='ja'?'戦線変更を保存':'Save frontline'):
+                lang==='ja'?(frontDraftSource==='none'?'戦線を作成':'戦線作成と部隊編入'):(frontDraftSource==='none'?'Create front':'Create and assign')}</button>
             <button data-testid="map-front-clear" disabled={!frontDraft.provinces.length} onClick={()=>
               setFrontDraft({...frontDraft,provinces:[]})}>{lang==='ja'?'指定解除':'Clear'}</button>
-            <button data-testid="map-front-cancel" onClick={()=>setFrontDraft(null)}>{lang==='ja'?'キャンセル':'Cancel'}</button>
+            <button data-testid={frontDraft.edit?'map-front-edit-cancel':'map-front-cancel'} onClick={()=>setFrontDraft(null)}>{lang==='ja'?'キャンセル':'Cancel'}</button>
           </div>
-          <small className="muted">{lang==='ja'?'作成と編入は一度に確定します。既存戦線から師団を奪わず手動固定も維持。平時の戦線は停止状態です。':
-                'Creation and assignment are atomic. Existing assignments and manual holds remain intact. Pre-war fronts start paused.'}</small>
+          <small className="muted">{frontDraft.edit
+            ?(lang==='ja'?'保存するまでは作戦に反映されません。0州の戦線は保存できません。':'Changes do not affect orders until saved. An empty front cannot be saved.')
+            :(lang==='ja'?'作成と編入は一度に確定します。既存戦線から師団を奪わず手動固定も維持。平時の戦線は停止状態です。':
+              'Creation and assignment are atomic. Existing assignments and manual holds remain intact. Pre-war fronts start paused.')}</small>
         </div>}
         {frontTargetId!==null&&<div className="map-front-planner" data-testid="map-front-target-planner">
           <b>{lang==='ja'?'地図で攻勢目標を指定':'Pick offensive objective'}</b>
