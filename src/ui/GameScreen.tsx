@@ -7,6 +7,7 @@ import { t } from './i18n';
 import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
+import {ArmyCommandDock} from './ArmyCommandDock';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
 import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, canCommitFrontEdit, frontProvinceChangeSummary, provincesAlongStroke, nearestProjectedProvince } from './frontMapPlanning';
@@ -906,6 +907,13 @@ export function GameScreen() {
           <div className="status-toast" onClick={() => appStore.set({ statusMessage: null })}>{st.statusMessage}</div>
         )}
       </div>
+      <ArmyCommandDock snap={snap} lang={lang} selectedIds={selectedIds}
+        pending={st.pendingCommands} focus={focusedFormation}
+        onFocus={setFocusedFormation}
+        onSelect={ids=>selectUnits(ids,false)}
+        onDrawFront={startFrontDraft}
+        onDrawObjective={frontId=>{startFrontTarget();setFrontTargetId(frontId);}}
+      />
       <div className="bottombar">
         {(['political', 'terrain', 'supply'] as const).map((m) => (
           <button key={m} className={'mode-btn' + (st.mapMode === m ? ' active' : '')} data-testid={'mode-' + m} onClick={() => appStore.set({ mapMode: m })}>
