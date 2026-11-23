@@ -470,8 +470,10 @@ export function registerAllCommands(): void {
       if (!w.countries.alive[country]) return 'countryDead';
       if (!Number.isInteger(enemy) || enemy < 0 || enemy >= w.countries.count || !w.countries.alive[enemy]) return 'badTarget';
       if (enemy === country) return 'selfWar';
-      if (!atWar(w, country, enemy)) return 'notAtWar';
+      const atWarNow = atWar(w, country, enemy);
       const provinces = p.provinces as number[] | undefined;
+      // A peacetime front must be explicitly drawn; automatic frontline discovery is wartime-only.
+      if (!atWarNow && provinces === undefined) return 'notAtWar';
       if (provinces !== undefined) {
         if (!Array.isArray(provinces) || provinces.length === 0 || new Set(provinces).size !== provinces.length) return 'badParams';
         for (const prov of provinces) {
@@ -490,7 +492,8 @@ export function registerAllCommands(): void {
       const provinces = Array.isArray(p.provinces) ? (p.provinces as number[]).slice().sort((a, b) => a - b) : autoFrontProvinces(w, country, enemy);
       const targets = Array.isArray(p.targets) ? (p.targets as number[]).slice().sort((a, b) => a - b) : [];
       const cap = typeof p.cap === 'number' ? p.cap : 2;
-      const front = { id: w.nextFrontId++, owner: country, enemy, stance: 'hold' as const, provinces, targets, cap, revision: 1, paused: false };
+      const front = { id: w.nextFrontId++, owner: country, enemy, stance: 'hold' as const, provinces, targets, cap,
+        revision: 1, paused: !atWar(w, country, enemy) };
       w.fronts.push(front);
       void issuer;
     },
@@ -504,7 +507,8 @@ export function registerAllCommands(): void {
       if (!['hold','attack','retreat'].includes(p.stance as string)) return 'badParams';
       if (p.cap !== undefined && (!Number.isInteger(p.cap) || (p.cap as number)<0 || (p.cap as number)>8)) return 'badParams';
       if (p.targets !== undefined && (!Array.isArray(p.targets) || new Set(p.targets).size !== p.targets.length || p.targets.some(x=>!Number.isInteger(x)||x<0||x>=w.prov.count||w.prov.controller[x]!==f.enemy))) return 'badParams';
-      if (!atWar(w,f.owner,f.enemy) && p.stance === 'attack') return 'notAtWar';
+      // An offensive can be drafted before war only while automation is paused.
+      if (!atWar(w,f.owner,f.enemy) && p.stance === 'attack' && !f.paused) return 'notAtWar';
       if ((f.revision??1)>=Number.MAX_SAFE_INTEGER) return 'limitExceeded';
       return null;
     },
@@ -536,12 +540,19 @@ export function registerAllCommands(): void {
       const f=frontOf(w,p.frontId as number), c=actorCountry(w,issuer), ids=p.units;
       if(!f)return 'noFront';
       if(c===null||f.owner!==c||issuer==='frontai')return 'notYourFront';
-      if(!atWar(w,c,f.enemy))return 'notAtWar';
+      if(!w.countries.alive[f.enemy])return 'badTarget';
       if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';
       for(const id of ids)if(!w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))return 'notYourUnit';
       return null;
     },
-    apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id)){u.frontId=p.frontId as number;u.manualHold=false;}},
+    apply(w,p){
+      const ids=new Set(p.units as number[]),f=frontOf(w,p.frontId as number)!;
+      for(const u of w.units)if(ids.has(u.id)){
+        u.frontId=f.id;
+        // Pre-war assignment is organizational only and must never clear a player's manual hold.
+        if(atWar(w,f.owner,f.enemy))u.manualHold=false;
+      }
+    },
   });
   registerCommand('unassignFromFront', {
     validate(w,p,issuer){const c=actorCountry(w,issuer),ids=p.units;if(c===null||issuer==='frontai')return 'badIssuer';if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))?null:'notYourUnit';},
