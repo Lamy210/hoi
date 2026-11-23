@@ -19,6 +19,8 @@ export interface MapFrontOverlay {
   stance: string;
   paused: boolean;
   highlighted: boolean;
+  /** Peace-time or post-war orders are visible but never executable until explicitly resumed. */
+  planned?: boolean;
 }
 export interface MapRenderer {
   setFrontOverlay(fronts: MapFrontOverlay[]): void;
