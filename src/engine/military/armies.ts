@@ -4,6 +4,19 @@ export interface Army { id: number; owner: number; name: string; color: string; 
 export interface ArmyGroup { id: number; owner: number; name: string; color: string; commanderId?: number }
 export const MAX_ARMIES = 256, MAX_GROUPS = 64, MAX_ARMY_UNITS = 24, MAX_GROUP_ARMIES = 5;
 export const ARMY_COLORS = ['#4479b6','#638b64','#ad8150','#8b70b4','#aa6666'] as const;
+/** Deterministic, per-country default name. Reuse a vacant sequence number
+ * rather than mutating a second counter. Existing custom names are respected.
+ */
+export function nextFormationName(kind:'army'|'group',names:readonly string[]):string {
+  const prefix=kind==='army'?'軍団':'軍集団';
+  const existing=new Set(names);
+  for(let n=1;n<=MAX_ARMIES+MAX_GROUPS+1;n++){
+    const candidate=prefix+n;
+    if(!existing.has(candidate))return candidate;
+  }
+  throw new RangeError('formation name limit');
+}
+
 export function validName(name: unknown): name is string {
   return typeof name === 'string' && name === name.trim() && [...name].length >= 1 && [...name].length <= 64 && !/[\u0000-\u001f\u007f-\u009f]/u.test(name);
 }
