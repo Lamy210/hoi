@@ -40,6 +40,19 @@ export function createUnitOverlay(container: HTMLElement, project: (province: nu
         const x=(a[0]+b[0])/2,y=(a[1]+b[1])/2,n=Math.min(14,d*.25);
         group.appendChild(el('line',{x1:x-dy/d*n,y1:y+dx/d*n,x2:x+dy/d*n,y2:y-dx/d*n,class:'front-link'}));
       }
+      // A dashed intent line connects the nearest selected anchor with each planned objective.
+      // It is NOT a pathfinding result, movement route, or a guaranteed offensive order.
+      for(const target of f.targets){
+        const dst=point(target);if(!valid(dst))continue;
+        const anchors=f.provinces.map(point).filter(valid);
+        if(!anchors.length)continue;
+        anchors.sort((a,b)=>Math.hypot(a[0]-dst[0],a[1]-dst[1])-Math.hypot(b[0]-dst[0],b[1]-dst[1]));
+        const from=anchors[0],distance=Math.hypot(dst[0]-from[0],dst[1]-from[1]);
+        if(distance<2)continue;
+        group.appendChild(el('line',{x1:from[0],y1:from[1],x2:dst[0],y2:dst[1],class:'front-intent-line','data-intent-target':target}));
+        const dx=(dst[0]-from[0])/distance,dy=(dst[1]-from[1])/distance;
+        group.appendChild(el('path',{d:`M${dst[0]} ${dst[1]} L${dst[0]-dx*11-dy*5} ${dst[1]-dy*11+dx*5} L${dst[0]-dx*11+dy*5} ${dst[1]-dy*11-dx*5} Z`,class:'front-intent-arrow'}));
+      }
       for(const p of f.targets){
         const [x,y]=point(p);if(!valid([x,y]))continue;
         group.appendChild(el('path',{d:`M${x} ${y-12} L${x+12} ${y} L${x} ${y+12} L${x-12} ${y} Z`,class:'front-target','data-target':p}));
