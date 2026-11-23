@@ -64,3 +64,16 @@
 - [ ] 目的: 研究MIO/試作コストの実予約 / 対象: MIO/Researchの実装 / 内容: MIO効果の設計版snapshot、研究コストと試作IC支出の正規台帳 / テスト: 二重XP・無料試作不可 / 期待: 本PRの無償設計登録を将来の試作経済と混同しない
 
 **制限:** 本PRは既存の独立`src/engine/strategy`参照ルール内の接続で、現行本番WorldState、航空任務/航空隊、MIO、UI、国家ごとのライセンス譲渡は対象外。設計Revision用の原材料費は製造時にのみ消費。tick毎の設計整合再計算の性能は未測定で、1000設計以上の最適化を別途実施する。
+
+
+## DEPLOY-01：師団・航空隊へ配備する装備台帳の初期統合（このPR）
+- [x] 目的: 師団への配備・返却を原子化 / 対象: `src/engine/strategy/equipment/{ledger,division}.ts` / 内容: category別需要・国家権限・不足・重複送信防止Revision、倉庫⇔師団Lot移転 / テスト: 新型戦車生産→師団配備→火力増/返却、盗用・容量超過・交戦中拒否 / 期待: 在庫総数不変・操作失敗時入力不変
+- [x] 目的: 航空基地と航空隊の正本を構築 / 対象: `src/engine/strategy/model.ts` / 内容: optional AirBase/ AirWingと修理Lot、国別pilot/師団POP排他、型番一致と駐機上限 / テスト: 他国基地・異型番/偽装機・超過pilots・満杯基地 / 期待: 不正Stateを即時拒否
+- [x] 目的: ready/repairingを同一正本から算出 / 対象: `src/engine/strategy/air/wings.ts` / 内容: 航空隊生成・搭乗員・倉庫⇔航空隊・修理待ち、駐機/運用枠の区別 / テスト: 2機配備・1機修理、満杯運用枠と基地75%破損 / 期待: ready+repairingと国家機体数保存、運用枠重複なし
+- [x] 目的: 保存再開/決定論の統合回帰 / 対象: `tests/integration/strategy-equipment-deployment.test.ts` / 内容: 設計→生産→師団/航空隊→修理、msgpack再読込・tick再進行 / テスト: state hash/lotの整合 / 期待: 再読込で台帳・Revision・pilotが一致
+- [ ] 目的: ブランチ最終品質ゲート / 対象: GitHub Actions Check/Specification Design / 内容: TS/Vitest/Build/Playwright/OpenSpec strictと設計レビュー / テスト: HEAD CI success / 期待: 検証成功後にのみマージ
+- [ ] 目的: 修理中機体の有償復帰 / 対象: `src/engine/strategy/air/repairs.ts` と産業Tick / 内容: IC/資材/労働力から修理工作を予約・払出 / テスト: 0資材でready増えない、失われた機体が0以下にならない / 期待: 無料修理禁止（本PR未実装）
+- [ ] 目的: 国家ごとの航空基地建設と奪取 / 対象: Scenario/建設/Occupation / 内容: 駐機施設のIC建設・修理、敵軍による占領時の退避/喪失 / テスト: 敵基地奪取・容量縮退 / 期待: 保存・指揮系統が破綻しない（本PR未実装）
+- [ ] 目的: 本番WorldStateとゲーム画面の装備管理 / 対象: command bus、React、Worker、戦闘/補給Tick / 内容: 師団/航空隊パネルと複数選択配備・補給/空戦結合 / テスト: UI E2E、航空任務/燃料・航続/AA検証 / 期待: 実際の画面から装備を移動・出撃可能（本PR未実装）
+
+**設計境界:** 基地の`operationalSlots`は燃料・航続・機動・迎撃を計算する実sortie数ではない。AirWing`mission='grounded'`のみ。修理中機体は無料復帰不可。旧WorldState/UIを変更せず参照`strategy-v1`に限定する。
