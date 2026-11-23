@@ -29,7 +29,7 @@ test('地図上の戦線作成と軍未所属師団の紐づけを一度に実�
   await expect(page.getByTestId('map-front-planner')).toHaveCount(0);
   await page.getByTestId('btn-fronts-top').click();
   const modal=page.getByTestId('fronts-modal');
-  const row=modal.locator('[data-testid^="front-"]').filter({has:modal.locator('button[data-testid^="front-pause-"]')}).first();
+  const row=modal.locator('[data-testid^="front-"]').filter({has:page.locator('button[data-testid^="front-pause-"]')}).first();
   await expect(row).toContainText('5');
   await expect(row).toContainText('事前計画');
   await page.getByTestId('close-fronts').click();
