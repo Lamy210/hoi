@@ -25,7 +25,7 @@
 | BonusToken | tokenId, countryId, source=focus/espionage/decision, category, expiryTick?, yearDiscount<=2, speedBonus<=0.2, consumedByProjectId? | 使い捨て・同時割当不可。スパイ活動の実装前は任務成功イベント由来のみ |
 | AirMissionSnapshot | tick, subphase, wingId, effectiveSorties, detection, airBattleLoss, aaLoss, nonCombatLoss, fuelSpent, targetId | 診断派生ログ。active機数以外から戦力を生成しない |
 
-設計revisionの内容ハッシュは昇順moduleIds+catalogVersion+所属国+設計MIO snapshotを入力として計算。設計自体の変更で既存ロットを一括変換しない。該当revisionの削除/再使用は禁止（参照中は完全に保持）。
+設計revisionの内容ハッシュは、スロットIDを含めたcanonicalな[slotId,moduleId]列（slotId昇順）、catalogVersion、所属国、設計MIO snapshotを入力として計算。主砲とエンジンの順序を失わせない。設計自体の変更で既存ロットを一括変換しない。該当revisionの削除/再使用は禁止（参照中は完全に保持）。
 
 ## 2. 戦車デザイナー（選択スロット・カタログ）
 | Chassis | 基礎mass t | 許容mass t | 基礎armor | 基礎speed | 基礎R | 基礎IC | 複雑度予算 |
@@ -123,7 +123,7 @@ p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance
 - Distance: 戦車 1+0.4×max(0,TravelDistanceKm/100−1)、上限2.0。航空機 1+0.5×max(0,MissionDistance/MissionRadiusKm−0.6)、上限1.2。作戦半径外は sortie拒否。
 - Maintenance: 平時整備0.8、標準1、燃料/補給不足1.5、包囲/拠点損傷2.0。倍率は一回だけ掛ける。
 - 各entity/day/subphase/causeをPCG32派生シードにして Expected=N×p から整数損失 = floor(Expected)+Bernoulli(frac(Expected))。同サブフェーズの実損失はN以下。中間計算はdoubleで構わないが、確率ソート・seedは固定。発生理由を保有ロット上のlossLedgerで一度だけ引き落とす。
-- 同一の機体が air-to-air loss / AA loss / noncombat loss の複数対象にならないよう、生存航空機を順次減らす。故障機はdestroyedとrepairableに分けてもよいが、回復可能分はEquipmentLot holder=repairingへ移し工業IC/部品を支払わない限りreadyへ復帰させない。参照数式の初期PoCでは全件を廃棄としてもよいが、その場合repairing在庫に同じ機体を残してはならない。
+- 同一の機体が air-to-air loss / AA loss / noncombat loss の複数対象にならないよう、生存航空機を順次減らす。撃墜/破損のイベントは（eventId, modelId, fromHolder, toHolderまたはdestruction, quantity, cause）の台帳一件として記録し、修理可能なら資産は移転（国総機数不変）、完全破壊なら国総機数を減少する。故障機はdestroyedとrepairableに分けてもよいが、回復可能分はEquipmentLot holder=repairingへ移し工業IC/部品を支払わない限りreadyへ復帰させない。参照数式の初期PoCでは全件を廃棄としてもよいが、その場合repairing在庫に同じ機体を残してはならない。
 - 例: R=.80、悪天候W1.8、泥濘2、長距離1.3、整備1 → p=0.0004×(2^1.5)×1.8×2×1.3≈0.00529/6h（約0.529%）。高信頼R=.95なら約0.066%。6h×4日の損耗は逐次残数を使い、初期数N×4pで一括計上しない。
 
 ## 5. 陸戦：師団幅、編制、装甲/貫通
@@ -156,7 +156,7 @@ p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance
 国家の現役POPはDivision兵員+AirWing搭乗員+Garrison兵員+未配備の現役兵に一意に分割する。Σ部隊/航空/駐屯の予約現役兵 <= population.soldiersを全tickで検証。パイロットが退役/墜落/移籍した場合は二重に動員しない。
 
 1日4×6hサブフェーズの順序: (1) 出撃可能数・航続距離・燃料・天候でsorties予約→(2) detection/迎撃と空対空損失→(3) surviving bomber/CASにAA対空損失と任務妨害→(4) surviving fightersによる制空指数→(5) CAS陸戦追加損害→(6) 戦略爆撃→(7) 最終生存機の非戦闘故障→(8) 空域/factory/logistics dirtyと在庫収支記録。空戦・AA・故障の順序は固定。CASが陸戦開始前に存在しても同じ6h戦闘から直接損害を引かない（戦闘が存在するときだけ）。
-- ActiveSorties = min(ready, pilots, availableFuel/fuelPerSortie, freeAirbaseCapacity)×weatherLaunchFactor×rangeFactor×missionAvailability（整数化、fractionは確定乱数）。distance>MissionRadiusKmなら0。任務距離は基地/空域中心のシナリオ固定座標と距離換算規則で決定論的に計算する。
+- ActiveSorties = min(ready, pilots, availableFuel/fuelPerSortie, allocatedOperationalCapacity)×weatherLaunchFactor×rangeFactor×missionAvailability（整数化、fractionは確定乱数）。distance>MissionRadiusKmなら0。任務距離は基地/空域中心のシナリオ固定座標と距離換算規則で決定論的に計算する。駐機受入に用いるfreeHangarSlots=max(0,BaseCapacity−ΣParkedPlanes)と、出撃に使うallocatedOperationalCapacityを混同しない。満杯の基地でも既に駐機している機体は出撃可能。基地損害により稼働率が減る場合は BaseOperationalCapacity=floor(BaseCapacity×(1−BaseDamage)) から航空隊ID昇順に分配し、実際に割り当てた枠だけをsortie制限に使う。
 - Detection=clamp(0.35+0.40×radarCoverage+MIOReconBonus−0.25×adverseWeather,0.10,0.95)。
 - 空対空撃墜期待値 K_aa = min(EnemySorties, 0.020×OwnEngagedFighters×sqrt(OwnAirAttack/max(5,EnemyAirDefense))×clamp(OwnAgility/EnemyAgility,0.70,1.30)×Detection)。互いの撃墜は同一「戦闘開始スナップショット」で算出してから双方へ適用（先攻有利を防止）。1機は一度しか撃墜されない。
 - AA地上防空: K_groundAA=min(SurvivingHostileSorties, [0.0003×StateAAQuality+0.0008×EngagedDivisionAA]×SurvivingHostileSorties×AAReadiness)。StateAAが0/DivisionAAが0なら撃墜0。州AAは爆撃/CASに、師団AAはCASに適用。迎撃済み機体には再計算しない。
@@ -186,7 +186,7 @@ RPtotal/day=max(0.05,Researchers×0.003×literacy×(0.3+0.7education)×(0.5+0.5i
 - 研究割引tokenは作成時に技術カテゴリと期限を検証し、プロジェクト開始時にusedByProjectを一回だけ書く。途中キャンセルのrefundは原則なし（狙ったプロジェクトへ1回のみ使用）。spy機能がまだない場合はイベント/国家方針によるtoken発行のみ実装。
 
 ## 8. MIO（設計局/産業組織）
-MIOは countryId+organizationId に帰属し、国家方針・研究完了・契約から設計/生産/研究への参入可否が決まる。1社あたり同時タスク3を初期上限。専門分野 tank/air/small-arms の不一致は割当拒否。実行結果に紐づけたXP ledgerを唯一の正本にする。
+MIOは countryId+organizationId に帰属し、国家方針・研究完了・契約から設計/生産/研究への参入可否が決まる。1社あたり同時タスク3を初期上限。専門分野 tank/air/small-arms の不一致は割当拒否。実行結果に紐づけたXP ledger（eventId, organizationId, tick, sourceKind, sourceId, deltaXP）を唯一の正本にし、eventIdとsourceKind+sourceId+tickの両方で重複計上を拒否する。研究完了はtechId×国IDで一度のみXPを発行する。
 - XP/day = min(20, 1.5×sqrt(CompletedProductionIC)+0.5×ActiveResearchTasks+2×CompletedResearchEvents+min(2,0.05×ActuallySpentPrototypeIC))。設計局が受注した開発プロジェクトは実際に試作IC/資材/国庫を消費した場合だけ開発XPを得る。設計の保存・rev番号だけではXP0。待機/停止/不正研究からはXP0。複数対象が同じ生産ICをXPへ二重計上しない。
 - perkコスト=20+15×UnlockedCount、最大8perks/MIO、前提DAG・相互排他・分野/レベルでロックする。
 | Trait | 作用位置 | 初期効果 | 排他/上限 |
