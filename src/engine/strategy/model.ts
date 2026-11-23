@@ -27,6 +27,7 @@ export interface Factory {
 export interface Construction {
   id:number; country:number; factoryId:number;
   kind:'build'|'repair'; targetFactoryId?:number;
+  newFactory?:{id:number;regionId:number;kind:'civilian'|'military';baseIC:number;workerDemand:number};
   remainingIC:number; cashPerIC:number; material:Good; materialPerIC:number;
 }
 export interface Design {
@@ -175,10 +176,15 @@ export function assertStrategyState(w:StrategyState):void{
       nonnegative(v);
     if(u.hardness>1||u.supply>1)throw new RangeError('division ratio');
   }
+  // A deployed soldier must exist exactly once inside the nation's exclusive POP pool.
+  for(const n of w.nations){
+    const deployed=w.divisions.filter(d=>d.country===n.id).reduce((a,d)=>a+d.soldiers,0);
+    if(deployed>n.population.soldiers)throw new RangeError('deployed soldiers exceed POP');
+  }
   for(const p of w.plans){
     if(!countries.has(p.country)||!countries.has(p.enemy)||p.country===p.enemy||
       p.provinces.some(x=>!provinces.has(x))||p.targets.some(x=>!provinces.has(x))||
-      p.divisionIds.some(id=>!divisions.has(id))||!Number.isSafeInteger(p.revision)||p.revision<1)
+      p.divisionIds.some(id=>!divisions.has(id)||w.divisions.find(d=>d.id===id)?.country!==p.country)||!Number.isSafeInteger(p.revision)||p.revision<1)
       throw new RangeError('plan reference');
     if(p.planning<0||p.planning>0.25||!Number.isFinite(p.planning))throw new RangeError('planning');
   }
@@ -197,9 +203,26 @@ export function assertStrategyState(w:StrategyState):void{
     const shares=w.occupations.filter(o=>o.regionId===r.id).reduce((a,b)=>a+b.share,0);
     if(shares>1+1e-8)throw new RangeError('occupation overcommit');
   }
+  const buildIds=new Set<number>(),constructionSites=new Set<number>();
   for(const pr of w.construction){
-    if(!factories.has(pr.factoryId)||!countries.has(pr.country)||pr.cashPerIC<0||
-      pr.materialPerIC<0)throw new RangeError('construction refs');
+    const source=factories.get(pr.factoryId);
+    if(!source||source.country!==pr.country||source.kind!=='civilian'||!countries.has(pr.country)||
+      pr.cashPerIC<0||pr.materialPerIC<0||!Number.isFinite(pr.cashPerIC)||!Number.isFinite(pr.materialPerIC))
+      throw new RangeError('construction refs');
+    if(constructionSites.has(pr.factoryId))throw new RangeError('double construction factory allocation');
+    constructionSites.add(pr.factoryId);
     nonnegative(pr.remainingIC);
+    if(pr.kind==='build'){
+      const build=pr.newFactory;
+      if(!build||buildIds.has(build.id)||factories.has(build.id)||
+        !Number.isSafeInteger(build.id)||build.id<1||!regions.has(build.regionId)||
+        w.regions.find(r=>r.id===build.regionId)?.owner!==pr.country)
+        throw new RangeError('invalid new factory');
+      nonnegative(build.baseIC);nonnegative(build.workerDemand);
+      buildIds.add(build.id);
+    }else if(pr.kind==='repair'){
+      if(!pr.targetFactoryId||factories.get(pr.targetFactoryId)?.country!==pr.country)
+        throw new RangeError('invalid repair target');
+    }else throw new RangeError('construction kind');
   }
 }
