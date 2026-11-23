@@ -23,7 +23,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const summary=formationOperationalSummary(units);
   const commander=formation?.commanderId===undefined?undefined:
     snap.commanders.find(c=>c.id===formation.commanderId&&c.country===country);
-  const frontOptions=snap.fronts.filter(f=>f.owner===country&&player.atWar.includes(f.enemy));
+  const frontOptions=snap.fronts.filter(f=>f.owner===country&&snap.countries[f.enemy]?.alive);
   const front=frontOptions.find(f=>String(f.id)===chosenFront);
   const scoped=scopedFormationUnits(units,targetScope,selectedIds);
   const ids=scoped.map(u=>u.id);
