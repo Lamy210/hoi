@@ -91,6 +91,11 @@ describe('v17 model warehouse is a subset of the aggregate two-goods stock',()=>
     }
     const v16=decode(encoded) as any;
     v16.header.v=16;delete v16.stores.modelStock;delete v16.stores.issuedEquipment;
+    // The v16 fixture must not contain future-version unit readiness fields.
+    for(const unit of v16.stores.units){
+      delete unit.entrenchment;
+      delete unit.preparation;
+    }
     const old=await createTestEngine();
     expect(old.loadFrom(encoded).ok).toBe(true);
     // Historical hash excludes the v17 warehouse (all other v16 fields included).
