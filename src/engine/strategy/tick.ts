@@ -57,10 +57,15 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
     region.resources[project.material]=Math.max(0,amount-progress.materialsSpent);
     project.remainingIC=Math.max(0,project.remainingIC-progress.progressIC);
     // Repair is completed at end-of-day; no same-tick boost to production.
-    if(project.remainingIC<=1e-8&&project.kind==='repair'&&project.targetFactoryId!==undefined){
-      const target=next.factories.find(x=>x.id===project.targetFactoryId);
-      if(!target)throw new RangeError('repair target');
-      target.damage=0;
+    if(project.remainingIC<=1e-8){
+      if(project.kind==='build'&&project.newFactory){
+        next.factories.push({...project.newFactory,country:project.country,damage:0});
+      }
+      if(project.kind==='repair'&&project.targetFactoryId!==undefined){
+        const target=next.factories.find(x=>x.id===project.targetFactoryId);
+        if(!target)throw new RangeError('repair target');
+        target.damage=0;
+      }
     }
   }
   next.construction=next.construction.filter(p=>p.remainingIC>1e-8);
