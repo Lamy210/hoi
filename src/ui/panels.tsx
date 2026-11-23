@@ -442,47 +442,86 @@ export function FrontsPanel() {
   const st=useApp(), lang=st.lang, snap=st.snap!, meta=st.meta!;
   const ja=lang==='ja';
   const fronts=snap.fronts.filter(f=>f.owner===snap.playerCountry);
-  const enemies=snap.countries[snap.playerCountry].atWar;
-  const [enemy,setEnemy]=useState<number>(enemies[0]??-1);
+  const atWar=snap.countries[snap.playerCountry].atWar;
+  const enemies=snap.countries.flatMap((country,i)=>country.alive&&i!==snap.playerCountry?[i]:[]);
+  const [enemy,setEnemy]=useState<number>(atWar[0]??enemies[0]??-1);
+  const [assignmentSource,setAssignmentSource]=useState('selection');
+  const [confirmedRelease,setConfirmedRelease]=useState<string|null>(null);
   const selected=snap.units.filter(u=>u.owner===snap.playerCountry&&(st.selection.unitIds??(st.selection.unitId===null?[]:[st.selection.unitId])).includes(u.id));
-  const ids=selected.map(u=>u.id);
+  const armies=snap.armies.filter(a=>a.owner===snap.playerCountry);
+  const groups=snap.armyGroups.filter(g=>g.owner===snap.playerCountry);
+  const groupArmies=new Map(groups.map(g=>[g.id,new Set(armies.filter(a=>a.groupId===g.id).map(a=>a.id))]));
+  const assignmentUnits=assignmentSource==='selection'?selected:
+    snap.units.filter(u=>u.owner===snap.playerCountry&&(
+      assignmentSource==='unassigned'?u.armyId===null:
+      assignmentSource.startsWith('army:')?u.armyId===Number(assignmentSource.slice(5)):
+      assignmentSource.startsWith('group:')?u.armyId!==null&&
+        groupArmies.get(Number(assignmentSource.slice(6)))?.has(u.armyId):false));
+  const ids=assignmentUnits.map(u=>u.id);
   const busy=st.pendingCommands>0;
   const name=(p:number)=>ja?meta.provNameJa[p]:meta.provNameEn[p];
   return <div className="modal-backdrop" onClick={()=>appStore.set({panel:null})}>
     <div className="modal" onClick={e=>e.stopPropagation()} data-testid="fronts-modal">
       <h3>{t(lang,'panel.fronts')}</h3>
-      <p data-testid="front-selection-count">{ja?'選択師団':'Selected divisions'}: {ids.length}</p>
+      <p data-testid="front-selection-count">{ja?'対象師団':'Target divisions'}: {ids.length}</p>
+      <label className="front-assign-source">{ja?'簡単に紐づける対象':'Assign by formation'}
+        <select data-testid="front-assignment-source" value={assignmentSource} onChange={e=>setAssignmentSource(e.target.value)}>
+          <option value="selection">{ja?'地図・一覧で選択した師団':'Selected divisions on map / roster'}</option>
+          <option value="unassigned">{ja?'軍未所属の師団':'Unassigned divisions'}</option>
+          {groups.map(g=><option value={'group:'+g.id} key={'g'+g.id}>{ja?'軍集団':'Group'}: {g.name}</option>)}
+          {armies.map(a=><option value={'army:'+a.id} key={'a'+a.id}>{ja?'軍':'Army'}: {a.name}</option>)}
+        </select>
+      </label>
       {enemies.length>0&&<div className="row">
         <select data-testid="front-enemy" value={enemy} onChange={e=>setEnemy(Number(e.target.value))}>
           {enemies.map(c=><option key={c} value={c}>{ja?snap.countries[c].nameJa:snap.countries[c].nameEn}</option>)}
         </select>
-        <button className="primary" data-testid="btn-create-front" disabled={busy||!enemies.includes(enemy)} onClick={()=>engineClient.command('createFront',{enemy})}>{t(lang,'front.create')}</button>
+        <button className="primary" data-testid="btn-create-front" disabled={busy||!atWar.includes(enemy)} onClick={()=>engineClient.command('createFront',{enemy})}>{t(lang,'front.create')}</button>
       </div>}
+      {enemies.length>0&&!atWar.includes(enemy)&&<small className="muted" data-testid="front-peace-hint">
+        {ja?'開戦前の戦線は地図の「戦線指定」から州を指定して作成できます。':'Before war, use Draw front on the map and select controlled provinces.'}
+      </small>}
       {!fronts.length&&<div className="muted">{t(lang,'front.none')}</div>}
-      {fronts.map(f=><div key={f.id} className="panel-section" data-testid={'front-'+f.id}>
+      {fronts.map(f=>{
+        const warring=atWar.includes(f.enemy);
+        const candidates=assignmentUnits.filter(u=>u.frontId!==f.id||(warring&&u.manualHold));
+        const releases=warring?candidates.filter(u=>u.manualHold):[];
+        const releaseSignature=f.id+':'+candidates.map(u=>u.id).join(',')+':'+releases.map(u=>u.id).join(',');
+        return <div key={f.id} className="panel-section" data-testid={'front-'+f.id}>
         <h4>#{f.id} {ja?snap.countries[f.enemy].nameJa:snap.countries[f.enemy].nameEn}</h4>
         <div className="kv"><span>{t(lang,'front.assigned')}: {f.assigned}</span><span>{ja?'手動優先':'Manual hold'}: {f.held}</span></div>
-        <div className="kv"><span>{ja?'自動作戦':'Automation'}</span><strong data-testid={'front-state-'+f.id}>{!enemies.includes(f.enemy)?(ja?'交戦終了':'War ended'):f.paused?(ja?'一時停止':'Paused'):(ja?'実行可能':'Enabled')}</strong></div>
+        <div className="kv"><span>{ja?'自動作戦':'Automation'}</span><strong data-testid={'front-state-'+f.id}>{!warring?(ja?'事前計画・攻撃停止':'Planned / no combat'):f.paused?(ja?'一時停止':'Paused'):(ja?'実行可能':'Enabled')}</strong></div>
         <div className="row">
-          {(['hold','attack','retreat'] as const).map(stance=><button key={stance} className={f.stance===stance?'primary':''} disabled={busy||!enemies.includes(f.enemy)} data-testid={'front-stance-'+stance} onClick={()=>engineClient.command('setFrontStance',{frontId:f.id,stance})}>{t(lang,'front.stance.'+stance)}</button>)}
-          <button data-testid={'front-pause-'+f.id} disabled={busy||!enemies.includes(f.enemy)} onClick={()=>engineClient.command('setFrontPaused',{frontId:f.id,paused:!f.paused})}>{f.paused?(ja?'再開':'Resume'):(ja?'一時停止':'Pause')}</button>
+          {(['hold','attack','retreat'] as const).map(stance=><button key={stance} className={f.stance===stance?'primary':''} disabled={busy} data-testid={'front-stance-'+stance} onClick={()=>engineClient.command('setFrontStance',{frontId:f.id,stance})}>{t(lang,'front.stance.'+stance)}</button>)}
+          <button data-testid={'front-pause-'+f.id} disabled={busy||(!warring&&f.paused)} onClick={()=>engineClient.command('setFrontPaused',{frontId:f.id,paused:!f.paused})}>{f.paused?(ja?'再開':'Resume'):(ja?'一時停止':'Pause')}</button>
         </div>
         <div className="kv"><span>{t(lang,'front.cap')}</span><select aria-label={t(lang,'front.cap')} data-testid={'front-cap-'+f.id} disabled={busy} value={f.cap} onChange={e=>engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,cap:Number(e.target.value)})}>{Array.from({length:9},(_,n)=><option key={n} value={n}>{n}</option>)}</select></div>
         <div className="muted">{ja?'戦線州':'Front provinces'}: {f.provinces.map(name).join(', ')||'—'}</div>
         <div className="kv"><span>{t(lang,'front.targets')}</span><span>{f.targets.map(name).join(', ')||(ja?'自動':'Automatic')}</span></div>
         <div className="row">
-          <select aria-label={t(lang,'front.targets')} data-testid={'front-target-'+f.id} value={f.targets.length===1?f.targets[0]:-1} disabled={busy||!enemies.includes(f.enemy)} onChange={e=>engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,targets:Number(e.target.value)<0?[]:[Number(e.target.value)]})}>
+          <select aria-label={t(lang,'front.targets')} data-testid={'front-target-'+f.id} value={f.targets.length===1?f.targets[0]:-1} disabled={busy} onChange={e=>engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,targets:Number(e.target.value)<0?[]:[Number(e.target.value)]})}>
             <option value={-1}>{ja?'自動選択':'Automatic'}</option>
             {meta.provIds.map((id,p)=>snap.controller[p]===f.enemy&&<option key={id} value={p}>{name(p)} ({id})</option>)}
           </select>
         </div>
         <div className="row">
-          <button data-testid={'front-assign-'+f.id} disabled={busy||!ids.length||ids.length>256||!enemies.includes(f.enemy)} onClick={()=>engineClient.command('assignToFront',{units:ids,frontId:f.id})}>{t(lang,'front.assignSelected')} ({ids.length})</button>
+          <button data-testid={'front-assign-'+f.id}
+            disabled={busy||!candidates.length||candidates.length>256||(releases.length>0&&confirmedRelease!==releaseSignature)}
+            onClick={()=>engineClient.command('assignToFront',{units:candidates.map(u=>u.id),frontId:f.id})}>
+            {ja?'まとめて戦線に紐づけ':'Assign formation'} ({candidates.length})
+          </button>
           <button data-testid={'front-unassign-'+f.id} disabled={busy||!selected.some(u=>u.frontId===f.id)} onClick={()=>engineClient.command('unassignFromFront',{units:selected.filter(u=>u.frontId===f.id).map(u=>u.id)})}>{ja?'選択師団の割当解除':'Unassign selected'}</button>
           <button className="danger" disabled={busy} onClick={()=>engineClient.command('deleteFront',{frontId:f.id})}>{t(lang,'front.delete')}</button>
         </div>
-      </div>)}
-      <p className="muted">{ja?'作戦は週次で評価されます。一時停止は新規自動命令を止め、すでに移動中の師団は現在の経路を維持します。':'Plans are evaluated weekly. Pausing stops new automatic orders; deployed movement paths continue.'}</p>
+        {releases.length>0&&<label className="formation-command-warning" data-testid={'front-release-warning-'+f.id}>
+          <input type="checkbox" data-testid={'front-confirm-release-'+f.id}
+            checked={confirmedRelease===releaseSignature}
+            onChange={e=>setConfirmedRelease(e.target.checked?releaseSignature:null)}/>
+          {ja?releases.length+'師団の手動固定が解除され自動作戦が有効になります。確認して編入':
+            'This clears manual hold on '+releases.length+' divisions. Confirm assignment'}
+        </label>}
+      </div>})}
+      <p className="muted">{ja?'作戦は週次で評価されます.一時停止は新規自動命令を止め、すでに移動中の師団は現在の経路を維持します。':'Plans are evaluated weekly. Pausing stops new automatic orders; deployed movement paths continue.'}</p>
       <PendingOrders/>
       <button data-testid="close-fronts" onClick={()=>appStore.set({panel:null})}>{t(lang,'common.close')}</button>
     </div>
