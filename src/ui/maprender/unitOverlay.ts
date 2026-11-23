@@ -28,7 +28,7 @@ export function createUnitOverlay(container: HTMLElement, project: (province: nu
       return node;
     };
     for(const f of fronts){
-      const group=el('g',{'data-testid':f.id<0?'map-front-draft':'map-front-'+f.id,'data-state':f.paused?'paused':'active','data-highlighted':String(f.highlighted),class:'front-plan '+(f.paused?'paused ': '')+(f.highlighted?'highlighted ':'')+f.stance});
+      const group=el('g',{'data-testid':f.id<0?'map-front-draft':'map-front-'+f.id,'data-state':f.paused?'paused':'active','data-highlighted':String(f.highlighted),class:'front-plan '+(f.paused?'paused ': '')+(f.highlighted?'highlighted ':'')+(f.planned?'prewar ':'')+f.stance});
       for(const p of f.provinces){
         const xy=point(p);if(!valid(xy))continue;
         group.appendChild(el('circle',{cx:xy[0],cy:xy[1],r:15,class:'front-province'}));
@@ -39,6 +39,19 @@ export function createUnitOverlay(container: HTMLElement, project: (province: nu
         const dx=b[0]-a[0],dy=b[1]-a[1],d=Math.hypot(dx,dy);if(d<1)continue;
         const x=(a[0]+b[0])/2,y=(a[1]+b[1])/2,n=Math.min(14,d*.25);
         group.appendChild(el('line',{x1:x-dy/d*n,y1:y+dx/d*n,x2:x+dy/d*n,y2:y-dx/d*n,class:'front-link'}));
+      }
+      // A dashed intent line connects the nearest selected anchor with each planned objective.
+      // It is NOT a pathfinding result, movement route, or a guaranteed offensive order.
+      for(const target of f.targets){
+        const dst=point(target);if(!valid(dst))continue;
+        const anchors=f.provinces.map(point).filter(valid);
+        if(!anchors.length)continue;
+        anchors.sort((a,b)=>Math.hypot(a[0]-dst[0],a[1]-dst[1])-Math.hypot(b[0]-dst[0],b[1]-dst[1]));
+        const from=anchors[0],distance=Math.hypot(dst[0]-from[0],dst[1]-from[1]);
+        if(distance<2)continue;
+        group.appendChild(el('line',{x1:from[0],y1:from[1],x2:dst[0],y2:dst[1],class:'front-intent-line','data-intent-target':target}));
+        const dx=(dst[0]-from[0])/distance,dy=(dst[1]-from[1])/distance;
+        group.appendChild(el('path',{d:`M${dst[0]} ${dst[1]} L${dst[0]-dx*11-dy*5} ${dst[1]-dy*11+dx*5} L${dst[0]-dx*11+dy*5} ${dst[1]-dy*11-dx*5} Z`,class:'front-intent-arrow'}));
       }
       for(const p of f.targets){
         const [x,y]=point(p);if(!valid([x,y]))continue;

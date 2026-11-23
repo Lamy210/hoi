@@ -28,11 +28,40 @@ export function updateFrontDraftProvinces(
   return mergeDivisionSelection(current,next,owned,mode,max);
 }
 
-/** Check at dispatch time; controller or diplomatic relations may change during editing. */
+/** Check at dispatch time; province controller and enemy viability may change during editing. */
 export function canCommitFrontDraft(
   provinces:readonly number[],enemy:number,owner:number,
   controller:readonly number[],enemies:readonly number[],busy:boolean,
 ):boolean{
   return !busy&&enemies.includes(enemy)&&provinces.length>0&&provinces.length<=256&&
     new Set(provinces).size===provinces.length&&provinces.every(p=>Number.isInteger(p)&&p>=0&&p<controller.length&&controller[p]===owner);
+}
+
+/** Pick enemy-controlled province anchors near a mouse/touch drawn stroke.
+ * A stroke is an intent line, not a geographic border or troop movement path.
+ */
+export function provincesAlongStroke(
+  controller:readonly number[], enemy:number,
+  project:(province:number)=>ScreenPoint|null,
+  points:readonly ScreenPoint[],radius=22,
+):number[]{
+  if(points.length<2||!Number.isFinite(radius)||radius<0)return [];
+  const segments:[ScreenPoint,ScreenPoint][]=[];
+  for(let i=1;i<points.length;i++){
+    const a=points[i-1],b=points[i];
+    if([a.x,a.y,b.x,b.y].every(Number.isFinite))segments.push([a,b]);
+  }
+  if(!segments.length)return [];
+  const threshold=radius*radius,result:number[]=[];
+  for(let p=0;p<controller.length;p++){
+    if(controller[p]!==enemy)continue;
+    const anchor=project(p);if(!anchor||![anchor.x,anchor.y].every(Number.isFinite))continue;
+    if(segments.some(([a,b])=>{
+      const dx=b.x-a.x,dy=b.y-a.y,lenSq=dx*dx+dy*dy;
+      const t=lenSq===0?0:Math.max(0,Math.min(1,((anchor.x-a.x)*dx+(anchor.y-a.y)*dy)/lenSq));
+      const x=a.x+t*dx,y=a.y+t*dy;
+      return (anchor.x-x)**2+(anchor.y-y)**2<=threshold;
+    }))result.push(p);
+  }
+  return result;
 }

@@ -9,7 +9,7 @@ import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
-import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft } from './frontMapPlanning';
+import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, provincesAlongStroke } from './frontMapPlanning';
 import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
@@ -56,6 +56,8 @@ export function GameScreen() {
   const [marqueeMode,setMarqueeMode]=useState(false);
   const [frontDraft,setFrontDraft]=useState<{enemy:number;provinces:number[]}|null>(null);
   const [frontTargetId,setFrontTargetId]=useState<number|null>(null);
+  const [targetStroke,setTargetStroke]=useState<{x:number;y:number}[]>([]);
+  const targetStrokeRef=useRef<{x:number;y:number}[]>([]);
   const suppressDraftClick=useRef(false);
   const [marquee,setMarquee]=useState<ScreenRect|null>(null);
   const marqueePointer=useRef<{id:number;origin:{x:number;y:number}}|null>(null);
@@ -257,10 +259,12 @@ export function GameScreen() {
     setSearch(null);
   }
   const player = snap.countries[snap.playerCountry];
-  const activeFronts=snap.fronts.filter(f=>f.owner===snap.playerCountry&&player.atWar.includes(f.enemy));
+  const frontEnemyOptions=snap.countries.flatMap((country,index)=>
+    country.alive&&index!==snap.playerCountry?[index]:[]);
+  const activeFronts=snap.fronts.filter(f=>f.owner===snap.playerCountry&&snap.countries[f.enemy]?.alive);
   const targetFront=activeFronts.find(f=>f.id===frontTargetId);
   const draftReady=frontDraft!==null&&canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,
-    snap.playerCountry,snap.controller,player.atWar,st.pendingCommands>0);
+    snap.playerCountry,snap.controller,frontEnemyOptions,st.pendingCommands>0);
   const selProv = st.selection.prov;
   const selUnit = st.selection.unitId !== null ? snap.units.find((u) => u.id === st.selection.unitId) : null;
 
@@ -353,21 +357,34 @@ export function GameScreen() {
       else sendMove(prov);
     }
   }
+  function updateOffensiveTargets(provinces:readonly number[],mode:SelectionMergeMode){
+    const f=activeFronts.find(row=>row.id===frontTargetId);
+    if(!f||st.pendingCommands>0)return;
+    const controlled=gameSnap.controller.flatMap((c,p)=>c===f.enemy?[p]:[]);
+    const targets=mergeDivisionSelection(f.targets,provinces,controlled,mode);
+    if(targets===null){
+      appStore.set({statusMessage:lang==='ja'?'目標は最大256州まで':'Maximum 256 objective provinces'});
+      return;
+    }
+    if(targets.join(',')!==f.targets.slice().sort((a,b)=>a-b).join(',')){
+      engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,targets});
+    }
+    setFrontTargetId(null);
+    targetStrokeRef.current=[];
+    setTargetStroke([]);
+  }
+
   function handleMapClick(e: React.MouseEvent): void {
     const { prov, marker } = provinceFromEvent(e);
     if (prov === null) return;
     if(frontTargetId!==null){
-      const f=activeFronts.find(row=>row.id===frontTargetId);
-      if(!f){setFrontTargetId(null);return;}
-      if(gameSnap.controller[prov]!==f.enemy){
-        appStore.set({statusMessage:lang==='ja'?'指定戦線の敵支配州をクリックしてください':'Choose a province controlled by the front enemy'});
+      const front=activeFronts.find(row=>row.id===frontTargetId);
+      if(!front)return;
+      if(gameSnap.controller[prov]!==front.enemy){
+        appStore.set({statusMessage:lang==='ja'?'指定戦線の敵支配州を選択してください':'Choose a province controlled by the front enemy'});
         return;
       }
-      if(st.pendingCommands>0)return;
-      const targets=e.altKey?f.targets.filter(p=>p!==prov):
-        e.ctrlKey||e.metaKey||e.shiftKey?[...new Set([...f.targets,prov])].sort((a,b)=>a-b):[prov];
-      engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,targets});
-      setFrontTargetId(null);
+      updateOffensiveTargets([prov],e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'replace');
       return;
     }
     if (attackMode) { sendAttack(prov); return; }
@@ -410,25 +427,50 @@ export function GameScreen() {
     e.preventDefault();
     const origin=pointInMarquee(e);
     marqueePointer.current={id:e.pointerId,origin};
-    setMarquee({x1:origin.x,y1:origin.y,x2:origin.x,y2:origin.y});
+    if(frontTargetId!==null){
+      targetStrokeRef.current=[origin];
+      setTargetStroke([origin]);
+    }else{
+      setMarquee({x1:origin.x,y1:origin.y,x2:origin.x,y2:origin.y});
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
   }
   function moveMarquee(e:ReactPointerEvent<HTMLDivElement>){
     const current=marqueePointer.current;
     if(current?.id!==e.pointerId)return;
     const p=pointInMarquee(e);
-    setMarquee({x1:current.origin.x,y1:current.origin.y,x2:p.x,y2:p.y});
+    if(frontTargetId!==null){
+      const previous=targetStrokeRef.current;
+      if(previous.length===0||Math.hypot(p.x-previous[previous.length-1].x,p.y-previous[previous.length-1].y)>=3){
+        targetStrokeRef.current=[...previous,p];
+        setTargetStroke(targetStrokeRef.current);
+      }
+    }else setMarquee({x1:current.origin.x,y1:current.origin.y,x2:p.x,y2:p.y});
   }
   function endMarquee(e:ReactPointerEvent<HTMLDivElement>,cancel=false){
     const current=marqueePointer.current;
     if(current?.id!==e.pointerId)return;
     marqueePointer.current=null;
     setMarquee(null);
-    if(cancel)return;
     const p=pointInMarquee(e);
-    if(Math.hypot(p.x-current.origin.x,p.y-current.origin.y)<5)return;
+    const stroke=[...targetStrokeRef.current,p];
+    targetStrokeRef.current=[];
+    setTargetStroke([]);
+    if(cancel||Math.hypot(p.x-current.origin.x,p.y-current.origin.y)<5)return;
     const r=rendererRef.current;
     if(!r)return;
+    if(frontTargetId!==null){
+      suppressDraftClick.current=true;
+      const front=activeFronts.find(row=>row.id===frontTargetId);
+      if(!front)return;
+      const targets=provincesAlongStroke(gameSnap.controller,front.enemy,province=>r.projectProvince(province),stroke);
+      if(targets.length){
+        updateOffensiveTargets(targets,e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'replace');
+      }else{
+        appStore.set({statusMessage:lang==='ja'?'線上に敵国州がありません。もう一度描いてください。':'No enemy provinces on this stroke. Try again.'});
+      }
+      return;
+    }
     const box={x1:current.origin.x,y1:current.origin.y,x2:p.x,y2:p.y};
     const mode:SelectionMergeMode=e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'replace';
     if(frontDraft){
@@ -456,8 +498,8 @@ export function GameScreen() {
   }
 
   function startFrontDraft(){
-    if(!mapReady||!player.atWar.length)return;
-    setFrontDraft({enemy:player.atWar[0],provinces:[]});
+    if(!mapReady||!frontEnemyOptions.length)return;
+    setFrontDraft({enemy:player.atWar[0]??frontEnemyOptions[0],provinces:[]});
     setFrontTargetId(null);
     setMarqueeMode(false);
     setMoveMode(false);setAttackMode(false);setDestination('');
@@ -475,9 +517,19 @@ export function GameScreen() {
   function clickFrontDraft(e:ReactMouseEvent<HTMLDivElement>){
     e.stopPropagation();
     if(suppressDraftClick.current){suppressDraftClick.current=false;return;}
-    if(!frontDraft)return;
     const prov=rendererRef.current?.pickAt(e.clientX,e.clientY);
     if(prov===null||prov===undefined)return;
+    if(frontTargetId!==null){
+      const f=activeFronts.find(row=>row.id===frontTargetId);
+      if(!f)return;
+      if(gameSnap.controller[prov]!==f.enemy){
+        appStore.set({statusMessage:lang==='ja'?'敵国支配州を指定してください':'Select an enemy-controlled province'});
+        return;
+      }
+      updateOffensiveTargets([prov],e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'replace');
+      return;
+    }
+    if(!frontDraft)return;
     if(gameSnap.controller[prov]!==gameSnap.playerCountry){
       appStore.set({statusMessage:lang==='ja'?'自国支配州のみ戦線に指定できます':'Only controlled provinces may be drafted'});
       return;
@@ -489,13 +541,13 @@ export function GameScreen() {
   }
   function commitFrontDraft(){
     if(!frontDraft||!canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,gameSnap.playerCountry,
-      gameSnap.controller,player.atWar,st.pendingCommands>0))return;
+      gameSnap.controller,frontEnemyOptions,st.pendingCommands>0))return;
     engineClient.command('createFront',{enemy:frontDraft.enemy,provinces:frontDraft.provinces});
     setFrontDraft(null);
   }
 
   function handleMapMove(e: React.MouseEvent): void {
-    if(marqueeMode||frontDraft)return;
+    if(marqueeMode||frontDraft||frontTargetId!==null)return;
     const r = rendererRef.current;
     if (!r) return;
     setHoverPos({ x: e.clientX, y: e.clientY });
@@ -564,8 +616,8 @@ export function GameScreen() {
           onMouseMove={handleMapMove}
           onMouseLeave={() => setHoverProv(null)}
         >
-          {(marqueeMode||frontDraft)&&<div className="map-marquee-layer" data-testid="map-marquee-layer"
-            aria-label={frontDraft?(lang==='ja'?'戦線州をクリックまたは矩形ドラッグ':'Click or drag to draft a front'):(lang==='ja'?'ドラッグで師団を矩形選択':'Drag to box-select divisions')}
+          {(marqueeMode||frontDraft||frontTargetId!==null)&&<div className="map-marquee-layer" data-testid="map-marquee-layer"
+            aria-label={frontTargetId!==null?(lang==='ja'?'ドラッグで攻勢計画線を描く':'Drag to sketch offensive line'):frontDraft?(lang==='ja'?'戦線州をクリックまたは矩形ドラッグ':'Click or drag to draft a front'):(lang==='ja'?'ドラッグで師団を矩形選択':'Drag to box-select divisions')}
             onPointerDown={beginMarquee}
             onPointerMove={moveMarquee}
             onPointerUp={e=>endMarquee(e)}
@@ -573,6 +625,9 @@ export function GameScreen() {
             onLostPointerCapture={e=>endMarquee(e,true)}
             onClick={clickFrontDraft}
             onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
+            {targetStroke.length>1&&<svg className="front-stroke-preview" data-testid="map-offensive-stroke" aria-hidden="true">
+              <polyline points={targetStroke.map(point=>point.x+','+point.y).join(' ')} />
+            </svg>}
             {marquee&&<div className="map-marquee-rectangle" data-testid="map-marquee-rectangle" aria-hidden="true"
               style={{left:Math.min(marquee.x1,marquee.x2),top:Math.min(marquee.y1,marquee.y2),
                 width:Math.abs(marquee.x2-marquee.x1),height:Math.abs(marquee.y2-marquee.y1)}}/>}
@@ -585,7 +640,7 @@ export function GameScreen() {
           <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
           <button type="button" data-testid="map-box-select" aria-pressed={marqueeMode} disabled={!mapReady}
             onClick={toggleMarquee}>{marqueeMode?(lang==='ja'?'範囲選択を終了':'Exit box select'):(lang==='ja'?'▱ 範囲選択':'▱ Box select')}</button>
-          <button type="button" data-testid="map-front-draw" disabled={!mapReady||!player.atWar.length}
+          <button type="button" data-testid="map-front-draw" disabled={!mapReady||!frontEnemyOptions.length}
             aria-pressed={frontDraft!==null} onClick={()=>frontDraft?setFrontDraft(null):startFrontDraft()}>
             {frontDraft?(lang==='ja'?'戦線指定終了':'Exit front draft'):(lang==='ja'?'✎ 戦線指定':'Draw front')}</button>
           <button type="button" data-testid="map-front-target-mode" disabled={!mapReady||!activeFronts.length}
@@ -597,7 +652,7 @@ export function GameScreen() {
           <label>{lang==='ja'?'交戦相手':'Enemy'}
             <select data-testid="map-front-enemy" value={frontDraft.enemy} onChange={e=>
               setFrontDraft({enemy:Number(e.target.value),provinces:[]})}>
-              {player.atWar.map(enemy=><option value={enemy} key={enemy}>
+              {frontEnemyOptions.map(enemy=><option value={enemy} key={enemy}>
                 {lang==='ja'?snap.countries[enemy].nameJa:snap.countries[enemy].nameEn}
               </option>)}
             </select>
@@ -612,7 +667,7 @@ export function GameScreen() {
               setFrontDraft({...frontDraft,provinces:[]})}>{lang==='ja'?'指定解除':'Clear'}</button>
             <button data-testid="map-front-cancel" onClick={()=>setFrontDraft(null)}>{lang==='ja'?'キャンセル':'Cancel'}</button>
           </div>
-          <small className="muted">{lang==='ja'?'作成後の師団割当・作戦開始は戦線画面で操作します。':'Assign divisions and start operations from the front panel.'}</small>
+          <small className="muted">{lang==='ja'?'開戦前の戦線は一時停止で保存されます。師団の一括割当は戦線画面で実行できます。':'Pre-war fronts are saved paused. Assign divisions in the fronts panel.'}</small>
         </div>}
         {frontTargetId!==null&&<div className="map-front-planner" data-testid="map-front-target-planner">
           <b>{lang==='ja'?'地図で攻勢目標を指定':'Pick offensive objective'}</b>
@@ -621,8 +676,8 @@ export function GameScreen() {
               {activeFronts.map(f=><option value={f.id} key={f.id}>#{f.id} {lang==='ja'?snap.countries[f.enemy].nameJa:snap.countries[f.enemy].nameEn}</option>)}
             </select>
           </label>
-          <div className="muted">{lang==='ja'?'敵支配州をクリックして目標を登録。Ctrl/Shift:追加、Alt:除外。戦線のスタンスは変わりません。':
-            'Click an enemy-controlled province. Ctrl/Shift: add, Alt: remove. Stance is unchanged.'}</div>
+          <div className="muted">{lang==='ja'?'敵国州をクリック、またはドラッグで攻勢線を描く。Shift/Ctrl:追加、Alt:除外。計画だけでは攻撃しません。':
+            'Click an enemy province or drag an offensive line. Shift/Ctrl: add, Alt: remove. Planning never launches attacks.'}</div>
           <div className="row">
             <button data-testid="map-target-clear" disabled={!targetFront?.targets.length||st.pendingCommands>0}
               onClick={()=>{

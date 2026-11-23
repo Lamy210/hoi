@@ -23,7 +23,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const summary=formationOperationalSummary(units);
   const commander=formation?.commanderId===undefined?undefined:
     snap.commanders.find(c=>c.id===formation.commanderId&&c.country===country);
-  const frontOptions=snap.fronts.filter(f=>f.owner===country&&player.atWar.includes(f.enemy));
+  const frontOptions=snap.fronts.filter(f=>f.owner===country&&snap.countries[f.enemy]?.alive);
   const front=frontOptions.find(f=>String(f.id)===chosenFront);
   const scoped=scopedFormationUnits(units,targetScope,selectedIds);
   const ids=scoped.map(u=>u.id);
@@ -32,7 +32,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const resume=formationOperationPreview(scoped,'resume');
   const assign=formationOperationPreview(scoped,'assignFront',front?.id);
   const unassign=formationOperationPreview(scoped,'unassignFront');
-  const releasingIds=scoped.filter(u=>u.manualHold&&assign.ids.includes(u.id)).map(u=>u.id);
+  const releasingIds=front&&player.atWar.includes(front.enemy)?scoped.filter(u=>u.manualHold&&assign.ids.includes(u.id)).map(u=>u.id):[];
   const targetSignature=focus?.kind+':'+focus?.id+':'+chosenFront+':'+targetScope+
     ':'+assign.ids.join(',')+':'+releasingIds.join(',');
   // The acknowledgement is scoped to the exact division IDs and their hold state.
@@ -103,7 +103,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           </option>)}
         </select>
         <button data-testid="formation-assign-front"
-          disabled={!enabled||!front||!assign.ids.length||(assign.releasesManualHold>0&&!confirmedRelease)}
+          disabled={!enabled||!front||!assign.ids.length||(releasingIds.length>0&&!confirmedRelease)}
           onClick={()=>front&&send('assignToFront',{units:assign.ids,frontId:front.id},assign.ids)}>
           {label('戦線へ割当・変更','Assign / change front')} ({assign.ids.length})
         </button>
@@ -118,16 +118,16 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
         {label('戦線割当','Assign front')}: {assign.ids.length} ·
         {label('戦線解除','Unassign front')}: {unassign.ids.length}
       </small>
-      {front&&assign.releasesManualHold>0&&<label className="formation-command-warning" data-testid="formation-release-warning">
+      {front&&releasingIds.length>0&&<label className="formation-command-warning" data-testid="formation-release-warning">
         <input type="checkbox" data-testid="formation-confirm-release"
           checked={confirmedRelease} onChange={e=>setAcknowledgedSignature(e.target.checked?targetSignature:null)}/>
         {label(
-          'この戦線割当で'+assign.releasesManualHold+'師団の手動固定が解除され、自動作戦が再開します。確認して実行',
-          'Assigning this front clears manual hold for '+assign.releasesManualHold+' divisions and resumes automated orders. Confirm to proceed'
+          'この戦線割当で'+releasingIds.length+'師団の手動固定が解除され、自動作戦が再開します。確認して実行',
+          'Assigning this front clears manual hold for '+releasingIds.length+' divisions and resumes automated orders. Confirm to proceed'
         )}
       </label>}
       {!frontOptions.length&&<small className="muted" data-testid="formation-no-fronts">
-        {label('戦争中の戦線がありません。戦線画面で先に作成してください。','No active wartime fronts. Create one in the fronts panel.')}
+        {label('戦線がありません。開戦前でも地図から作成できます。','No fronts yet. Draw a front on the map, even before war.')}
       </small>}
       <small className="muted">{label(
         '命令は変更が必要な師団だけに送信します。作戦の移動は既存の戦線AIに委ね、実行時にも所有権・戦線状態を検証します。',
