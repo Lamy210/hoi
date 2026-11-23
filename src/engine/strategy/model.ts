@@ -92,6 +92,7 @@ export interface Quote {
 }
 export interface StrategyState {
   ruleset:'strategy-v1'; seed:number; tick:number; epochDays:number;
+  equipmentCommandRevision?:number;
   nations:Nation[]; provinces:Province[]; regions:Region[];
   factories:Factory[]; construction:Construction[];
   designs:Design[]; designRevisions?:EquipmentRevision[]; lines:Line[]; lots:Lot[]; divisions:Division[];
@@ -120,6 +121,9 @@ export function atWar(w:Pick<StrategyState,'wars'>,a:number,b:number):boolean{
 }
 export function assertStrategyState(w:StrategyState):void{
   if(w.ruleset!=='strategy-v1'||!Number.isSafeInteger(w.tick)||w.tick<0||!Number.isSafeInteger(w.epochDays))throw new RangeError('version/tick/epoch');
+  if(w.equipmentCommandRevision!==undefined&&
+    (!Number.isSafeInteger(w.equipmentCommandRevision)||w.equipmentCommandRevision<0))
+    throw new RangeError('invalid equipment command revision');
   const ids=(xs:ReadonlyArray<{id:number|string}>,label:string)=>{
     if(new Set(xs.map(x=>x.id)).size!==xs.length)throw new RangeError('duplicate '+label);
   };
