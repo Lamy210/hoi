@@ -37,9 +37,17 @@ export function frontlineOrder(a:Unit,b:Unit):number {
   return frontlinePriority(b)-frontlinePriority(a)||a.id-b.id;
 }
 
-/** Fit higher-priority divisions first; then lower unit IDs.
- * Skip non-fitting formations; fallback to one over-wide unit.
- * Legacy: each 20-width division, terrain capacity == previous slots * 20.
+/** Healthy reserves enter before fatigued divisions (no teleport).
+ * A depleted division can still hold an otherwise vacant frontage: combat
+ * width does not vanish when no reserve is ready. This is a daily selection
+ * rule, not a permanent or cached combat participation state.
+ */
+export const FRONTLINE_READY_ORG = 65;
+
+/** Fit healthy divisions before fatigued ones; within the same readiness
+ * tier use player priority and unit ID. Skip non-fitting formations;
+ * fallback to one over-wide unit, preserving the original width penalty.
+ * Legacy: each 20-width division, terrain capacity == slots * 20.
  */
 export function selectCombatFront(w:WorldState,units:readonly Unit[],legacySlots:number):
   { units:Unit[]; penalties:number[] } {
@@ -48,7 +56,9 @@ export function selectCombatFront(w:WorldState,units:readonly Unit[],legacySlots
   let used=0;
   const selected:Unit[]=[];
   const penalties:number[]=[];
-  const ranked=[...units].sort(frontlineOrder);
+  const ranked=[...units].sort((a,b)=>
+    Number(b.org>=FRONTLINE_READY_ORG)-Number(a.org>=FRONTLINE_READY_ORG)||
+    frontlineOrder(a,b));
   for(const u of ranked){
     const width=unitCombatWidth(w,u);
     if(width<=0)continue;
