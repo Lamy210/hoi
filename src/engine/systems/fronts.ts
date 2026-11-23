@@ -13,12 +13,13 @@ function log(w: WorldState, country: number, module: string, options: string[], 
   if (arr.length > 100) arr.shift();
 }
 
-function cmd(w: WorldState, front: Front, type: string, p: Record<string, unknown>): void {
+function cmd(w: WorldState, front: Front, type: string, p: Record<string, unknown>): boolean {
   // プレイヤー戦線の命令は専用issuer 'frontai'（手動コマンドのuidと衝突しない・INV-6）
-  if (type !== 'moveUnits') return;
+  if (type !== 'moveUnits') return false;
   const unitId = (p.units as number[])[0];
-  if (w.runtime.commandsSinceLastTick.some(c => c.type === 'frontMove' && c.p.unitId === unitId)) return;
+  if (w.runtime.commandsSinceLastTick.some(c => c.type === 'frontMove' && c.p.unitId === unitId)) return false;
   aiCmd(w, front.owner === w.playerCountry ? 'frontai' : 'ai:' + front.owner, 'frontMove', { unitId, target: p.target, frontId: front.id, revision: front.revision ?? 1 });
+  return true;
 }
 
 function unitExpectedPower(w: WorldState, u: Unit, provIdx: number, side: 'attack' | 'defend'): number {
@@ -57,9 +58,10 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       if (best >= 0) {
         const path = findPath(w, u.loc, best, front.owner, false);
         if (path) {
-          cmd(w, front, 'moveUnits', { units: [u.id], target: best });
-          orders++;
-          log(w, front.owner, 'front-retreat', ['hold', 'retreat:' + provName(best)], [0, bestEff], 'retreat', '戦線スタンス=撤退');
+          if (cmd(w, front, 'moveUnits', { units: [u.id], target: best })) {
+            orders++;
+            log(w, front.owner, 'front-retreat', ['hold', 'retreat:' + provName(best)], [0, bestEff], 'retreat', '戦線スタンス=撤退');
+          }
         }
       }
     }
@@ -78,9 +80,10 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       if (!spare) continue;
       const path = findPath(w, spare.loc, fp, front.owner, false);
       if (path) {
-        cmd(w, front, 'moveUnits', { units: [spare.id], target: fp });
-        orders++;
-        log(w, front.owner, 'front-hold', ['hold', 'fill:' + provName(fp)], [0, 1], 'fill', '前線駐留なし');
+        if (cmd(w, front, 'moveUnits', { units: [spare.id], target: fp })) {
+          orders++;
+          log(w, front.owner, 'front-hold', ['hold', 'fill:' + provName(fp)], [0, 1], 'fill', '前線駐留なし');
+        }
       }
     }
     return;
@@ -114,9 +117,10 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       if (nearest >= 0) {
         const path = findPath(w, u.loc, nearest, front.owner, false);
         if (path) {
-          cmd(w, front, 'moveUnits', { units: [u.id], target: nearest });
-          musterOrders++;
-          log(w, front.owner, 'front-muster', ['hold', 'muster:' + provName(nearest)], [0, 1], 'muster', '前線へ集結');
+          if (cmd(w, front, 'moveUnits', { units: [u.id], target: nearest })) {
+            musterOrders++;
+            log(w, front.owner, 'front-muster', ['hold', 'muster:' + provName(nearest)], [0, 1], 'muster', '前線へ集結');
+          }
         }
       }
     }
@@ -159,14 +163,15 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
     const scores = candidates.map((x) => x.ratio).concat([0]);
     if (front.cap > 0 && best && best.ratio > threshold) {
       // 目標へ移動（投入上限・週4命令まで）
-      const movable = unitsOfFront(w, front).filter((u) => u.path.length === 0 && !u.encircled);
+      // Match frontMove validation before reserving the attack command budget:
+      // manually held, moving or engaged divisions must not crowd out ready ones.
+      const attackReady = movable.filter(u => u.org > 0 && w.prov.controller[u.loc] === front.owner);
       let sent = 0;
-      for (const u of movable) {
+      for (const u of attackReady) {
         if (sent >= front.cap || sent >= 4) break;
         const adjacent = w.adj.targets.slice(w.adj.offsets[u.loc],w.adj.offsets[u.loc+1]).some((p,i)=>p===best.target&&!w.adj.strait[w.adj.offsets[u.loc]+i]);
         if (adjacent && w.prov.controller[u.loc]===front.owner && u.org>0) {
-          cmd(w, front, 'moveUnits', { units: [u.id], target: best.target });
-          sent++;
+          if (cmd(w, front, 'moveUnits', { units: [u.id], target: best.target })) sent++;
         }
       }
       if (sent > 0) {
