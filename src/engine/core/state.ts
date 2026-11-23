@@ -84,7 +84,7 @@ export interface Front {
   id: number;
   owner: number;
   enemy: number;
-  stance: 'hold' | 'attack' | 'retreat';
+  stance: 'hold' | 'attack' | 'counterattack' | 'retreat';
   provinces: number[]; // 前線州（自国支配）
   targets: number[]; // 攻勢目標州（攻勢スタンス時）
   cap: number; // 攻勢投入上限
