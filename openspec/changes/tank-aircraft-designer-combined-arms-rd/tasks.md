@@ -52,3 +52,15 @@
 - [ ] 目的: 設計カタログのシナリオpack化 / 対象: data/packs/.../modules.json / 内容: バージョン付き外部カタログ・source validation・ゲームへ接続 / テスト: malformed packと旧model revision / 期待: 無効データ拒否、後方カタログsnapshotに対応
 - [ ] 目的: 設計版永続化/実ゲーム装備の導出 / 対象: strategy/model.ts, designer/revisions.ts, save.ts, command bus / 内容: modelId+revisionと実際の国別techDone・MIO快照による承認、Lot/Lineへ紐付け / テスト: 旧型番が設計変更で自動強化されない / 期待: 生産・装備移転は単一資産台帳で確定
 - [ ] 目的: 4×6時間戦闘への接続 / 対象: strategy/tick.ts と本番戦闘 / 内容: pure preview→現場戦闘/airwingsへ統合、非戦闘損耗をeventIdで重複排除 / テスト: 同時戦闘・故障・修理の数量差分 / 期待: 机上のpreviewを実戦結果と取り違えない
+
+
+## DESIGN-02b：設計Revision→実生産・保存の独立参照パイプライン（今回のPR）
+- [x] 目的: 国家技術を元に設計を承認 / 対象: `src/engine/strategy/designer/revisions.ts` / 内容: actorCountry、familyId、部品、techDoneをcommit時に再評価してr1, r2...を原子的に登録 / テスト: 未研究/他国/無効family拒否、在庫不変 / 期待: previewとcommitの責務分離
+- [x] 目的: 設計版から生産能力のキャッシュを凍結 / 対象: `src/engine/strategy/designer/frozen.ts` / 内容: 保存された部品・研究スナップショットから計算した性能とDesign登録値の一致検査 / テスト: reliability/ICキャッシュ不正の拒否 / 期待: 研究後も旧revisionに遡及buffなし
+- [x] 目的: 設計版を状態保存と不変条件へ接続 / 対象: `src/engine/strategy/model.ts` と既存`save.ts` / 内容: optional designRevisionsと国別生産権限/型番別仕掛ICをStateへ追加 / テスト: msgpack checksum+hash復元、不正改訂欠番/国外ライン拒否 / 期待: 現行参照v19形式で正本を往復
+- [x] 目的: 実際の工場生産へ接続 / 対象: `src/engine/strategy/designer/revisions.ts` と既存`tick.ts` / 内容: 型番切替を原子化し、工場は既存の労働・IC・資源で新モデルLotを製造 / テスト: 戦車/航空機の新モデルがwarehouseへ投入、資源を消費 / 期待: 保存則、工場二重利用禁止
+- [ ] 目的: 実WorldStateと操作UIへ接続 / 対象: 本番command bus/React/現行save / 内容: 画面から設計登録→ライン切替、技術研究済みと権限の都度検証 / テスト: E2E操作・save復元 / 期待: 実ゲーム画面から操作可能（本PR未実装）
+- [ ] 目的: カタログ将来の複数バージョン対応 / 対象: scenario packとfrozen.ts / 内容: 新カタログの導入時に旧revisionの計算器を選択可能にする / テスト: 旧版/新版の同時保存ロード / 期待: v1しかない間に無根拠な互換保証をしない
+- [ ] 目的: 研究MIO/試作コストの実予約 / 対象: MIO/Researchの実装 / 内容: MIO効果の設計版snapshot、研究コストと試作IC支出の正規台帳 / テスト: 二重XP・無料試作不可 / 期待: 本PRの無償設計登録を将来の試作経済と混同しない
+
+**制限:** 本PRは既存の独立`src/engine/strategy`参照ルール内の接続で、現行本番WorldState、航空任務/航空隊、MIO、UI、国家ごとのライセンス譲渡は対象外。設計Revision用の原材料費は製造時にのみ消費。tick毎の設計整合再計算の性能は未測定で、1000設計以上の最適化を別途実施する。
