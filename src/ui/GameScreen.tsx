@@ -359,7 +359,7 @@ export function GameScreen() {
     if(frontTargetId!==null){
       const f=activeFronts.find(row=>row.id===frontTargetId);
       if(!f){setFrontTargetId(null);return;}
-      if(snap.controller[prov]!==f.enemy){
+      if(gameSnap.controller[prov]!==f.enemy){
         appStore.set({statusMessage:lang==='ja'?'指定戦線の敵支配州をクリックしてください':'Choose a province controlled by the front enemy'});
         return;
       }
@@ -433,9 +433,9 @@ export function GameScreen() {
     const mode:SelectionMergeMode=e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'replace';
     if(frontDraft){
       suppressDraftClick.current=true;
-      const incoming=provincesInRectangle(snap.controller,snap.playerCountry,
+      const incoming=provincesInRectangle(gameSnap.controller,gameSnap.playerCountry,
         province=>r.projectProvince(province),box);
-      const next=updateFrontDraftProvinces(frontDraft.provinces,incoming,snap.controller,snap.playerCountry,mode);
+      const next=updateFrontDraftProvinces(frontDraft.provinces,incoming,gameSnap.controller,gameSnap.playerCountry,mode);
       if(next===null)appStore.set({statusMessage:lang==='ja'?'戦線州は最大256件まで':'Maximum 256 front provinces'});
       else setFrontDraft({...frontDraft,provinces:next});
       return;
@@ -478,18 +478,18 @@ export function GameScreen() {
     if(!frontDraft)return;
     const prov=rendererRef.current?.pickAt(e.clientX,e.clientY);
     if(prov===null||prov===undefined)return;
-    if(snap.controller[prov]!==snap.playerCountry){
+    if(gameSnap.controller[prov]!==gameSnap.playerCountry){
       appStore.set({statusMessage:lang==='ja'?'自国支配州のみ戦線に指定できます':'Only controlled provinces may be drafted'});
       return;
     }
     const mode:SelectionMergeMode=e.altKey?'remove':e.ctrlKey||e.metaKey||e.shiftKey?'add':'toggle';
-    const next=updateFrontDraftProvinces(frontDraft.provinces,[prov],snap.controller,snap.playerCountry,mode);
+    const next=updateFrontDraftProvinces(frontDraft.provinces,[prov],gameSnap.controller,gameSnap.playerCountry,mode);
     if(next===null)appStore.set({statusMessage:lang==='ja'?'戦線州は最大256件まで':'Maximum 256 front provinces'});
     else setFrontDraft({...frontDraft,provinces:next});
   }
   function commitFrontDraft(){
-    if(!frontDraft||!canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,snap.playerCountry,
-      snap.controller,player.atWar,st.pendingCommands>0))return;
+    if(!frontDraft||!canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,gameSnap.playerCountry,
+      gameSnap.controller,player.atWar,st.pendingCommands>0))return;
     engineClient.command('createFront',{enemy:frontDraft.enemy,provinces:frontDraft.provinces});
     setFrontDraft(null);
   }
