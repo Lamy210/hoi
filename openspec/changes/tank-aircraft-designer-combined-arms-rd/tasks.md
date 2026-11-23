@@ -85,7 +85,7 @@
 - [x] 目的: 4×6時間の両側同時損害 / 対象: `src/engine/strategy/tick.ts`, `combat/land.ts` / 内容: subphaseの開始状態から装甲・貫通・火力を再計算、HP/ORG上限付き減算、実装備損耗 / テスト: AP69.9/70、6時間壊滅後の3フェーズ射撃禁止 / 期待: 同一Tick内の二重被害・0HP攻撃なし
 - [x] 目的: セーブ再開・決定論の回帰 / 対象: `tests/integration/strategy-armored-combat.test.ts` / 内容: 国家装備Lot/人員収支と戦闘Tickの再実行 / テスト: hash一致、セーブ再ロード次Tick一致 / 期待: 回帰結果に差がない
 - [x] 目的: 小数装備損耗の6時間分割による消失修正 / 対象: `model.ts`, `tick.ts`, `equipment/ledger.ts`, `tests/integration/strategy-armored-combat.test.ts` / 内容: Lotごとの損耗carryを4×6時間と翌日へ繰越、返却/再配備で比例移転 / テスト: 既存戦闘損耗回帰、部分返却後もcarry保存、save hash再現 / 期待: 切捨て損耗0の悪用防止と現物保存則
-- [ ] 目的: PR最終品質ゲート / 対象: GitHub Actions Check/Specification Design / 内容: TS/Vitest/Build/Playwright/OpenSpec strict / テスト: 全CIでHEAD成功 / 期待: 問題を修正してからマージ
+- [x] 目的: PR最終品質ゲート / 対象: GitHub Actions Check/Specification Design / 内容: TS/Vitest/Build/Playwright/OpenSpec strict / テスト: TypeScript・Vitest309件・Playwright45件・OpenSpec strictがPR #60のCIで成功 / 期待: 問題を修正してからマージ
 - [ ] 目的: 戦闘幅を実大隊編制から導出 / 対象: division templates/編制システム / 内容: 現在のoptional combatWidthを兵種・兵員・実装備に基づく確定編制幅へ移行 / テスト: 編制編集→正しい戦闘幅 / 期待: 手動数値だけの幅設定に依存しない
 - [ ] 目的: 本番WorldState/兵站・GUIへの接続 / 対象: command bus/React/Worker/main combat / 内容: 実師団の選択・装備の配備・戦闘ツールチップ / テスト: UIで戦闘幅/装甲/貫通確認 / 期待: 本番プレイ画面から操作可能
 - [ ] 目的: 同日援軍・撤退/増援に対応 / 対象: 6時間戦闘参加キュー / 内容: 今回のfrontageは日開始時の静的割当、途中増援・戦場離脱と再割当は次フェーズ / テスト: 隊列変更時の保存則 / 期待: 兵員の二重交戦を拒否
