@@ -103,7 +103,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           </option>)}
         </select>
         <button data-testid="formation-assign-front"
-          disabled={!enabled||!front||!assign.ids.length||(assign.releasesManualHold>0&&!confirmedRelease)}
+          disabled={!enabled||!front||!assign.ids.length||(releasingIds.length>0&&!confirmedRelease)}
           onClick={()=>front&&send('assignToFront',{units:assign.ids,frontId:front.id},assign.ids)}>
           {label('戦線へ割当・変更','Assign / change front')} ({assign.ids.length})
         </button>
