@@ -1,5 +1,6 @@
 import type {UiSnapshot,UiUnit} from '../engine/ui';
 import {engineClient} from './engineClient';
+import {FRONTLINE_READY_ORG} from '../engine/military/unitComposition';
 
 type Lang='ja'|'en';
 
@@ -51,8 +52,8 @@ export function CombatFrontageInspector({snap,selected,lang,pending}:Props) {
         </select>
       </label>
     </div>
-    <small>{label('優先度が高い師団から前線へ投入し、同順位なら師団番号順です。次の日次戦闘から反映されます。補給の優先度とは別です。',
-      'Higher priorities enter combat first; ties use division ID. Effective at the next daily combat resolution. Independent from supply priority.')}</small>
+    <small>{label('組織率65以上の師団を優先投入し、同じ準備段階では投入優先度・師団番号順です。消耗した師団は予備で再編し、空きがあれば組織率65未満でも参加します。次の日次戦闘から反映されます。',
+      'Divisions with at least 65 organization enter first, then priority and ID. Fatigued troops recover in reserve and can still fill unused width. Effective from the next daily battle.')}</small>
     {provinces.map(([province,units])=>{
       const front=frontByProvince.get(province);
       const terrainCapacity=units[0].frontageCapacity;
@@ -85,10 +86,11 @@ export function CombatFrontageInspector({snap,selected,lang,pending}:Props) {
           const state=u.moving?label('移動中','Moving'):
             !front?label('未交戦','Not engaged'):
             active.has(u.id)?label('前線','Engaged'):
+            reserves.has(u.id)&&u.org<FRONTLINE_READY_ORG?label('予備・再編中','Reserve · reorganizing'):
             reserves.has(u.id)?label('予備','Reserve'):label('対象外','Not eligible');
           const factor=penalties.get(u.id);
           return <div className="kv" key={u.id} data-testid={'combat-frontage-unit-'+u.id}>
-            <span>#{u.id} · {label('幅','Width')} {u.combatWidth} · {label('優先度','Priority')} {u.frontlinePriority??5}</span>
+            <span>#{u.id} · {label('幅','Width')} {u.combatWidth} · {label('優先度','Priority')} {u.frontlinePriority??5} · {label('組織率','Org')} {Math.round(u.org)}</span>
             <span>{state}{factor!==undefined&&factor<1?(' · ×'+factor.toFixed(2)):''}</span>
           </div>;
         })}

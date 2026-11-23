@@ -8,10 +8,19 @@ export const DEFAULT_REINFORCEMENT_PRIORITY = 5;
  * Higher-priority armies receive scarce resources first.
  * Equal priorities preserve the original stable deployed-unit order.
  */
-export function reinforceIdleUnits(w:WorldState,battleLocations:ReadonlySet<number>):void {
+export function reinforceIdleUnits(
+  w:WorldState,battleLocations:ReadonlySet<number>,
+  engagedUnitIds?:ReadonlySet<number>,
+):void {
   const armyPriority=new Map(w.armies.map(a=>[a.id,a.reinforcementPriority??DEFAULT_REINFORCEMENT_PRIORITY]));
   const getPriority=(u:Unit)=>armyPriority.get(u.armyId??-1)??DEFAULT_REINFORCEMENT_PRIORITY;
-  const eligible=w.units.filter(u=>!u.destroyed&&!u.encircled&&!u.path.length&&!battleLocations.has(u.loc));
+  // On a controlled battlefield, a non-engaged reserve may replenish from
+  // national stocks. Fighting divisions and attackers in hostile territory may
+  // not exploit reserve replenishment during the active engagement.
+  const eligible=w.units.filter(u=>!u.destroyed&&!u.encircled&&!u.path.length&&
+    (!battleLocations.has(u.loc)||
+      (engagedUnitIds!==undefined&&!engagedUnitIds.has(u.id)&&
+        w.prov.controller[u.loc]===u.owner)));
   eligible.sort((a,b)=>getPriority(b)-getPriority(a));
   for(const u of eligible){
     const c=u.owner, speed=0.5+0.5*effectiveSupply(w,u);

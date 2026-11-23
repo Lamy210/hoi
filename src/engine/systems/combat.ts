@@ -132,7 +132,7 @@ function gatherBattles(w: WorldState): Map<number, Sides> {
   return map;
 }
 
-function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
+function resolveBattle(w: WorldState, provIdx: number, sides: Sides, engagedUnitIds: Set<number>): void {
   const prov = w.prov;
   const rng = deriveStream(w.seed, 'combat', prov.id[provIdx] + ':' + String(w.tick));
   const t = TERRAIN_DATA[prov.terrain[provIdx]];
@@ -142,6 +142,9 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
   const selA=selectCombatFront(w,attackers,t.width);
   const selD=selectCombatFront(w,defenders,t.width);
   const frontA=selA.units,frontD=selD.units;
+  // Persist participation for this tick only. Reserves on the same
+  // contested tile must not be treated as engaged or take battle losses.
+  for (const u of [...frontA,...frontD]) engagedUnitIds.add(u.id);
   const powersA = frontA.map((u,i) => factorProduct(unitPowerFactors(w, u, provIdx, 'attack'))*selA.penalties[i]);
   const powersD = frontD.map((u,i) => factorProduct(unitPowerFactors(w, u, provIdx, 'defend'))*selD.penalties[i]);
   const sumA = powersA.reduce((a, b) => a + b, 0) || 1e-9;
@@ -309,11 +312,15 @@ function tickOccupation(w: WorldState, battles: Map<number, Sides>): void {
   }
 }
 
-function tickAttrition(w: WorldState, battles: Map<number, Sides>): void {
+function tickAttrition(w: WorldState, battles: Map<number, Sides>, engagedUnitIds: ReadonlySet<number>, activeBattles: ReadonlySet<number>): void {
   for (const u of w.units) {
     if (u.destroyed) continue;
     // 実戦闘=攻撃側が存在する場合のみ（防衛のみのエントリは戦闘扱いにしない）
-    const inBattle = battles.has(u.loc) && battles.get(u.loc)!.attackers.length > 0;
+    const contested = battles.has(u.loc) && battles.get(u.loc)!.attackers.length > 0;
+    // Attackers occupying an undefended tile retain the legacy behavior.
+    // During an actual fight, only selected frontline divisions are engaged:
+    // co-located reserves can recover organization without moving.
+    const inBattle = contested && (!activeBattles.has(u.loc) || engagedUnitIds.has(u.id));
     // 補給途絶による包囲判定（phase2-fronts-logistics）: eff≈0かつ周囲に自領なし→包囲
     if (!u.encircled && !inBattle) {
       const eff = effectiveSupply(w, u);
@@ -344,7 +351,7 @@ function tickAttrition(w: WorldState, battles: Map<number, Sides>): void {
       // 補充は日次の組織回復・損耗処理後に優先度順で適用する。
     }
   }
-  reinforceIdleUnits(w,new Set([...battles].filter(([,s])=>s.attackers.length>0).map(([p])=>p)));
+  reinforceIdleUnits(w,new Set([...battles].filter(([,s])=>s.attackers.length>0).map(([p])=>p)),engagedUnitIds);
   // 破壊済みユニットの除去（ID順維持 → 決定論）
   for (let i = w.units.length - 1; i >= 0; i--) {
     if (w.units[i].destroyed) {
@@ -394,13 +401,15 @@ export function registerCombatSystems(): void {
       w.runtime.activeBattles = nowActive;
       // 2) 戦闘解決（ID順・決定論）
       const provKeys = [...nowActive].sort((a, b) => a - b);
+      const engagedUnitIds=new Set<number>();
       for (const prov of provKeys) {
         const s = battles.get(prov);
-        if (s && s.attackers.length > 0 && s.defenders.length > 0) resolveBattle(w, prov, s);
+        if (s && s.attackers.length > 0 && s.defenders.length > 0)
+          resolveBattle(w, prov, s, engagedUnitIds);
       }
       // 3) 占領タイマ → 4) 損耗・回復 → 5) 破壊済み除去 → 6) 併合判定（phase2-fronts-logistics）
       tickOccupation(w, battles);
-      tickAttrition(w, battles);
+      tickAttrition(w, battles, engagedUnitIds, nowActive);
       for(const u of w.units)if(initialLocations.get(u.id)!==u.loc)travelling.add(u.id);
       advanceBattlePreparedness(w,travelling,nowActive);
       for (const c of checkAnnexation(w)) {

@@ -47,9 +47,11 @@ describe('custom composition in real combat, logistics and movement',()=>{
 
   it('respects terrain width with stable id order and over-wide fallback',async()=>{
     const {w,u,c}=await fixture();
-    const short={...u,id:800000,customTemplateId:1,customRevision:1};
-    const another={...u,id:800001,customTemplateId:1,customRevision:1};
-    const legacy={...w.units.find(x=>x.owner===c && x.customTemplateId===undefined)!,id:800002};
+    // Compare equal-readiness divisions: this case tests frontage fitting
+    // and ID order, while combat-reserve-rotation covers exhaustion sorting.
+    const short={...u,id:800000,customTemplateId:1,customRevision:1,org:100};
+    const another={...u,id:800001,customTemplateId:1,customRevision:1,org:100};
+    const legacy={...w.units.find(x=>x.owner===c && x.customTemplateId===undefined)!,id:800002,org:100};
     const one=selectCombatFront(w,[short,another,legacy],1);
     expect(one.units.map(x=>x.id)).toEqual([short.id]);
     expect(one.penalties).toEqual([1]);
