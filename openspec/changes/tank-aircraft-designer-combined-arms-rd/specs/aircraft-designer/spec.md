@@ -5,7 +5,7 @@
 
 #### Scenario: レーダー付き増槽戦闘機
 - **WHEN** small機体にレシプロ単発・機関砲・レーダー・増槽を選ぶ
-- **THEN** 設計プレビューは約461km/h、航続約894km、AirAttack18、信頼性88%、IC18.0を示す
+- **THEN** 設計プレビューは約461km/h、総航続約894km、作戦半径約402km、AirAttack18、信頼性88%、IC18.0を示す
 
 #### Scenario: エンジン出力不足
 - **WHEN** Thrust/(12×TotalMass) が1.0未満の過積載機体を確定する
