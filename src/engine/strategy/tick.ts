@@ -244,10 +244,14 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
       u.soldiers-=loss;nation.population.soldiers-=loss;home.population-=loss;
       casualties+=loss;
     }
-    // Equipment attrition removes actual issued lots, never cloned warehouse stock.
+    // Preserve fractional equipment damage across the 6h phases AND following
+    // days. Without this carry, four losses of 0.95 are incorrectly rounded to 0.
     for(const l of next.lots.filter(l=>l.holder==='division'&&l.holderId===u.id)){
-      const lost=Math.min(l.quantity,Math.floor(l.quantity*Math.min(1,hpLoss/100)+1e-9));
+      const rawLoss=l.quantity*Math.min(1,hpLoss/100)+(l.combatLossCarry??0);
+      const whole=Math.floor(rawLoss+1e-10);
+      const lost=Math.min(l.quantity,whole);
       l.quantity-=lost;equipmentLoss+=lost;
+      l.combatLossCarry=l.quantity?Math.max(0,rawLoss-whole):0;
     }
     if(u.hp===0){
       // Remaining soldiers rout into reserves; the formation stops fighting.
@@ -256,7 +260,7 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
       nation.population.reserves+=u.soldiers;
       u.soldiers=0;u.destroyed=true;u.casualtyCarry=0;
       for(const l of next.lots.filter(l=>l.holder==='division'&&l.holderId===u.id)){
-        equipmentLoss+=l.quantity;l.quantity=0;
+        equipmentLoss+=l.quantity;l.quantity=0;l.combatLossCarry=0;
       }
     }
   };
