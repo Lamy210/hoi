@@ -1,8 +1,9 @@
 import type {StrategyState} from '../../src/engine/strategy/model';
+import {daysFromCivil} from '../../src/engine/clock/date';
 
 export function strategyFixture():StrategyState{
   return {
-    ruleset:'strategy-v1',seed:42,tick:0,
+    ruleset:'strategy-v1',seed:42,tick:0,epochDays:daysFromCivil(2026,1,1),
     nations:[
       {id:0,cash:100,householdCash:50,population:{dependents:20,unemployed:20,workers:40,researchers:10,reserves:10,soldiers:20},
         literacy:0.85,education:0.8,stability:0.8,researchSlotBonus:0,focusDone:[],techDone:[]},
