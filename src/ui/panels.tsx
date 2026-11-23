@@ -510,7 +510,7 @@ export function FrontsPanel() {
             onClick={()=>engineClient.command('assignToFront',{units:candidates.map(u=>u.id),frontId:f.id})}>
             {ja?'まとめて戦線に紐づけ':'Assign formation'} ({candidates.length})
           </button>
-          <button data-testid={'front-unassign-'+f.id} disabled={busy||!selected.some(u=>u.frontId===f.id)} onClick={()=>engineClient.command('unassignFromFront',{units:selected.filter(u=>u.frontId===f.id).map(u=>u.id)})}>{ja?'選択師団の割当解除':'Unassign selected'}</button>
+          <button data-testid={'front-unassign-'+f.id} disabled={busy||!assignmentUnits.some(u=>u.frontId===f.id)} onClick={()=>engineClient.command('unassignFromFront',{units:assignmentUnits.filter(u=>u.frontId===f.id).map(u=>u.id)})}>{ja?'選択師団の割当解除':'Unassign selected'}</button>
           <button className="danger" disabled={busy} onClick={()=>engineClient.command('deleteFront',{frontId:f.id})}>{t(lang,'front.delete')}</button>
         </div>
         {releases.length>0&&<label className="formation-command-warning" data-testid={'front-release-warning-'+f.id}>
