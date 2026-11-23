@@ -564,14 +564,14 @@ export function GameScreen() {
           onMouseMove={handleMapMove}
           onMouseLeave={() => setHoverProv(null)}
         >
-          {marqueeMode&&<div className="map-marquee-layer" data-testid="map-marquee-layer"
-            aria-label={lang==='ja'?'ドラッグで師団を矩形選択':'Drag to box-select divisions'}
+          {(marqueeMode||frontDraft)&&<div className="map-marquee-layer" data-testid="map-marquee-layer"
+            aria-label={frontDraft?(lang==='ja'?'戦線州をクリックまたは矩形ドラッグ':'Click or drag to draft a front'):(lang==='ja'?'ドラッグで師団を矩形選択':'Drag to box-select divisions')}
             onPointerDown={beginMarquee}
             onPointerMove={moveMarquee}
             onPointerUp={e=>endMarquee(e)}
             onPointerCancel={e=>endMarquee(e,true)}
             onLostPointerCapture={e=>endMarquee(e,true)}
-            onClick={e=>e.stopPropagation()}
+            onClick={clickFrontDraft}
             onContextMenu={e=>{e.preventDefault();e.stopPropagation();}}>
             {marquee&&<div className="map-marquee-rectangle" data-testid="map-marquee-rectangle" aria-hidden="true"
               style={{left:Math.min(marquee.x1,marquee.x2),top:Math.min(marquee.y1,marquee.y2),
@@ -585,7 +585,52 @@ export function GameScreen() {
           <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
           <button type="button" data-testid="map-box-select" aria-pressed={marqueeMode} disabled={!mapReady}
             onClick={toggleMarquee}>{marqueeMode?(lang==='ja'?'範囲選択を終了':'Exit box select'):(lang==='ja'?'▱ 範囲選択':'▱ Box select')}</button>
+          <button type="button" data-testid="map-front-draw" disabled={!mapReady||!player.atWar.length}
+            aria-pressed={frontDraft!==null} onClick={()=>frontDraft?setFrontDraft(null):startFrontDraft()}>
+            {frontDraft?(lang==='ja'?'戦線指定終了':'Exit front draft'):(lang==='ja'?'✎ 戦線指定':'Draw front')}</button>
+          <button type="button" data-testid="map-front-target-mode" disabled={!mapReady||!activeFronts.length}
+            aria-pressed={frontTargetId!==null} onClick={()=>frontTargetId!==null?setFrontTargetId(null):startFrontTarget()}>
+            {frontTargetId!==null?(lang==='ja'?'目標指定終了':'Exit objective'):(lang==='ja'?'◇ 攻勢目標':'Set objective')}</button>
         </div>
+        {frontDraft&&<div className="map-front-planner" data-testid="map-front-planner">
+          <b>{lang==='ja'?'地図で戦線を指定':'Draft frontline on map'}</b>
+          <label>{lang==='ja'?'交戦相手':'Enemy'}
+            <select data-testid="map-front-enemy" value={frontDraft.enemy} onChange={e=>
+              setFrontDraft({enemy:Number(e.target.value),provinces:[]})}>
+              {player.atWar.map(enemy=><option value={enemy} key={enemy}>
+                {lang==='ja'?snap.countries[enemy].nameJa:snap.countries[enemy].nameEn}
+              </option>)}
+            </select>
+          </label>
+          <span data-testid="map-front-draft-count">{lang==='ja'?'指定州':'Provinces'}: {frontDraft.provinces.length}</span>
+          <div className="muted">{lang==='ja'?'クリック:追加・解除 / 矩形ドラッグ:置換 / Shift・Ctrl:追加 / Alt:除外':
+            'Click: toggle / drag: replace / Shift or Ctrl: add / Alt: remove'}</div>
+          <div className="row">
+            <button data-testid="map-front-create" className="primary" disabled={!draftReady} onClick={commitFrontDraft}>
+              {lang==='ja'?'戦線を作成':'Create front'}</button>
+            <button data-testid="map-front-clear" disabled={!frontDraft.provinces.length} onClick={()=>
+              setFrontDraft({...frontDraft,provinces:[]})}>{lang==='ja'?'指定解除':'Clear'}</button>
+            <button data-testid="map-front-cancel" onClick={()=>setFrontDraft(null)}>{lang==='ja'?'キャンセル':'Cancel'}</button>
+          </div>
+          <small className="muted">{lang==='ja'?'作成後の師団割当・作戦開始は戦線画面で操作します。':'Assign divisions and start operations from the front panel.'}</small>
+        </div>}
+        {frontTargetId!==null&&<div className="map-front-planner" data-testid="map-front-target-planner">
+          <b>{lang==='ja'?'地図で攻勢目標を指定':'Pick offensive objective'}</b>
+          <label>{lang==='ja'?'対象戦線':'Front'}
+            <select data-testid="map-target-front" value={targetFront?.id??''} onChange={e=>setFrontTargetId(Number(e.target.value))}>
+              {activeFronts.map(f=><option value={f.id} key={f.id}>#{f.id} {lang==='ja'?snap.countries[f.enemy].nameJa:snap.countries[f.enemy].nameEn}</option>)}
+            </select>
+          </label>
+          <div className="muted">{lang==='ja'?'敵支配州をクリックして目標を登録。Ctrl/Shift:追加、Alt:除外。戦線のスタンスは変わりません。':
+            'Click an enemy-controlled province. Ctrl/Shift: add, Alt: remove. Stance is unchanged.'}</div>
+          <div className="row">
+            <button data-testid="map-target-clear" disabled={!targetFront?.targets.length||st.pendingCommands>0}
+              onClick={()=>{
+                if(targetFront){engineClient.command('setFrontStance',{frontId:targetFront.id,stance:targetFront.stance,targets:[]});setFrontTargetId(null);}
+              }}>{lang==='ja'?'目標を自動選択へ戻す':'Clear objectives'}</button>
+            <button data-testid="map-target-cancel" onClick={()=>setFrontTargetId(null)}>{lang==='ja'?'キャンセル':'Cancel'}</button>
+          </div>
+        </div>}
         {marqueeMode&&<div className="map-marquee-hint" data-testid="map-marquee-hint" role="status">
           {lang==='ja'?'ドラッグで師団を囲む · Ctrl/⌘/Shift:追加 · Alt:除外 · 最大256師団':
             'Drag around divisions · Ctrl/⌘/Shift: add · Alt: remove · max 256'}
