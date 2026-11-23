@@ -26,11 +26,20 @@ export function operationalFrontProvinces(w:WorldState,front:Front):number[] {
   for(const u of w.units){
     if(u.destroyed||u.owner!==front.owner||u.frontId!==front.id||u.path.length||
       w.prov.controller[u.loc]!==front.owner||w.prov.owner[u.loc]!==front.enemy)continue;
-    // Do not extend through straits or areas that are no longer adjacent to this enemy.
+    // The line may also fall back one tile behind a captured part of its
+    // original drawn border. The unit must be adjacent to THAT lost border:
+    // unrelated theaters remain outside this front.
+    let adjacentEnemy=false,adjacentLostDrawn=false;
     for(let i=w.adj.offsets[u.loc];i<w.adj.offsets[u.loc+1];i++){
-      if(!w.adj.strait[i]&&w.prov.controller[w.adj.targets[i]]===front.enemy){
-        active.add(u.loc);break;
+      if(w.adj.strait[i])continue;
+      const p=w.adj.targets[i];
+      if(w.prov.controller[p]===front.enemy){
+        adjacentEnemy=true;
+        if(front.provinces.includes(p))adjacentLostDrawn=true;
       }
+    }
+    if(adjacentEnemy&&(w.prov.owner[u.loc]===front.enemy||adjacentLostDrawn)){
+      active.add(u.loc);
     }
   }
   return [...active].sort((a,b)=>a-b);
