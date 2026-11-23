@@ -3,7 +3,7 @@
  */
 import {assertStrategyState,atWar,populationSize,type StrategyState,type Factory,type Lot} from './model';
 import {availableIC,construct,modelOutput,nextPrice,researchPerDay,studySlots,
-  allocatedResearch,researchAhead,canAutoAttack,resistanceAfterDay,combatHits} from './rules';
+  allocatedResearch,researchAhead,canAutoAttack,resistanceAfterDay,combatHits,controlledFactoryFraction} from './rules';
 
 export const STRATEGY_PHASES=[
   'economy-market','research-production','supply-movement-delegation',
@@ -52,7 +52,10 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
     const region=next.regions.find(x=>x.id===f?.regionId);
     if(!f||!liveFactory||!n||!region||f.kind!=='civilian')throw new RangeError('invalid construction');
     const labor=claimWorkers(f),amount=region.resources[project.material]??0;
-    const progress=construct(f,project.remainingIC,n.cash,amount,labor,project.cashPerIC,project.materialPerIC);
+    const claims=baseline.occupations.filter(o=>o.regionId===region.id);
+    const operated=controlledFactoryFraction(region.owner,f.country,claims);
+    const progress=construct({...f,baseIC:f.baseIC*operated},project.remainingIC,
+      n.cash,amount,labor,project.cashPerIC,project.materialPerIC);
     n.cash-=progress.paid;n.householdCash+=progress.paid;
     region.resources[project.material]=Math.max(0,amount-progress.materialsSpent);
     project.remainingIC=Math.max(0,project.remainingIC-progress.progressIC);
@@ -101,7 +104,9 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
     const region=next.regions.find(x=>x.id===f.regionId)!;
     const workforce=claimWorkers(f);
     // Materials are the single resource constraint in this iteration.
-    const ic=availableIC(f,workforce,1,1,line.efficiency);
+    const occupied=baseline.occupations.filter(o=>o.regionId===region.id);
+    const operated=controlledFactoryFraction(region.owner,f.country,occupied);
+    const ic=availableIC({...f,baseIC:f.baseIC*operated},workforce,1,1,line.efficiency);
     const result=modelOutput(ic,line.carryIC,design,region.resources);
     line.carryIC=result.carry;
     for(const [good,qty] of Object.entries(result.spent))
