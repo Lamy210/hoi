@@ -28,7 +28,7 @@ export function createUnitOverlay(container: HTMLElement, project: (province: nu
       return node;
     };
     for(const f of fronts){
-      const group=el('g',{'data-testid':'map-front-'+f.id,'data-state':f.paused?'paused':'active','data-highlighted':String(f.highlighted),class:'front-plan '+(f.paused?'paused ': '')+(f.highlighted?'highlighted ':'')+f.stance});
+      const group=el('g',{'data-testid':f.id<0?'map-front-draft':'map-front-'+f.id,'data-state':f.paused?'paused':'active','data-highlighted':String(f.highlighted),class:'front-plan '+(f.paused?'paused ': '')+(f.highlighted?'highlighted ':'')+f.stance});
       for(const p of f.provinces){
         const xy=point(p);if(!valid(xy))continue;
         group.appendChild(el('circle',{cx:xy[0],cy:xy[1],r:15,class:'front-province'}));
@@ -53,7 +53,7 @@ export function createUnitOverlay(container: HTMLElement, project: (province: nu
       }
       const first=f.provinces[0];if(first!==undefined){
         const [x,y]=point(first);
-        if(valid([x,y])){const label=el('text',{x:x+18,y:y-18,class:'front-label'});label.textContent='#'+f.id+(f.paused?' II':'');group.appendChild(label);}
+        if(valid([x,y])){const label=el('text',{x:x+18,y:y-18,class:'front-label'});label.textContent=f.id<0?'DRAFT':'#'+f.id+(f.paused?' II':'');group.appendChild(label);}
       }
       plans.appendChild(group);
     }
