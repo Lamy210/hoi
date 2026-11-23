@@ -65,3 +65,22 @@ export function provincesAlongStroke(
   }
   return result;
 }
+
+/** Read-only comparison. Existing AI, targets and assigned divisions remain unchanged. */
+export function frontProvinceChangeSummary(before:readonly number[],after:readonly number[]){
+  const original=new Set(before),next=new Set(after);
+  return {added:after.filter(p=>!original.has(p)).length,
+    removed:before.filter(p=>!next.has(p)).length,
+    changed:before.length!==after.length||before.some(p=>!next.has(p))};
+}
+
+/** Edit is submitted only if the exact existing front generation is still current. */
+export function canCommitFrontEdit(
+  before:readonly number[],after:readonly number[],expectedRevision:number,
+  currentRevision:number|undefined,enemy:number,owner:number,
+  controller:readonly number[],enemies:readonly number[],busy:boolean,
+):boolean{
+  return Number.isSafeInteger(expectedRevision)&&expectedRevision>=1&&
+    expectedRevision===currentRevision&&frontProvinceChangeSummary(before,after).changed&&
+    canCommitFrontDraft(after,enemy,owner,controller,enemies,busy);
+}
