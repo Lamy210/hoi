@@ -521,7 +521,7 @@ export function FrontsPanel() {
             'This clears manual hold on '+releases.length+' divisions. Confirm assignment'}
         </label>}
       </div>})}
-      <p className="muted">{ja?'作戦は週次で評価されます.一時停止は新規自動命令を止め、すでに移動中の師団は現在の経路を維持します。':'Plans are evaluated weekly. Pausing stops new automatic orders; deployed movement paths continue.'}</p>
+      <p className="muted">{ja?'作戦は週次で評価されます。一時停止は新規自動命令を止め、すでに移動中の師団は現在の経路を維持します。':'Plans are evaluated weekly. Pausing stops new automatic orders; deployed movement paths continue.'}</p>
       <PendingOrders/>
       <button data-testid="close-fronts" onClick={()=>appStore.set({panel:null})}>{t(lang,'common.close')}</button>
     </div>
