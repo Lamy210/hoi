@@ -1,9 +1,11 @@
 /** Five-phase reference implementation; transactional clone + invariant check.
  * Produces advisory plans, never executes war/movement without authorization.
  */
-import {assertStrategyState,atWar,populationSize,type StrategyState,type Factory,type Lot} from './model';
+import {assertStrategyState,atWar,populationSize,type StrategyState,type Factory,type Lot,type Division} from './model';
+import {civilFromDays} from '../clock/date';
 import {availableIC,construct,modelOutput,nextPrice,researchPerDay,studySlots,
-  allocatedResearch,researchAhead,canAutoAttack,resistanceAfterDay,combatHits,controlledFactoryFraction} from './rules';
+  allocatedResearch,researchAhead,canAutoAttack,resistanceAfterDay,combatHits,controlledFactoryFraction,
+  equippedCombatStats,combatReady,laborForProgress} from './rules';
 
 export const STRATEGY_PHASES=[
   'economy-market','research-production','supply-movement-delegation',
@@ -14,7 +16,7 @@ export interface Strike {factoryId:number;damage:number;}
 export interface StrategyTickResult {
   next:StrategyState;phases:string[];orders:StrategyOrder[];
   production:{modelId:string;country:number;quantity:number}[];
-  reports:{battleOrgLoss:number;factoryDamage:number};
+  reports:{battleOrgLoss:number;factoryDamage:number;casualties:number;equipmentLoss:number};
 }
 const sumCash=(w:StrategyState)=>w.nations.reduce((s,c)=>s+c.cash+c.householdCash,0);
 const sumPopulation=(w:StrategyState)=>w.nations.reduce((s,c)=>s+populationSize(c.population),0);
@@ -31,15 +33,15 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   const next:StrategyState=structuredClone(initial);
   const baseline:StrategyState=structuredClone(initial);
   const phases:string[]=[],orders:StrategyOrder[]=[],production:StrategyTickResult['production']=[];
-  let battleOrgLoss=0,factoryDamage=0;
+  let battleOrgLoss=0,factoryDamage=0,casualties=0,equipmentLoss=0;
   // Actual allocation is only applied to next. All coefficients read baseline.
   // A shortage in one item must not double-discount output in a postprocess step.
   const workerRemaining=new Map(baseline.nations.map(n=>[n.id,n.population.workers]));
-  const claimWorkers=(f:Factory):number=>{
+  const availableWorkers=(f:Factory):number=>Math.min(workerRemaining.get(f.country)??0,f.workerDemand);
+  const consumeWorkers=(f:Factory,used:number):void=>{
     const available=workerRemaining.get(f.country)??0;
-    const taken=Math.min(available,f.workerDemand);
-    workerRemaining.set(f.country,available-taken);
-    return taken;
+    if(used>available+1e-8)throw new RangeError('worker overcommit');
+    workerRemaining.set(f.country,Math.max(0,available-used));
   };
 
   // 1. Market uses previous-day supply/demand, not this tick's output.
@@ -51,11 +53,12 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
     const n=next.nations.find(x=>x.id===project.country);
     const region=next.regions.find(x=>x.id===f?.regionId);
     if(!f||!liveFactory||!n||!region||f.kind!=='civilian')throw new RangeError('invalid construction');
-    const labor=claimWorkers(f),amount=region.resources[project.material]??0;
+    const labor=availableWorkers(f),amount=region.resources[project.material]??0;
     const claims=baseline.occupations.filter(o=>o.regionId===region.id);
     const operated=controlledFactoryFraction(region.owner,f.country,claims);
     const progress=construct({...f,baseIC:f.baseIC*operated},project.remainingIC,
       n.cash,amount,labor,project.cashPerIC,project.materialPerIC);
+    consumeWorkers(f,laborForProgress(f,progress.progressIC,operated));
     n.cash-=progress.paid;n.householdCash+=progress.paid;
     region.resources[project.material]=Math.max(0,amount-progress.materialsSpent);
     project.remainingIC=Math.max(0,project.remainingIC-progress.progressIC);
@@ -79,7 +82,13 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   for(const nation of next.nations){
     const original=baseline.nations.find(n=>n.id===nation.id)!;
     const owned=baseline.factories.filter(f=>f.country===nation.id);
-    const industry=owned.reduce((a,f)=>a+f.baseIC*(1-f.damage),0);
+    const workersRequired=owned.reduce((a,f)=>a+f.workerDemand,0);
+    const laborFill=workersRequired>0?Math.min(1,original.population.workers/workersRequired):1;
+    const industry=owned.reduce((a,f)=>{
+      const region=baseline.regions.find(r=>r.id===f.regionId)!;
+      const occupations=baseline.occupations.filter(o=>o.regionId===region.id);
+      return a+f.baseIC*(1-f.damage)*controlledFactoryFraction(region.owner,f.country,occupations);
+    },0)*laborFill;
     const infraProvinces=baseline.provinces.filter(p=>p.controller===nation.id);
     const infra=infraProvinces.length?
       Math.min(1,infraProvinces.reduce((a,p)=>a+p.infrastructure,0)/infraProvinces.length/10):0;
@@ -89,7 +98,7 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
     const allocations=allocatedResearch(researchPerDay(original,infra),active.map(r=>r.priority),slots);
     for(let i=0;i<active.length;i++){
       const r=active[i];
-      const year=new Date(Date.UTC(2026,0,1)+baseline.tick*86400000).getUTCFullYear();
+      const year=civilFromDays(baseline.epochDays+baseline.tick).y;
       const bonus=1+Math.min(0.3,Math.max(0,r.instituteBonus+r.mioBonus));
       r.progress=Math.min(r.total,r.progress+allocations[i]*bonus/researchAhead(year,r.year));
       if(r.progress>=r.total&&!nation.techDone.includes(r.techId))nation.techDone.push(r.techId);
@@ -102,17 +111,41 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
     const n=baseline.nations.find(x=>x.id===line.country)!;
     if(design.unlockTech&&!n.techDone.includes(design.unlockTech))continue;
     const region=next.regions.find(x=>x.id===f.regionId)!;
-    const workforce=claimWorkers(f);
+    const workforce=availableWorkers(f);
     // Materials are the single resource constraint in this iteration.
     const occupied=baseline.occupations.filter(o=>o.regionId===region.id);
     const operated=controlledFactoryFraction(region.owner,f.country,occupied);
     const ic=availableIC({...f,baseIC:f.baseIC*operated},workforce,1,1,line.efficiency);
-    const result=modelOutput(ic,line.carryIC,design,region.resources);
+    const previousCarry=line.carryIC;
+    const potential=Math.floor((ic+previousCarry)/design.ic+1e-10);
+    const result=modelOutput(ic,previousCarry,design,region.resources);
+    // If materials limited production, do not consume labor for idle production capacity.
+    const consumedIC=result.count===potential?ic:Math.min(ic,Math.max(0,result.count*design.ic-previousCarry));
+    const maximumIC=f.baseIC*(1-f.damage)*operated*line.efficiency;
+    consumeWorkers(f,maximumIC>0?Math.min(workforce,workforce*consumedIC/Math.max(ic,1e-12)):0);
     line.carryIC=result.carry;
     for(const [good,qty] of Object.entries(result.spent))
       region.resources[good]=Math.max(0,(region.resources[good]??0)-qty);
     addLot(next.lots,'warehouse',line.country,design.id,result.count);
     if(result.count)production.push({modelId:design.id,country:line.country,quantity:result.count});
+  }
+  // The next day's market has access to today's finalized goods, not tomorrow's.
+  // Material demand is the pre-resource-limited requirement for all active work.
+  for(const q of next.quotes){
+    const regions=next.regions.filter(r=>r.owner===q.country);
+    q.supply=regions.reduce((sum,r)=>sum+(r.resources[q.good]??0),0);
+    let requested=0;
+    for(const p of next.construction.filter(x=>x.country===q.country&&x.material===q.good)){
+      const f=next.factories.find(x=>x.id===p.factoryId);
+      if(f)requested+=Math.min(p.remainingIC,f.baseIC*(1-f.damage))*p.materialPerIC;
+    }
+    for(const line of next.lines.filter(x=>x.country===q.country&&x.active)){
+      const design=next.designs.find(x=>x.id===line.modelId);
+      const f=next.factories.find(x=>x.id===line.factoryId);
+      if(design&&f)requested+=Math.floor((f.baseIC*(1-f.damage)*line.efficiency+line.carryIC)/design.ic)*
+        (design.materials[q.good]??0);
+    }
+    q.demand=requested;
   }
   phases.push(STRATEGY_PHASES[1]);
 
@@ -120,13 +153,19 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   // routine; the future command dispatcher must revalidate every proposal.
   let evaluations=0;
   const plannedUnit=new Set<number>();
-  for(const p of sorted(next.plans,x=>x.id)){
+  const plans=sorted(next.plans,x=>x.id);
+  const rotatingPlans=plans.length?
+    [...plans.slice(baseline.tick%plans.length),...plans.slice(0,baseline.tick%plans.length)]:[];
+  for(const p of rotatingPlans){
     const targets=[...new Set(p.targets)].sort((a,b)=>a-b);
-    for(const uid of [...new Set(p.divisionIds)].sort((a,b)=>a-b)){
+    const unitIds=[...new Set(p.divisionIds)].sort((a,b)=>a-b);
+    const offset=unitIds.length?(baseline.tick*1000)%unitIds.length:0;
+    const rotatedUnits=[...unitIds.slice(offset),...unitIds.slice(0,offset)];
+    for(const uid of rotatedUnits){
       if(orders.length>=16||evaluations>=1000)break;
       evaluations++;
       const u=next.divisions.find(d=>d.id===uid);
-      if(!u||plannedUnit.has(uid)||u.manualHold||u.moving||u.inBattle||p.paused)continue;
+      if(!u||plannedUnit.has(uid)||!combatReady(u)||u.planId!==p.id||u.manualHold||u.inBattle||p.paused)continue;
       if(p.kind==='OFFENSIVE'){
         if(!canAutoAttack(next,p,u))continue;
         const target=targets.find(t=>next.provinces.find(q=>q.id===u.province)?.adjacent.includes(t)&&
@@ -140,7 +179,7 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
         if(target===undefined)continue;
         orders.push({planId:p.id,divisionId:uid,targetProvince:target,type:'defend'});
       }
-      plannedUnit.add(uid);
+      if(orders.some(x=>x.divisionId===uid))plannedUnit.add(uid);
     }
   }
   phases.push(STRATEGY_PHASES[2]);
