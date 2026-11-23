@@ -547,7 +547,7 @@ export function registerAllCommands(): void {
       const f = frontOf(w,p.frontId as number), c = actorCountry(w,issuer);
       if (!f) return 'noFront';
       if (c === null || c !== f.owner || issuer === 'frontai') return 'notYourFront';
-      if (!['hold','attack','retreat'].includes(p.stance as string)) return 'badParams';
+      if (!['hold','attack','counterattack','retreat'].includes(p.stance as string)) return 'badParams';
       if (p.cap !== undefined && (!Number.isInteger(p.cap) || (p.cap as number)<0 || (p.cap as number)>8)) return 'badParams';
       if (p.targets !== undefined && (!Array.isArray(p.targets) || new Set(p.targets).size !== p.targets.length || p.targets.some(x=>!Number.isInteger(x)||x<0||x>=w.prov.count||w.prov.controller[x]!==f.enemy))) return 'badParams';
       // An offensive can be drafted before war only while automation is paused.
@@ -557,7 +557,7 @@ export function registerAllCommands(): void {
     },
     apply(w,p) {
       const f=frontOf(w,p.frontId as number)!;
-      f.stance=p.stance as 'hold'|'attack'|'retreat';
+      f.stance=p.stance as 'hold'|'attack'|'counterattack'|'retreat';
       if(Array.isArray(p.targets)) f.targets=(p.targets as number[]).slice().sort((a,b)=>a-b);
       if(typeof p.cap==='number') f.cap=p.cap;
       f.revision=(f.revision??1)+1;
