@@ -112,6 +112,9 @@ test('戦線割当による手動固定の解除確認を必須にし、対象�
   await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('formation-front-assigned')).toHaveText('2');
   await expect(page.getByTestId('formation-manual-hold-count')).toHaveText('0');
+  // Previous assertion used "withoutFront"; the assigned units are now excluded by that filter.
+  await page.getByTestId('formation-target-scope').selectOption('all');
+  await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
   await page.getByTestId('formation-deployment-mode').selectOption('even');
   await expect(page.getByTestId('formation-deploy-front')).toBeEnabled();
   await page.getByTestId('formation-deploy-front').click();
