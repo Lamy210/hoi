@@ -1,6 +1,8 @@
 /** Canonical next-generation strategy ruleset; independent of legacy WorldState.
  * No persistence compatibility with old save v18 is promised.
  */
+import type {EquipmentRevision} from './designer/frozen';
+import {validateRevisionRegistry} from './designer/frozen';
 export type Good = string;
 export interface Pop {
   dependents:number; unemployed:number; workers:number;
@@ -32,14 +34,14 @@ export interface Construction {
 }
 export interface Design {
   id:string; category:'infantry'|'artillery'|'tank'|'aircraft'|'support';
-  year:number; unlockTech?:string;
+  year:number; unlockTech?:string; ownerCountry?:number;
   softAttack:number; hardAttack:number; defense:number; breakthrough:number;
   armor:number; piercing:number; reliability:number;
   ic:number; materials:Record<Good,number>;
 }
 export interface Line {
   id:number; country:number; factoryId:number; modelId:string;
-  efficiency:number; carryIC:number; active:boolean;
+  efficiency:number; carryIC:number; carryByModel?:Record<string,number>; active:boolean;
 }
 export interface Lot {
   holder:'warehouse'|'division'|'garrison'; holderId:number;
@@ -84,7 +86,7 @@ export interface StrategyState {
   ruleset:'strategy-v1'; seed:number; tick:number; epochDays:number;
   nations:Nation[]; provinces:Province[]; regions:Region[];
   factories:Factory[]; construction:Construction[];
-  designs:Design[]; lines:Line[]; lots:Lot[]; divisions:Division[];
+  designs:Design[]; designRevisions?:EquipmentRevision[]; lines:Line[]; lots:Lot[]; divisions:Division[];
   plans:Plan[]; research:Research[]; spirits:Spirit[];
   focuses:Focus[]; occupations:Occupation[]; quotes:Quote[];
   wars:{a:number;b:number}[];
@@ -165,12 +167,27 @@ export function assertStrategyState(w:StrategyState):void{
     if(line.efficiency<0||line.efficiency>1||!Number.isFinite(line.efficiency))
       throw new RangeError('efficiency');
     nonnegative(line.carryIC);
+    const currentDesign=w.designs.find(d=>d.id===line.modelId)!;
+    if(line.carryIC>=currentDesign.ic+1e-8)throw new RangeError('model WIP exceeds unit IC');
+    if(currentDesign.ownerCountry!==undefined&&currentDesign.ownerCountry!==line.country)
+      throw new RangeError('production model belongs to another country');
+    if(line.carryByModel){
+      for(const [id,ic] of Object.entries(line.carryByModel)){
+        const old=w.designs.find(d=>d.id===id);
+        if(!old||id===line.modelId||!Number.isFinite(ic)||ic<0||ic>=old.ic+1e-8)
+          throw new RangeError('invalid model WIP');
+        if(old.ownerCountry!==undefined&&old.ownerCountry!==line.country)
+          throw new RangeError('foreign model WIP');
+      }
+    }
     if(line.active){if(usedFactories.has(line.factoryId))throw new RangeError('factory double use');
       usedFactories.add(line.factoryId);}
   }
   for(const d of w.designs){
     if(d.reliability<0||d.reliability>1||!Number.isFinite(d.reliability)||d.ic<=0||!Number.isFinite(d.ic))
       throw new RangeError('design');
+    if(d.ownerCountry!==undefined&&!countries.has(d.ownerCountry))
+      throw new RangeError('invalid equipment designer country');
     for(const amount of Object.values(d.materials))nonnegative(amount);
   }
   const lotKeys=new Set<string>();
@@ -237,6 +254,7 @@ export function assertStrategyState(w:StrategyState):void{
     const pop=w.regions.filter(r=>r.owner===n.id).reduce((a,r)=>a+r.population,0);
     if(pop!==populationSize(n.population))throw new RangeError('regional population mismatch');
   }
+  validateRevisionRegistry(w);
   for(const r of w.regions){
     const shares=w.occupations.filter(o=>o.regionId===r.id).reduce((a,b)=>a+b.share,0);
     if(shares>1+1e-8)throw new RangeError('occupation overcommit');
