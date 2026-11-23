@@ -127,7 +127,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
         )}
       </label>}
       {!frontOptions.length&&<small className="muted" data-testid="formation-no-fronts">
-        {label('戦争中の戦線がありません。戦線画面で先に作成してください。','No active wartime fronts. Create one in the fronts panel.')}
+        {label('戦線がありません。開戦前でも地図から作成できます。','No fronts yet. Draw a front on the map, even before war.')}
       </small>}
       <small className="muted">{label(
         '命令は変更が必要な師団だけに送信します。作戦の移動は既存の戦線AIに委ね、実行時にも所有権・戦線状態を検証します。',
