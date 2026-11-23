@@ -103,7 +103,7 @@ Jetと高度なレーダーは研究で解禁。機関砲、レーダー、爆�
 - Drag = 1+ΣdragDelta (>0)
 - Speed = clamp(FrameSpeed×sqrt(ThrustRatio/Drag)×(1−DiveBrakeSpeedPenalty),100,1200)
 - Agility = clamp((FrameAgility+ΣagilityDelta)×min(1.25,ThrustRatio)/(1+0.10×WeaponMass/PayloadCap),5,150)
-- Range = clamp(FrameRange×(1+ΣrangeBonus)/(1+0.10×(Drag−1)),100,10000)
+- RangeKm = clamp(FrameRange×(1+ΣrangeBonus)/(1+0.10×(Drag−1)),100,10000)（総航続距離、往復燃料を含む片道半径ではない）。MissionRadiusKm=0.45×RangeKm（往復＋10%燃料予備の簡易則）。基地から空域までの片道距離がMissionRadiusKmを超えたら出撃不可。天候・基地損害で実Radiusを下げるときはその係数を一度だけ適用する。
 - AirAttack=ΣmoduleAirAttack、AirDefense=FrameBaseDefense+ΣmoduleAirDefense、GroundAttack=ΣmoduleGroundAttack、StrategicBomb=ΣmoduleStrategicBomb
 - Reliability=clamp(FrameR+ΣdeltaR−0.035×max(0,Complexity−FrameComplexityBudget)−0.07×max(0,1.10−ThrustRatio),0.35,0.98)
 - IC=(FrameIC+ΣModuleIC)×[1+0.03×max(0,Complexity−Budget)]×(1−MIODesignDiscount)
@@ -112,7 +112,7 @@ Jetと高度なレーダーは研究で解禁。機関砲、レーダー、爆�
 例: small + レシプロ単発 + 機関砲 + レーダー + 増槽:
 Weight=2.5+.8+.4+.2+.5=4.4t; ThrustRatio=60/(12×4.4)=1.136;
 Drag=1+.06+.04+.08=1.18; Speed≈470×sqrt(1.136/1.18)=461km/h;
-Range≈650×1.40/(1+.018)=894km; AirAttack=18; BaseR .92−.01−.015−.005−.01=.880; IC=8+3.5+3+2+1.5=18.0。
+Range≈650×1.40/(1+.018)=894km（作戦半径約402km）; AirAttack=18; BaseR .92−.01−.015−.005−.01=.880; IC=8+3.5+3+2+1.5=18.0。
 同型から増槽を外すと範囲は短くなり、重量と抗力が下がって機動力が上がる。戦闘機と長距離護衛の使い分けを成立させる。
 
 ## 4. 信頼性・故障率／非戦闘損耗
@@ -120,7 +120,7 @@ Range≈650×1.40/(1+.018)=894km; AirAttack=18; BaseR .92−.01−.015−.005−
 p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance, 0, 0.05)
 - p0: tank 0.0004 / aircraft 0.0006（航空機は実出撃機に限る）。
 - W: 快晴1、雨1.4、雪1.7、悪天候中間1.8、嵐2.3。地上移動中は泥濘2.0、山岳1.6、砂漠1.5、通常1。航空機Terrain=1。
-- Distance: 戦車 1+0.4×max(0,TravelDistanceKm/100−1)、上限2.0。航空機 1+0.5×max(0,MissionDistance/DesignRange−0.6)、上限1.2。航続圏外は sortie拒否。
+- Distance: 戦車 1+0.4×max(0,TravelDistanceKm/100−1)、上限2.0。航空機 1+0.5×max(0,MissionDistance/MissionRadiusKm−0.6)、上限1.2。作戦半径外は sortie拒否。
 - Maintenance: 平時整備0.8、標準1、燃料/補給不足1.5、包囲/拠点損傷2.0。倍率は一回だけ掛ける。
 - 各entity/day/subphase/causeをPCG32派生シードにして Expected=N×p から整数損失 = floor(Expected)+Bernoulli(frac(Expected))。同サブフェーズの実損失はN以下。中間計算はdoubleで構わないが、確率ソート・seedは固定。発生理由を保有ロット上のlossLedgerで一度だけ引き落とす。
 - 同一の機体が air-to-air loss / AA loss / noncombat loss の複数対象にならないよう、生存航空機を順次減らす。故障機はdestroyedとrepairableに分けてもよいが、回復可能分はEquipmentLot holder=repairingへ移し工業IC/部品を支払わない限りreadyへ復帰させない。参照数式の初期PoCでは全件を廃棄としてもよいが、その場合repairing在庫に同じ機体を残してはならない。
@@ -156,7 +156,7 @@ p_6h = clamp(p0 × [(1−R)/0.10]^1.5 × W × Terrain × Distance × Maintenance
 国家の現役POPはDivision兵員+AirWing搭乗員+Garrison兵員+未配備の現役兵に一意に分割する。Σ部隊/航空/駐屯の予約現役兵 <= population.soldiersを全tickで検証。パイロットが退役/墜落/移籍した場合は二重に動員しない。
 
 1日4×6hサブフェーズの順序: (1) 出撃可能数・航続距離・燃料・天候でsorties予約→(2) detection/迎撃と空対空損失→(3) surviving bomber/CASにAA対空損失と任務妨害→(4) surviving fightersによる制空指数→(5) CAS陸戦追加損害→(6) 戦略爆撃→(7) 最終生存機の非戦闘故障→(8) 空域/factory/logistics dirtyと在庫収支記録。空戦・AA・故障の順序は固定。CASが陸戦開始前に存在しても同じ6h戦闘から直接損害を引かない（戦闘が存在するときだけ）。
-- ActiveSorties = min(ready, pilots, availableFuel/fuelPerSortie, freeAirbaseCapacity)×weatherLaunchFactor×rangeFactor×missionAvailability（整数化、fractionは確定乱数）。distance>rangeなら0。
+- ActiveSorties = min(ready, pilots, availableFuel/fuelPerSortie, freeAirbaseCapacity)×weatherLaunchFactor×rangeFactor×missionAvailability（整数化、fractionは確定乱数）。distance>MissionRadiusKmなら0。任務距離は基地/空域中心のシナリオ固定座標と距離換算規則で決定論的に計算する。
 - Detection=clamp(0.35+0.40×radarCoverage+MIOReconBonus−0.25×adverseWeather,0.10,0.95)。
 - 空対空撃墜期待値 K_aa = min(EnemySorties, 0.020×OwnEngagedFighters×sqrt(OwnAirAttack/max(5,EnemyAirDefense))×clamp(OwnAgility/EnemyAgility,0.70,1.30)×Detection)。互いの撃墜は同一「戦闘開始スナップショット」で算出してから双方へ適用（先攻有利を防止）。1機は一度しか撃墜されない。
 - AA地上防空: K_groundAA=min(SurvivingHostileSorties, [0.0003×StateAAQuality+0.0008×EngagedDivisionAA]×SurvivingHostileSorties×AAReadiness)。StateAAが0/DivisionAAが0なら撃墜0。州AAは爆撃/CASに、師団AAはCASに適用。迎撃済み機体には再計算しない。
