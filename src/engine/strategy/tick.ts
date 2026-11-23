@@ -159,7 +159,7 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   for(const p of rotatingPlans){
     const targets=[...new Set(p.targets)].sort((a,b)=>a-b);
     const unitIds=[...new Set(p.divisionIds)].sort((a,b)=>a-b);
-    const offset=unitIds.length?(baseline.tick*1000)%unitIds.length:0;
+    const offset=unitIds.length?(baseline.tick*16)%unitIds.length:0;
     const rotatedUnits=[...unitIds.slice(offset),...unitIds.slice(0,offset)];
     for(const uid of rotatedUnits){
       if(orders.length>=16||evaluations>=1000)break;
