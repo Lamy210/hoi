@@ -79,7 +79,7 @@ export function DivisionDesignerPreview({ lang, templates, playerCountry, pendin
             engineClient.command('deleteTemplate',{templateId:editing.templateId,expectedRevision:editing.revision});resetEditor();
           }}>{lang==='ja'?'編成を削除':'Delete template'}</button>}
         </div>
-        <small>{lang==='ja'?'改訂すると過去の版は保持されます。保存した編成は募集一覧から訓練可能です。戦闘幅・編制別補給の適用は後続です。':'Revisions preserve history. Saved templates can be trained from the recruitment list. Combat width and composition-based supply are coming later.'}</small>
+        <small>{lang==='ja'?'改訂すると過去の版は保持されます。保存した編成は募集一覧から訓練可能です。保存した編成は訓練・改編でき、戦闘幅と編制別補給は実ゲームに反映されます。':'Revisions preserve history. Saved templates can be trained or used for refits; combat width and composition-based supply already affect the live game.'}</small>
       </div>
       <b>{t(lang, 'designer.battalions')} ({battalions.length}/{MAX_BATTALIONS})</b>
       {BUILTIN_BATTALIONS.filter(d => d.category === 'battalion').map(d => {

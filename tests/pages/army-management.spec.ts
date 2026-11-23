@@ -27,6 +27,13 @@ test('通常UIで軍団・軍集団を作成し師団を編入、集計・所在
   await expect(page.getByTestId('group-select-1')).toContainText('1/5');
   await page.getByTestId('group-select-1').click();
   await expect(page.getByTestId('selected-unit-count')).toContainText('2');
+  const combatPanel=page.getByTestId('combat-frontage-inspector');
+  await expect(combatPanel).toBeVisible();
+  await expect(combatPanel).toContainText('戦闘幅・前線参加状況');
+  await expect(page.getByTestId('combat-frontage-unit-'+ids[0])).toContainText('幅');
+  await expect(page.getByTestId('combat-frontage-unit-'+ids[1])).toBeVisible();
+  // Peace-time summaries are estimates: do not mislabel them as actual combat.
+  await expect(combatPanel).toContainText('事前見積り');
   await expect(page.getByTestId('army-summary')).toContainText('平均補給効率');
   await expect(page.getByTestId('move-selected')).toBeEnabled();
   await page.getByTestId('roster-filter').selectOption('selected');
