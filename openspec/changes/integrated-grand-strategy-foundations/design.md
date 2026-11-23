@@ -86,9 +86,12 @@
 **注意:** 現行`registerAllSystems`は補給→戦闘→生産→前線AI→経済→人口→政治→研究→建設。新順序を直ちに本番へ入れると互換破壊となるため、本PRでは`referenceTick`で契約をテストする。
 
 ## 11. 移行・運用・障害/DR
-- v18生データからv19設計へ: population(cohort)の人数移管、milFactoryの所在地割当、旧2財stockと型番内訳のunclassified残分算出。差額が負なら拒否。全変換はread-only preview/保存控え/検証→commit。
-- 既存ゲームルールセットv18では旧計算式を維持。新rulesetのセーブのみ新計算。古いセーブの無断上書き不可。
+- 旧セーブの移行は行わない。新規シナリオから国別POP、施設、型番ロットを初期化し、v19以降でのみ保存/復元する。既存のセーブはバージョン違いで拒否する。
+- 完全移行時には旧ゲームルールセットv18を廃止可能。新セーブの原子的検証/復元・ハッシュ一致を必須とする。
 - 失敗したTickは先頭スナップショットへロールバックし、国庫・在庫・人口が半端に書かれないようにする。ルール違反はErrorで停止/識別ログ。
 - ログ: rulesetVersion, phase, tick, market price delta, cash balance, population delta, stock balance, ai nodes/pathfind, attacksRejected。
 - 監視: tick_p95_ms(5国家/500師団), finance_balance_error=0, population_cohort_error=0, equipment_inventory_error=0, duplicate_factory_alloc=0。
 - 修復経路: メトリクス閾値超過→最新保存/バージョンを検証→巻戻し、障害時に料金発生する外部サービスなし。主要コストはブラウザCPU、メモリ、セーブサイズ。
+
+## セーブ互換性の変更（正式決定）
+未リリースのためv18以下との互換性は保証しない。実エンジン接続時は新形式へschemaVersionを上げ、旧形式は明示的に拒否し、新規ゲームの初期化を提示する。今PRの参照シミュレーション自身にもラウンドトリップ検証を用意する。
