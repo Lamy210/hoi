@@ -2,6 +2,13 @@
 // 命令発行はsystems/fronts.ts（週次AI）。明示命令（移動中）の師団には触れない。
 import { atWar, type Front, type WorldState } from '../core/state';
 
+/** Front automation never orders depleted divisions back into combat immediately.
+ * Manual attackUnits orders remain independent of these thresholds.
+ */
+export const AUTO_ATTACK_MIN_ORG = 60;
+export const COUNTERATTACK_MIN_ORG = 75;
+export const FRONT_RESERVE_MIN_ORG = 45;
+
 export function autoFrontProvinces(w: WorldState, owner: number, enemy: number): number[] {
   const out: number[] = [];
   for (let p = 0; p < w.prov.count; p++) {
