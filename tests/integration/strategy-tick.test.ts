@@ -4,6 +4,7 @@ import {runStrategyTick,STRATEGY_PHASES} from '../../src/engine/strategy/tick';
 import {assertStrategyState,populationSize} from '../../src/engine/strategy/model';
 import {strategyHash} from '../../src/engine/strategy/save';
 import {daysFromCivil} from '../../src/engine/clock/date';
+import {transferFactoryOperation} from '../../src/engine/strategy/rules';
 
 const cash=(w:ReturnType<typeof strategyFixture>)=>w.nations.reduce((s,n)=>s+n.cash+n.householdCash,0);
 const pop=(w:ReturnType<typeof strategyFixture>)=>w.nations.reduce((s,n)=>s+populationSize(n.population),0);
@@ -179,15 +180,25 @@ describe('five-phase deterministic strategy simulation',()=>{
     expect(second.orders).toHaveLength(16);
     expect(new Set([...first.orders,...second.orders].map(x=>x.divisionId)).size).toBe(21);
   });
-  it('占領した工場の操業国を再割当すると占領者が物理容量内で生産する',()=>{
+  it('占領した工場の操業国を原子的に移管し、元ライン停止後だけ占領者が稼働させる',()=>{
     const w=strategyFixture();
-    w.factories.find(f=>f.id===3)!.country=0;
-    w.lines.push({id:2,country:0,factoryId:3,modelId:'rifle',efficiency:1,carryIC:0,active:true});
-    const occupied=runStrategyTick(w);
+    w.lines.push({id:2,country:1,factoryId:3,modelId:'rifle',efficiency:1,carryIC:1,active:true});
+    const before=runStrategyTick(w);
+    expect(before.production.reduce((s,p)=>s+(p.country===0?p.quantity:0),0)).toBe(5);
+    const seized=transferFactoryOperation(w,3,0);
+    const capturedLine=seized.lines.find(l=>l.id===2)!;
+    expect(capturedLine.country).toBe(0);
+    expect(capturedLine.active).toBe(false);
+    expect(capturedLine.carryIC).toBe(0);
+    expect(w.factories.find(f=>f.id===3)!.country).toBe(1);
+    capturedLine.active=true;
+    const occupied=runStrategyTick(seized);
     expect(occupied.production.reduce((s,p)=>s+(p.country===0?p.quantity:0),0)).toBeGreaterThan(5);
-    const without=structuredClone(w);
+    const without=strategyFixture();
     without.occupations=[];
-    const noOccupation=runStrategyTick(without);
-    expect(noOccupation.production.reduce((s,p)=>s+(p.country===0?p.quantity:0),0)).toBe(5);
+    expect(()=>transferFactoryOperation(without,3,0)).toThrow();
+    const invalid=structuredClone(seized);
+    invalid.occupations=[];
+    expect(()=>assertStrategyState(invalid)).toThrow();
   });
 });
