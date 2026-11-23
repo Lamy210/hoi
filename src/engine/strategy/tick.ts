@@ -1,7 +1,7 @@
 /** Five-phase reference implementation; transactional clone + invariant check.
  * Produces advisory plans, never executes war/movement without authorization.
  */
-import {assertStrategyState,atWar,populationSize,type StrategyState,type Factory,type Lot,type Division} from './model';
+import {assertStrategyState,atWar,populationSize,type StrategyState,type Factory,type Lot} from './model';
 import {availableIC,construct,modelOutput,nextPrice,researchPerDay,studySlots,
   allocatedResearch,researchAhead,canAutoAttack,resistanceAfterDay,combatHits} from './rules';
 
