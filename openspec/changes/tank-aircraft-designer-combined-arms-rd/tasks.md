@@ -77,3 +77,16 @@
 - [ ] 目的: 本番WorldStateとゲーム画面の装備管理 / 対象: command bus、React、Worker、戦闘/補給Tick / 内容: 師団/航空隊パネルと複数選択配備・補給/空戦結合 / テスト: UI E2E、航空任務/燃料・航続/AA検証 / 期待: 実際の画面から装備を移動・出撃可能（本PR未実装）
 
 **設計境界:** 基地の`operationalSlots`は燃料・航続・機動・迎撃を計算する実sortie数ではない。AirWing`mission='grounded'`のみ。修理中機体は無料復帰不可。旧WorldState/UIを変更せず参照`strategy-v1`に限定する。
+
+
+## COMBAT-01b：配備済み兵器に基づく陸戦と6時間サブフェーズ統合（今回のPR）
+- [x] 目的: 師団の実装備に基づく装甲/貫通 / 対象: `src/engine/strategy/combat/equippedArmor.ts` / 内容: division保管Lotとcategory別需要、型番別装甲/貫通、width加重と70% max/30% mean / テスト: 倉庫only0、未配備0、戦車1/歩兵8の加重 / 期待: 仮想装甲付与なし
+- [x] 目的: 戦場ごとの地形幅・予備判定 / 対象: `src/engine/strategy/tick.ts`, `model.ts` / 内容: 師団combatWidth(1〜120)、地形幅50〜80、戦場ごとのfrontage枠を一日開始時に割当 / テスト: 幅50×3師団の山岳戦で1師団のみ参加 / 期待: 余剰部隊が1日で全軍火力を無償投射しない
+- [x] 目的: 4×6時間の両側同時損害 / 対象: `src/engine/strategy/tick.ts`, `combat/land.ts` / 内容: subphaseの開始状態から装甲・貫通・火力を再計算、HP/ORG上限付き減算、実装備損耗 / テスト: AP69.9/70、6時間壊滅後の3フェーズ射撃禁止 / 期待: 同一Tick内の二重被害・0HP攻撃なし
+- [x] 目的: セーブ再開・決定論の回帰 / 対象: `tests/integration/strategy-armored-combat.test.ts` / 内容: 国家装備Lot/人員収支と戦闘Tickの再実行 / テスト: hash一致、セーブ再ロード次Tick一致 / 期待: 回帰結果に差がない
+- [ ] 目的: PR最終品質ゲート / 対象: GitHub Actions Check/Specification Design / 内容: TS/Vitest/Build/Playwright/OpenSpec strict / テスト: 全CIでHEAD成功 / 期待: 問題を修正してからマージ
+- [ ] 目的: 戦闘幅を実大隊編制から導出 / 対象: division templates/編制システム / 内容: 現在のoptional combatWidthを兵種・兵員・実装備に基づく確定編制幅へ移行 / テスト: 編制編集→正しい戦闘幅 / 期待: 手動数値だけの幅設定に依存しない
+- [ ] 目的: 本番WorldState/兵站・GUIへの接続 / 対象: command bus/React/Worker/main combat / 内容: 実師団の選択・装備の配備・戦闘ツールチップ / テスト: UIで戦闘幅/装甲/貫通確認 / 期待: 本番プレイ画面から操作可能
+- [ ] 目的: 同日援軍・撤退/増援に対応 / 対象: 6時間戦闘参加キュー / 内容: 今回のfrontageは日開始時の静的割当、途中増援・戦場離脱と再割当は次フェーズ / テスト: 隊列変更時の保存則 / 期待: 兵員の二重交戦を拒否
+
+**制約:** この実装は従来の`strategy-v1`独立参照エンジンのみ。実際の本番WorldStateや画面・空戦/CAS・兵站天候の6時間変化は未接続。戦闘幅は暫定的に師団combatWidth、未指定時は20。日中の援軍到着と自動再編成は追加しない。装甲値と貫通は要求装備の実配備比率から導出し、研究・倉庫ストックは対象外。
