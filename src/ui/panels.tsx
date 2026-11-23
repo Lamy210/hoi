@@ -492,7 +492,7 @@ export function FrontsPanel() {
         <div className="kv"><span>{t(lang,'front.assigned')}: {f.assigned}</span><span>{ja?'手動優先':'Manual hold'}: {f.held}</span></div>
         <div className="kv"><span>{ja?'自動作戦':'Automation'}</span><strong data-testid={'front-state-'+f.id}>{!warring?(ja?'事前計画・攻撃停止':'Planned / no combat'):f.paused?(ja?'一時停止':'Paused'):(ja?'実行可能':'Enabled')}</strong></div>
         <div className="row">
-          {(['hold','counterattack','attack','retreat'] as const).map(stance=><button key={stance} className={f.stance===stance?'primary':''} disabled={busy} data-testid={'front-stance-'+stance} onClick={()=>engineClient.command('setFrontStance',{frontId:f.id,stance})}>{t(lang,'front.stance.'+stance)}</button>)}
+          {(['hold','counterattack','attack','retreat'] as const).map(stance=><button key={stance} className={f.stance===stance?'primary':''} disabled={busy} data-testid={'front-stance-'+stance} onClick={()=>engineClient.command('setFrontStance',{frontId:f.id,stance,...(stance==='counterattack'&&f.stance!==stance&&f.cap===0?{cap:2}:{})})}>{t(lang,'front.stance.'+stance)}</button>)}
           <button data-testid={'front-pause-'+f.id} disabled={busy||(!warring&&f.paused)} onClick={()=>engineClient.command('setFrontPaused',{frontId:f.id,paused:!f.paused})}>{f.paused?(ja?'再開':'Resume'):(ja?'一時停止':'Pause')}</button>
         </div>
         <div className="kv"><span>{t(lang,'front.cap')}</span><select aria-label={t(lang,'front.cap')} data-testid={'front-cap-'+f.id} disabled={busy} value={f.cap} onChange={e=>engineClient.command('setFrontStance',{frontId:f.id,stance:f.stance,cap:Number(e.target.value)})}>{Array.from({length:9},(_,n)=><option key={n} value={n}>{n}</option>)}</select></div>
