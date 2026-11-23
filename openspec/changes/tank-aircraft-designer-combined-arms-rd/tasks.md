@@ -100,3 +100,15 @@
 - [x] 目的: 現行仕様と説明文言の整合 / 対象: `src/ui/DivisionDesignerPreview.tsx` / 内容: 既に本番に入った戦闘幅・編制別補給の「今後実装」文を修正 / テスト: 既存師団デザイナー画面テスト / 期待: UIの誤誘導防止
 - [ ] 目的: 最終CIゲート / 対象: Check/Specification Design / 内容: TypeScript、Vitest、Build、Playwright、OpenSpec strict / テスト: 最終HEAD完全成功 / 期待: 完走した成功HEADのみマージ
 - [ ] 目的: 本番戦車・航空機設計/戦闘系との統合 / 対象: 既存WorldStateの設計・装備/航空司令 / 内容: 別系統strategy-v1のtank/aircraft系を仕様調停して段階移行 / テスト: 旧セーブ/戦闘とE2E / 期待: 大規模移行を本PRに混ぜない
+
+
+## LIVEUI-02：本番師団の前線投入優先度と予備入替（このPR）
+- [x] 目的: 本番で投入順を指定する / 対象: `src/engine/core/state.ts`, `src/engine/military/unitComposition.ts` / 内容: optional優先度0〜9・未設定5、優先度降順/同順位ID昇順で`selectCombatFront`を決定論的選抜 / テスト: 山岳幅80・5師団中末尾師団の優先度9で予備入替 / 期待: 未設定は現行ID順を維持
+- [x] 目的: コマンドにより複数選択を原子化 / 対象: `src/engine/commands.ts` / 内容: 最大256師団・国家認可・有効な生存師団・重複/数値検証、補給優先度とは別スコープ / テスト: 他国混入/重複/不正0〜9/壊滅・frontai拒否 / 期待: 一部適用なし
+- [x] 目的: UI投影と操作を戦闘に接続 / 対象: `combatFrontProjection.ts`, `engine/ui.ts`, `CombatFrontageInspector.tsx`, `ArmyManagement.tsx` / 内容: 戦闘・投影同一ソータで前線/予備更新、選択師団をまとめて0〜9指定、混在表示 / テスト: Worker Snapshot一致・ブラウザから2師団の設定 / 期待: スナップショットと本番戦闘の前線枠同一
+- [x] 目的: 保存の整合と旧版読み込みを維持 / 対象: `src/engine/save/serialize.ts`, `src/engine/core/hash.ts` / 内容: v19セーブと範囲検証、旧v18はv19タグをハッシュへ混入しない / テスト: v19往復/7日再生、v18復元、範囲外99/CRC一致でも拒否 / 期待: 有効なv18のロード可・破損拒否
+- [ ] 目的: 最終PR CIとレビュー / 対象: Check/Specification Design / 内容: TypeScript/Vitest/Build/Playwright/OpenSpec strict / テスト: 最終HEAD success・差分確認・未解決レビューなし / 期待: 条件を満たせばマージ
+- [ ] 目的: サブフェーズ内の予備繰上げ/交代命令 / 対象: `src/engine/systems/combat.ts` / 内容: 今回は日次戦闘選抜時点の優先順のみ。日中撤退後の追加投入と組織率回復条件は別PR / テスト: 一戦闘で過剰攻撃/戦力二重参加なし / 期待: 回帰確認後の導入
+- [ ] 目的: 戦車・航空機デザイナーを本番WorldStateへ統合 / 対象: 装備カタログと生産・研究/空戦UI / 内容: 戦車/航空機の型番・資源・装備バケットの段階移行 / テスト: 旧セーブ・生産保存則・戦闘E2E / 期待: 本PRには混ぜない
+
+**設計境界:** 前線投入優先度は既存の軍団補充優先度と無関係であり、戦場幅の投入順のみを変更する。変更は過去の戦闘確定結果や移動中の師団を即時変更せず、次回日次戦闘判定で評価される。新保存形式v19は有効なv18ロードを引き続き許可する。
