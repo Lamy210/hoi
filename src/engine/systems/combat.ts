@@ -27,7 +27,9 @@ export const TERRAIN_DATA = [
 ] as const;
 
 export const RETREAT_ORG = 20;
-export const OCCUPATION_DAYS = 14;
+// A vacant hostile province changes control on the arrival-day combat tick.
+// Occupation is still conditional on surviving attackers and no defenders.
+export const OCCUPATION_DAYS = 1;
 export const ENCIRCLE_DAMAGE = 8;
 export const ORG_REGEN_BASE = 3;
 
