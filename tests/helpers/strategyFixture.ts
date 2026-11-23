@@ -1,0 +1,53 @@
+import type {StrategyState} from '../../src/engine/strategy/model';
+import {daysFromCivil} from '../../src/engine/clock/date';
+
+export function strategyFixture():StrategyState{
+  return {
+    ruleset:'strategy-v1',seed:42,tick:0,epochDays:daysFromCivil(2026,1,1),
+    nations:[
+      {id:0,cash:100,householdCash:50,population:{dependents:20,unemployed:20,workers:40,researchers:10,reserves:10,soldiers:20},
+        literacy:0.85,education:0.8,stability:0.8,researchSlotBonus:0,focusDone:[],techDone:[]},
+      {id:1,cash:90,householdCash:70,population:{dependents:20,unemployed:10,workers:40,researchers:5,reserves:5,soldiers:20},
+        literacy:0.65,education:0.7,stability:0.6,researchSlotBonus:0,focusDone:[],techDone:[]},
+    ],
+    provinces:[
+      {id:0,regionId:0,owner:0,controller:0,terrain:'plains',adjacent:[1],infrastructure:7},
+      {id:1,regionId:1,owner:1,controller:1,terrain:'hills',adjacent:[0],infrastructure:5},
+    ],
+    regions:[
+      {id:0,owner:0,provinces:[0],population:120,resources:{steel:500,concrete:500}},
+      {id:1,owner:1,provinces:[1],population:100,resources:{steel:200,concrete:200}},
+    ],
+    factories:[
+      {id:1,regionId:0,country:0,kind:'civilian',baseIC:10,damage:0,workerDemand:10},
+      {id:2,regionId:0,country:0,kind:'military',baseIC:10,damage:0,workerDemand:10},
+      {id:3,regionId:1,country:1,kind:'military',baseIC:6,damage:0,workerDemand:10},
+    ],
+    construction:[{id:1,country:0,factoryId:1,kind:'build',remainingIC:20,cashPerIC:2,
+      material:'concrete',materialPerIC:1,
+      newFactory:{id:4,regionId:0,kind:'civilian',baseIC:4,workerDemand:10}}],
+    designs:[{id:'rifle',category:'infantry',year:2026,softAttack:10,hardAttack:2,
+      defense:8,breakthrough:2,armor:0,piercing:2,reliability:0.95,ic:2,materials:{steel:1}}],
+    lines:[{id:1,country:0,factoryId:2,modelId:'rifle',efficiency:1,carryIC:0,active:true}],
+    lots:[{holder:'warehouse',holderId:0,modelId:'rifle',quantity:4}],
+    divisions:[
+      {id:1,country:0,province:0,planId:1,manualHold:false,moving:false,inBattle:false,
+        soldiers:20,organization:100,hp:100,hardness:0.1,supply:1,softAttack:50,
+        hardAttack:10,defense:30,breakthrough:20},
+      {id:2,country:1,province:1,planId:null,manualHold:false,moving:false,inBattle:false,
+        soldiers:20,organization:100,hp:100,hardness:0.3,supply:1,softAttack:35,
+        hardAttack:20,defense:40,breakthrough:15},
+    ],
+    plans:[{id:1,country:0,enemy:1,kind:'OFFENSIVE',autonomy:'AUTO',authorized:false,
+      paused:true,revision:1,provinces:[0],targets:[1],divisionIds:[1],planning:0}],
+    research:[{country:0,techId:'advanced-rifle',year:2026,progress:0,total:100,
+      priority:1,instituteBonus:0.1,mioBonus:0.2}],
+    spirits:[],
+    focuses:[{id:'industrial-reform',country:0,requires:[],
+      effects:[{kind:'researchSlot',id:'slot1',value:1}]}],
+    occupations:[{regionId:1,occupier:0,share:0.8,resistance:20,compliance:10,
+      policy:'military',garrisonSupply:1}],
+    quotes:[{country:0,good:'steel',price:2,basePrice:2,supply:0,demand:10}],
+    wars:[],
+  };
+}
