@@ -1,6 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {createTestEngine} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
+import {allocateAiSequence} from '../../src/engine/core/sequence';
 import {startWar} from '../../src/engine/military/war';
 import {runFront} from '../../src/engine/systems/fronts';
 
@@ -60,7 +61,7 @@ describe('front AI attack queue and manual-order precedence',()=>{
   it('already queued division orders do not exhaust the per-front order budget',async()=>{
     const {w,troops,front,target}=await attackFixture();
     w.runtime.commandsSinceLastTick.push({
-      issuer:'frontai',seq:1,type:'frontMove',
+      issuer:'frontai',seq:allocateAiSequence(w,'frontai'),type:'frontMove',
       p:{frontId:front.id,revision:front.revision??1,unitId:troops[0].id,target},
     });
     runFront(w,front,()=>0.5);
