@@ -121,7 +121,7 @@ describe('equipment revision -> factory -> canonical lots integration',()=>{
     expect(()=>switchEquipmentProduction(result.next,1,1,result.modelId)).toThrow(/unauthorized/);
 
     const tampered=structuredClone(result.next);
-    tampered.designRevisions![0].frozenPreview.reliability=.99;
+    (tampered.designRevisions![0].frozenPreview as {reliability:number}).reliability=.99;
     expect(()=>assertStrategyState(tampered)).toThrow(/frozen/);
     expect(()=>saveStrategy(tampered)).toThrow();
     const tamperedStats=structuredClone(result.next);
