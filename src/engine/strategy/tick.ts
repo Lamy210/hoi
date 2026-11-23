@@ -16,7 +16,7 @@ export interface Strike {factoryId:number;damage:number;}
 export interface StrategyTickResult {
   next:StrategyState;phases:string[];orders:StrategyOrder[];
   production:{modelId:string;country:number;quantity:number}[];
-  reports:{battleOrgLoss:number;factoryDamage:number;casualties:number;equipmentLoss:number};
+  reports:{battleOrgLoss:number;factoryDamage:number;casualties:number;equipmentLoss:number;aiEvaluations:number};
 }
 const sumCash=(w:StrategyState)=>w.nations.reduce((s,c)=>s+c.cash+c.householdCash,0);
 const sumPopulation=(w:StrategyState)=>w.nations.reduce((s,c)=>s+populationSize(c.population),0);
@@ -31,7 +31,7 @@ const sorted=<T>(items:readonly T[],key:(x:T)=>number):T[]=>[...items].sort((a,b
 export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=[]):StrategyTickResult {
   assertStrategyState(initial);
   const next:StrategyState=structuredClone(initial);
-  const baseline:StrategyState=structuredClone(initial);
+  const baseline:StrategyState=initial; // read-only throughout the tick; only next mutates
   const phases:string[]=[],orders:StrategyOrder[]=[],production:StrategyTickResult['production']=[];
   let battleOrgLoss=0,factoryDamage=0,casualties=0,equipmentLoss=0;
   // Actual allocation is only applied to next. All coefficients read baseline.
@@ -132,8 +132,10 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   // The next day's market has access to today's finalized goods, not tomorrow's.
   // Material demand is the pre-resource-limited requirement for all active work.
   for(const q of next.quotes){
-    const regions=next.regions.filter(r=>r.owner===q.country);
-    q.supply=regions.reduce((sum,r)=>sum+(r.resources[q.good]??0),0);
+    q.supply=next.regions.reduce((sum,r)=>{
+      const claims=baseline.occupations.filter(o=>o.regionId===r.id);
+      return sum+(r.resources[q.good]??0)*controlledFactoryFraction(r.owner,q.country,claims);
+    },0);
     let requested=0;
     for(const p of next.construction.filter(x=>x.country===q.country&&x.material===q.good)){
       const f=next.factories.find(x=>x.id===p.factoryId);
@@ -277,5 +279,5 @@ export function runStrategyTick(initial:StrategyState,strikes:readonly Strike[]=
   if(sumPopulation(baseline)-sumPopulation(next)!==casualties)throw new RangeError('population casualty balance');
   const productionTotal=production.reduce((s,p)=>s+p.quantity,0);
   if(lotTotal(next)-lotTotal(baseline)!==productionTotal-equipmentLoss)throw new RangeError('equipment conservation');
-  return {next,phases,orders,production,reports:{battleOrgLoss,factoryDamage,casualties,equipmentLoss}};
+  return {next,phases,orders,production,reports:{battleOrgLoss,factoryDamage,casualties,equipmentLoss,aiEvaluations:evaluations}};
 }
