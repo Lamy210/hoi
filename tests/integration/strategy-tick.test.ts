@@ -24,6 +24,16 @@ describe('five-phase deterministic strategy simulation',()=>{
     expect(pop(result.next)).toBe(pop(input));
     expect(strategyHash(input)).toBe(original); // transactional, input unchanged
   });
+  it('民需工場の建設費は国庫から支払い、完成施設は翌日からのみ稼働',()=>{
+    const w=strategyFixture();
+    const first=runStrategyTick(w).next;
+    expect(first.factories.some(f=>f.id===4)).toBe(false);
+    const second=runStrategyTick(first).next;
+    expect(second.factories.find(f=>f.id===4)?.kind).toBe('civilian');
+    expect(second.construction).toHaveLength(0);
+    expect(cash(second)).toBeCloseTo(cash(w));
+    expect(w.factories.some(f=>f.id===4)).toBe(false);
+  });
   it('戦略爆撃は当日生産に影響しないが翌日から低下する',()=>{
     const input=strategyFixture();
     const day1=runStrategyTick(input,[{factoryId:2,damage:0.5}]);
