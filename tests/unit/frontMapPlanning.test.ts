@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {provincesInRectangle,updateFrontDraftProvinces,canCommitFrontDraft} from '../../src/ui/frontMapPlanning';
+import {provincesInRectangle,updateFrontDraftProvinces,canCommitFrontDraft,provincesAlongStroke} from '../../src/ui/frontMapPlanning';
 
 describe('地図上の戦線計画',()=>{
   const controlled=[0,0,1,0,1,0];
@@ -32,4 +32,16 @@ describe('地図上の戦線計画',()=>{
     expect(allowed([0],1,false,[1,0,1])).toBe(false);
     expect(allowed([999],1)).toBe(false);
   });
+  it('ドラッグ軌跡の近傍敵州を一括取得し、重複・他国・不正座標を除外する',()=>{
+    const controller=[0,2,2,1,2,0],enemy=2;
+    const points=new Map([[1,{x:50,y:50}],[2,{x:100,y:100}],[3,{x:80,y:80}],[4,{x:220,y:220}]]);
+    const projection=(p:number)=>points.get(p)??null;
+    const path=[{x:20,y:20},{x:100,y:100},{x:140,y:140}];
+    expect(provincesAlongStroke(controller,enemy,projection,path,9)).toEqual([1,2]);
+    expect(provincesAlongStroke(controller,enemy,projection,[{x:20,y:20}],9)).toEqual([]);
+    expect(provincesAlongStroke(controller,enemy,projection,[{x:NaN,y:0},{x:Infinity,y:0}],9)).toEqual([]);
+    expect(provincesAlongStroke(controller,enemy,projection,path,-1)).toEqual([]);
+    expect(provincesAlongStroke(controller,enemy,projection,path,9)).not.toContain(3);
+  });
+
 });
