@@ -35,6 +35,7 @@ jobs:
       - run: npx openspec validate map-marquee-formation-selection --strict
       - run: npx openspec validate formation-operation-scope-preview --strict
       - run: npx openspec validate front-attack-command-budget --strict
+      - run: npx openspec validate rapid-province-capture --strict
       - run: npx openspec validate phase8-maritime-map --strict
       - run: npx openspec validate phase8-naval-fleets --strict
       - run: npx openspec validate phase8-amphibious-transport --strict
