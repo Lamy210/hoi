@@ -5,6 +5,7 @@ import {issuedArmorPiercing} from '../../src/engine/strategy/combat/equippedArmo
 import {resolveLandExchange} from '../../src/engine/strategy/combat/land';
 import {runStrategyTick} from '../../src/engine/strategy/tick';
 import {saveStrategy,loadStrategy,strategyHash} from '../../src/engine/strategy/save';
+import {transferEquipmentLot} from '../../src/engine/strategy/equipment/ledger';
 
 function battle():StrategyState{
   const w=strategyFixture();
@@ -113,6 +114,46 @@ describe('land battle uses only issued equipment models',()=>{
     w.divisions[0].combatWidth=20;
     w.divisions[0].requiredEquipment={aircraft:1};
     expect(()=>assertStrategyState(w)).toThrow(/equipment requirements/);
+  });
+
+  it('4×6時間で小数の装備損耗を累積し、10個ロットの損失が切り捨てで消えない',()=>{
+    const w=battle();
+    w.divisions[0].softAttack=10000;
+    w.divisions[1].requiredEquipment={infantry:10};
+    w.lots.push({holder:'division',holderId:2,modelId:'rifle',quantity:10});
+    const one=runStrategyTick(w);
+    expect(one.reports.equipmentLoss).toBeGreaterThan(0);
+    const remaining=one.next.lots.find(l=>l.holder==='division'&&l.holderId===2)!;
+    expect(remaining.quantity).toBe(10-one.reports.equipmentLoss);
+    expect(remaining.combatLossCarry).toBeGreaterThanOrEqual(0);
+    expect(remaining.combatLossCarry).toBeLessThan(1);
+    const restored=loadStrategy(saveStrategy(one.next));
+    expect(restored.errors).toEqual([]);
+    expect(restored.state?.lots.find(l=>l.holder==='division'&&l.holderId===2)?.combatLossCarry)
+      .toBe(remaining.combatLossCarry);
+    expect(strategyHash(runStrategyTick(restored.state!).next))
+      .toBe(strategyHash(runStrategyTick(one.next).next));
+  });
+
+  it('損耗キャリーは一部の装備を倉庫へ返却・再配備しても消失せず割合移転する',()=>{
+    const w=strategyFixture();
+    w.divisions[0].requiredEquipment={infantry:2};
+    w.lots.push({holder:'division',holderId:1,modelId:'rifle',quantity:2,
+      combatLossCarry:.75});
+    assertStrategyState(w);
+    const totalCarry=()=>w.lots.reduce((sum,l)=>sum+(l.combatLossCarry??0),0);
+    const before=totalCarry();
+    transferEquipmentLot(w,'rifle',1,
+      {holder:'division',holderId:1},{holder:'warehouse',holderId:0});
+    expect(w.lots.find(l=>l.holder==='division')?.combatLossCarry).toBeCloseTo(.375);
+    expect(w.lots.find(l=>l.holder==='warehouse')?.combatLossCarry).toBeCloseTo(.375);
+    transferEquipmentLot(w,'rifle',1,
+      {holder:'warehouse',holderId:0},{holder:'division',holderId:1});
+    expect(totalCarry()).toBeCloseTo(before);
+    assertStrategyState(w);
+    const restored=loadStrategy(saveStrategy(w));
+    expect(restored.errors).toEqual([]);
+    expect(restored.state?.lots.reduce((s,l)=>s+(l.combatLossCarry??0),0)).toBeCloseTo(before);
   });
 
   it('複数日の同一seed再計算と保存・復元後の次Tickが一致する',()=>{
