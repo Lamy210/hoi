@@ -91,3 +91,12 @@
 - [ ] 目的: 同日援軍・撤退/増援に対応 / 対象: 6時間戦闘参加キュー / 内容: 今回のfrontageは日開始時の静的割当、途中増援・戦場離脱と再割当は次フェーズ / テスト: 隊列変更時の保存則 / 期待: 兵員の二重交戦を拒否
 
 **制約:** この実装は従来の`strategy-v1`独立参照エンジンのみ。実際の本番WorldStateや画面・空戦/CAS・兵站天候の6時間変化は未接続。戦闘幅は暫定的に師団combatWidth、未指定時は20。日中の援軍到着と自動再編成は追加しない。装甲値と貫通は要求装備の実配備比率から導出し、研究・倉庫ストックは対象外。
+
+
+## LIVEUI-01：本番戦闘幅・予備師団の視覚化（このPR）
+- [x] 目的: 本番ゲームの参加/予備戦闘幅投影 / 対象: `src/engine/military/combatFrontProjection.ts` / 内容: 実WorldStateの在地軍から敵味方を判定、`selectCombatFront`再使用、ID昇順で予備・幅ペナルティを算出 / テスト: 山岳・平時・移動中・壊滅・超過、読み取り専用 / 期待: UIと戦闘の選抜結果が一致
+- [x] 目的: Worker→Reactの読取専用契約 / 対象: `src/engine/ui.ts` / 内容: UiSnapshotに`combatFronts`、UiUnitに現在州の`frontageCapacity`、本番`TERRAIN_DATA.width×20`の共有 / テスト: スナップショット同値・ハッシュ不変 / 期待: 別エンジンの地形幅と混線なし
+- [x] 目的: 選択中の師団に前線参加/予備を表示 / 対象: `src/ui/CombatFrontageInspector.tsx`, `ArmyManagement.tsx` / 内容: 州単位の幅と選択師団ごとの前線/予備/移動中表示、非交戦は選択師団限定の見積り / テスト: Playwrightで複数選択・幅/見積り表示 / 期待: 架空の戦闘参加を確定表示しない
+- [x] 目的: 現行仕様と説明文言の整合 / 対象: `src/ui/DivisionDesignerPreview.tsx` / 内容: 既に本番に入った戦闘幅・編制別補給の「今後実装」文を修正 / テスト: 既存師団デザイナー画面テスト / 期待: UIの誤誘導防止
+- [ ] 目的: 最終CIゲート / 対象: Check/Specification Design / 内容: TypeScript、Vitest、Build、Playwright、OpenSpec strict / テスト: 最終HEAD完全成功 / 期待: 完走した成功HEADのみマージ
+- [ ] 目的: 本番戦車・航空機設計/戦闘系との統合 / 対象: 既存WorldStateの設計・装備/航空司令 / 内容: 別系統strategy-v1のtank/aircraft系を仕様調停して段階移行 / テスト: 旧セーブ/戦闘とE2E / 期待: 大規模移行を本PRに混ぜない
