@@ -1,7 +1,7 @@
 /** Pure, deterministic rules for integrated grand strategy.
  * The values are balancing hypotheses; old game engine rules are not reused.
  */
-import {clamp,nonnegative,populationSize,atWar,type Pop,type PopKey,type Nation,type Factory,type Design,type Division,type Plan,type Quote,type Occupation,type Focus,type StrategyState} from './model';
+import {clamp,nonnegative,populationSize,atWar,assertStrategyState,type Pop,type PopKey,type Nation,type Factory,type Design,type Division,type Plan,type Quote,type Occupation,type Focus,type StrategyState} from './model';
 
 export function transferPop(pop:Pop,from:PopKey,to:PopKey,count:number):Pop{
   populationSize(pop);
@@ -241,4 +241,33 @@ export function laborForProgress(
   nonnegative(progressIC);
   const total=factory.baseIC*(1-factory.damage)*clamp(operationFactor,0,1);
   return total>0?Math.min(factory.workerDemand,factory.workerDemand*progressIC/total):0;
+}
+
+/** Explicit, atomic transfer of facility operating rights after occupation.
+ * The former owner's production line becomes suspended and must be reviewed
+ * before the new controller can resume production. No duplicated factory.
+ */
+export function transferFactoryOperation(
+  state:StrategyState,factoryId:number,newOperator:number,
+):StrategyState{
+  assertStrategyState(state);
+  const existing=state.factories.find(f=>f.id===factoryId);
+  if(!existing)throw new RangeError('unknown factory');
+  const region=state.regions.find(r=>r.id===existing.regionId)!;
+  if(!state.nations.some(n=>n.id===newOperator))throw new RangeError('unknown operator');
+  if(newOperator!==region.owner){
+    const claim=state.occupations.find(o=>o.regionId===region.id&&o.occupier===newOperator);
+    if(!claim||claim.share<0.5)throw new RangeError('occupation insufficient for factory capture');
+  }
+  const result:StrategyState=structuredClone(state);
+  result.factories.find(f=>f.id===factoryId)!.country=newOperator;
+  for(const line of result.lines.filter(l=>l.factoryId===factoryId)){
+    line.country=newOperator;
+    line.active=false;
+    line.carryIC=0;
+  }
+  // Unfinished construction is not inherited as free completed progress.
+  result.construction=result.construction.filter(p=>p.factoryId!==factoryId&&p.targetFactoryId!==factoryId);
+  assertStrategyState(result);
+  return result;
 }
