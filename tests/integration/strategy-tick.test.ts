@@ -3,6 +3,7 @@ import {strategyFixture} from '../helpers/strategyFixture';
 import {runStrategyTick,STRATEGY_PHASES} from '../../src/engine/strategy/tick';
 import {assertStrategyState,populationSize} from '../../src/engine/strategy/model';
 import {strategyHash} from '../../src/engine/strategy/save';
+import {daysFromCivil} from '../../src/engine/clock/date';
 
 const cash=(w:ReturnType<typeof strategyFixture>)=>w.nations.reduce((s,n)=>s+n.cash+n.householdCash,0);
 const pop=(w:ReturnType<typeof strategyFixture>)=>w.nations.reduce((s,n)=>s+populationSize(n.population),0);
@@ -92,5 +93,101 @@ describe('five-phase deterministic strategy simulation',()=>{
     expect(a.next.divisions[1].organization).toBeLessThan(100);
     expect(a.next.divisions.every(d=>d.organization>=0&&d.hp>=0)).toBe(true);
     expect(strategyHash(a.next)).toBe(strategyHash(b.next));
+  });
+
+  it('建設材料0で工場は労働力を占有せず、軍需生産が止まらない',()=>{
+    const w=strategyFixture();
+    w.regions[0].resources.concrete=0;
+    w.nations[0].population.workers=10;
+    w.nations[0].population.unemployed+=30;
+    const result=runStrategyTick(w);
+    expect(result.next.construction[0].remainingIC).toBe(20);
+    expect(result.production).toEqual([{modelId:'rifle',country:0,quantity:5}]);
+    expect(result.next.nations[0].cash).toBe(100);
+  });
+  it('昨日の産出・原料在庫を翌日市場へ反映し、固定Quoteに収束しない',()=>{
+    const w=strategyFixture();
+    const one=runStrategyTick(w).next;
+    expect(one.quotes[0].supply).toBeGreaterThan(0);
+    expect(one.quotes[0].demand).toBeGreaterThan(0);
+    const two=runStrategyTick(one).next;
+    expect(one.quotes[0].price).toBeGreaterThan(2);
+    expect(two.quotes[0].price).toBeLessThan(one.quotes[0].price);
+  });
+  it('研究年度はシナリオ開始日から計算し、占領で利用不能工場は枠に寄与しない',()=>{
+    const original=strategyFixture();
+    const early=structuredClone(original);
+    early.epochDays=daysFromCivil(1940,1,1);
+    const normal=runStrategyTick(original).next.research[0].progress;
+    const penalty=runStrategyTick(early).next.research[0].progress;
+    expect(penalty).toBeLessThan(normal);
+    const project={...original.research[0],techId:'reserve-technology',priority:1};
+    const third={...original.research[0],techId:'third-technology',priority:1};
+    original.research.push(project,third);
+    const free=runStrategyTick(original).next;
+    expect(free.research.filter(r=>r.progress>0)).toHaveLength(3);
+    original.occupations.push({regionId:0,occupier:1,share:1,resistance:20,compliance:10,
+      policy:'military',garrisonSupply:1});
+    const occupied=runStrategyTick(original).next;
+    expect(occupied.research.filter(r=>r.progress>0)).toHaveLength(2);
+  });
+  it('ORGまたはHPが0の師団は戦闘不能で、損害を与えない',()=>{
+    const w=strategyFixture();
+    w.wars=[{a:0,b:1}];
+    w.divisions[0].province=1;
+    for(const field of ['organization','hp'] as const){
+      const broken=structuredClone(w);
+      broken.divisions[0][field]=0;
+      const result=runStrategyTick(broken);
+      expect(result.reports.battleOrgLoss).toBe(0);
+      expect(result.next.divisions[1].organization).toBe(100);
+      expect(result.next.divisions[1].hp).toBe(100);
+    }
+  });
+  it('実戦で兵員死亡と師団装備損耗を台帳へ反映し、0HPは壊滅',()=>{
+    const w=strategyFixture();
+    w.wars=[{a:0,b:1}];w.divisions[0].province=1;
+    w.divisions[0].softAttack=10000;
+    w.lots.push({holder:'division',holderId:2,modelId:'rifle',quantity:10});
+    const result=runStrategyTick(w);
+    expect(result.reports.casualties).toBeGreaterThan(0);
+    expect(result.reports.equipmentLoss).toBeGreaterThan(0);
+    expect(pop(w)-pop(result.next)).toBe(result.reports.casualties);
+    expect(equipment(result.next)-equipment(w)).toBe(
+      result.production.reduce((s,l)=>s+l.quantity,0)-result.reports.equipmentLoss);
+    const routed=strategyFixture();
+    routed.wars=[{a:0,b:1}];routed.divisions[0].province=1;
+    routed.divisions[0].softAttack=10000;routed.divisions[1].hp=1;
+    const fight=runStrategyTick(routed).next;
+    expect(fight.divisions[1].destroyed).toBe(true);
+    expect(fight.divisions[1].soldiers).toBe(0);
+  });
+  it('AI命令予算が16件でも師団の評価順を日ごとに循環させる',()=>{
+    const w=strategyFixture();
+    const firstUnit=w.divisions[0];
+    const extra=Array.from({length:20},(_,i)=>({...firstUnit,id:i+3,soldiers:1}));
+    w.divisions.push(...extra);
+    w.plans[0].divisionIds.push(...extra.map(u=>u.id));
+    w.nations[0].population.soldiers+=20;
+    w.regions[0].population+=20;
+    w.wars=[{a:0,b:1}];
+    w.plans[0].paused=false;
+    w.plans[0].authorized=true;
+    const first=runStrategyTick(w);
+    const second=runStrategyTick(first.next);
+    expect(first.orders).toHaveLength(16);
+    expect(second.orders).toHaveLength(16);
+    expect(new Set([...first.orders,...second.orders].map(x=>x.divisionId)).size).toBe(21);
+  });
+  it('占領した工場の操業国を再割当すると占領者が物理容量内で生産する',()=>{
+    const w=strategyFixture();
+    w.factories.find(f=>f.id===3)!.country=0;
+    w.lines.push({id:2,country:0,factoryId:3,modelId:'rifle',efficiency:1,carryIC:0,active:true});
+    const occupied=runStrategyTick(w);
+    expect(occupied.production.reduce((s,p)=>s+(p.country===0?p.quantity:0),0)).toBeGreaterThan(5);
+    const without=structuredClone(w);
+    without.occupations=[];
+    const noOccupation=runStrategyTick(without);
+    expect(noOccupation.production.reduce((s,p)=>s+(p.country===0?p.quantity:0),0)).toBe(5);
   });
 });
