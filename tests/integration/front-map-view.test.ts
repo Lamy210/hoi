@@ -38,7 +38,11 @@ describe('front map projection',()=>{
     expect(view.targets).toEqual([to]);
     expect(view.arrows).toEqual([]);
     endWar(w,war);
-    expect(frontView(e.getUiSnapshot(0),[u.id],'all')).toEqual([]);
+    const planned=frontView(e.getUiSnapshot(0),[u.id],'all');
+    expect(planned).toHaveLength(1);
+    expect(planned[0].planned).toBe(true);
+    expect(planned[0].paused).toBe(true);
+    expect(planned[0].arrows).toEqual([]);
   });
   it('removes obsolete targets and ownership-invalid front provinces from the view',async()=>{
     const {e,w,c,enemy,from,to,u}=await fixture();
