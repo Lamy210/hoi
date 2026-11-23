@@ -52,11 +52,12 @@ describe('bottom army command dock: auto names and atomic creation',()=>{
     const cmd=(type:string,p:Record<string,unknown>)=>
       applyCommands(w,[{issuer:'player',seq:++seq,type,p}])[0];
     const beforeArmies=w.armies.length,counter=w.nextArmyId,groupCounter=w.nextArmyGroupId;
+    const originalArmyId=own.armyId;
     for(const ids of [[own.id,foreign.id],[own.id,own.id],[],[own.id,999999]]){
       expect(cmd('createArmy',{color:'#4479b6',unitIds:ids}).ok).toBe(false);
       expect(w.armies).toHaveLength(beforeArmies);
       expect(w.nextArmyId).toBe(counter);
-      expect(own.armyId).toBeNull();
+      expect(own.armyId).toBe(originalArmyId);
     }
     expect(cmd('createArmy',{color:'#4479b6',name:'a'.repeat(65)}).ok).toBe(false);
     expect(cmd('createArmyGroup',{color:'#638b64',armyIds:[-1]}).ok).toBe(false);
