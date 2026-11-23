@@ -43,6 +43,17 @@ describe('five-phase deterministic strategy simulation',()=>{
     const day2=runStrategyTick(day1.next);
     expect(day2.production[0].quantity).toBeLessThan(day1.production[0].quantity);
   });
+  it('占領済み州の工場は旧所有国に丸ごと二重に生産されない',()=>{
+    const base=strategyFixture();
+    base.lines.push({id:2,country:1,factoryId:3,modelId:'rifle',efficiency:1,carryIC:0,active:true});
+    const underOccupation=runStrategyTick(base).production.filter(x=>x.country===1)
+      .reduce((s,x)=>s+x.quantity,0);
+    const peace=structuredClone(base);peace.occupations=[];
+    const fullyControlled=runStrategyTick(peace).production.filter(x=>x.country===1)
+      .reduce((s,x)=>s+x.quantity,0);
+    expect(underOccupation).toBeLessThan(fullyControlled);
+    expect(fullyControlled).toBe(3);
+  });
   it('AI攻撃には開戦かつ承認が必須。手動固定を尊重',()=>{
     const w=strategyFixture();
     w.plans[0].paused=false;w.plans[0].authorized=true;
