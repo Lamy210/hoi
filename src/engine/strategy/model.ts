@@ -26,6 +26,7 @@ export interface Factory {
 }
 export interface Construction {
   id:number; country:number; factoryId:number;
+  kind:'build'|'repair'; targetFactoryId?:number;
   remainingIC:number; cashPerIC:number; material:Good; materialPerIC:number;
 }
 export interface Design {
