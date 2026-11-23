@@ -34,7 +34,9 @@ export function computeComposition(battalions:readonly Battalion[]):CompositionP
   if(!Array.isArray(battalions)||battalions.length===0)throw new RangeError('empty formation');
   let width=0,armor=0,hardness=0,weightedPiercing=0,maxPiercing=0;
   let softAttack=0,hardAttack=0,defense=0,breakthrough=0;
-  for(const b of battalions){
+  // Array.isArray() narrows readonly arrays to any[] in TS; restore the typed members.
+  const typedBattalions:readonly Battalion[]=battalions as readonly Battalion[];
+  for(const b of typedBattalions){
     if(!b||!Object.prototype.hasOwnProperty.call(WIDTH,b.kind)||!Number.isSafeInteger(b.count)||b.count<=0)
       throw new RangeError('invalid battalion');
     for(const v of [b.softAttack,b.hardAttack,b.defense,b.breakthrough,b.armor,b.piercing,b.hardness,
@@ -42,7 +44,7 @@ export function computeComposition(battalions:readonly Battalion[]):CompositionP
       if(!Number.isFinite(v)||v<0)throw new RangeError('invalid battalion statistic');
     }
     if(b.manpowerFill>1||b.equipmentFill>1||b.hardness>1)throw new RangeError('invalid fill/ratio');
-    const bw=b.count*WIDTH[b.kind],equipment=b.equipmentFill,fill=b.manpowerFill*equipment;
+    const bw=b.count*WIDTH[b.kind as BattalionKind],equipment=b.equipmentFill,fill=b.manpowerFill*equipment;
     width+=bw;
     armor+=bw*b.armor*equipment;
     hardness+=bw*b.hardness*equipment;
