@@ -43,8 +43,16 @@ export interface Line {
   id:number; country:number; factoryId:number; modelId:string;
   efficiency:number; carryIC:number; carryByModel?:Record<string,number>; active:boolean;
 }
+export interface AirBase {
+  id:number; province:number; country:number;
+  capacity:number; damage:number;
+}
+export interface AirWing {
+  id:number; country:number; baseId:number; modelId:string;
+  pilots:number; mission:'grounded';
+}
 export interface Lot {
-  holder:'warehouse'|'division'|'garrison'; holderId:number;
+  holder:'warehouse'|'division'|'garrison'|'airwing'|'repairing'; holderId:number;
   modelId:string; quantity:number;
 }
 export interface Division {
@@ -87,6 +95,7 @@ export interface StrategyState {
   nations:Nation[]; provinces:Province[]; regions:Region[];
   factories:Factory[]; construction:Construction[];
   designs:Design[]; designRevisions?:EquipmentRevision[]; lines:Line[]; lots:Lot[]; divisions:Division[];
+  airBases?:AirBase[]; airWings?:AirWing[];
   plans:Plan[]; research:Research[]; spirits:Spirit[];
   focuses:Focus[]; occupations:Occupation[]; quotes:Quote[];
   wars:{a:number;b:number}[];
@@ -117,6 +126,11 @@ export function assertStrategyState(w:StrategyState):void{
   ids(w.nations,'nation');ids(w.provinces,'province');ids(w.regions,'region');
   ids(w.factories,'factory');ids(w.construction,'construction');ids(w.designs,'design');
   ids(w.lines,'line');ids(w.divisions,'division');ids(w.plans,'plan');
+  if((w.airBases!==undefined&&!Array.isArray(w.airBases))||
+     (w.airWings!==undefined&&!Array.isArray(w.airWings)))
+    throw new RangeError('invalid airbase/wing arrays');
+  const airBases=w.airBases??[],airWings=w.airWings??[];
+  ids(airBases,'airbase');ids(airWings,'airwing');
   // Focus definitions are reusable in every country; only (country,id) is unique.
   const focusKeys=w.focuses.map(f=>f.country+'\x1f'+f.id);
   if(new Set(focusKeys).size!==focusKeys.length)throw new RangeError('duplicate country focus');
@@ -128,6 +142,9 @@ export function assertStrategyState(w:StrategyState):void{
   const designs=new Set(w.designs.map(x=>x.id));
   const factories=new Map(w.factories.map(x=>[x.id,x]));
   const divisions=new Set(w.divisions.map(x=>x.id));
+  const wingById=new Map(airWings.map(x=>[x.id,x]));
+  const baseById=new Map(airBases.map(x=>[x.id,x]));
+  const designById=new Map(w.designs.map(x=>[x.id,x]));
   for(const n of w.nations){
     populationSize(n.population);
     nonnegative(n.cash);nonnegative(n.householdCash);
@@ -190,6 +207,26 @@ export function assertStrategyState(w:StrategyState):void{
       throw new RangeError('invalid equipment designer country');
     for(const amount of Object.values(d.materials))nonnegative(amount);
   }
+  const usedAirProvinces=new Set<number>();
+  for(const base of airBases){
+    const province=w.provinces.find(p=>p.id===base.province);
+    if(!Number.isSafeInteger(base.id)||base.id<1||
+      !province||!countries.has(base.country)||province.controller!==base.country||
+      !Number.isSafeInteger(base.capacity)||base.capacity<0||
+      !Number.isFinite(base.damage)||base.damage<0||base.damage>1||
+      usedAirProvinces.has(base.province))
+      throw new RangeError('invalid airbase capacity/ownership');
+    usedAirProvinces.add(base.province);
+  }
+  for(const wing of airWings){
+    const base=baseById.get(wing.baseId),design=designById.get(wing.modelId);
+    if(!Number.isSafeInteger(wing.id)||wing.id<1||
+      !countries.has(wing.country)||!base||base.country!==wing.country||
+      !design||design.category!=='aircraft'||
+      (design.ownerCountry!==undefined&&design.ownerCountry!==wing.country)||
+      !Number.isSafeInteger(wing.pilots)||wing.pilots<0||wing.mission!=='grounded')
+      throw new RangeError('invalid airwing');
+  }
   const lotKeys=new Set<string>();
   for(const l of w.lots){
     const key=l.holder+'\x1f'+l.holderId+'\x1f'+l.modelId;
@@ -197,9 +234,19 @@ export function assertStrategyState(w:StrategyState):void{
     lotKeys.add(key);
     if(!designs.has(l.modelId)||!Number.isSafeInteger(l.quantity)||l.quantity<0)
       throw new RangeError('lot');
-    if((l.holder==='warehouse'&&!countries.has(l.holderId))||
-      (l.holder==='division'&&!divisions.has(l.holderId))||
-      (l.holder==='garrison'&&!regions.has(l.holderId)))throw new RangeError('lot holder');
+    const model=designById.get(l.modelId)!;
+    const division=w.divisions.find(d=>d.id===l.holderId);
+    const wing=wingById.get(l.holderId);
+    if((l.holder==='warehouse'&&(!countries.has(l.holderId)||
+          (model.ownerCountry!==undefined&&model.ownerCountry!==l.holderId)))||
+      (l.holder==='division'&&(!divisions.has(l.holderId)||!division||
+          model.category==='aircraft'||
+          (model.ownerCountry!==undefined&&model.ownerCountry!==division.country)))||
+      (l.holder==='garrison'&&!regions.has(l.holderId))||
+      ((l.holder==='airwing'||l.holder==='repairing')&&
+        (!wing||wing.modelId!==l.modelId||model.category!=='aircraft'))||
+      !['warehouse','division','garrison','airwing','repairing'].includes(l.holder))
+      throw new RangeError('lot holder/owner/type');
   }
   for(const u of w.divisions){
     if(!countries.has(u.country)||!provinces.has(u.province))throw new RangeError('division reference');
@@ -209,9 +256,22 @@ export function assertStrategyState(w:StrategyState):void{
       nonnegative(v);
     if(u.hardness>1||u.supply>1)throw new RangeError('division ratio');
   }
+  // Airbase hangars count both ready aircraft and aircraft in the repair queue.
+  // Damage limits future operational sorties, NOT the existing parking footprint.
+  const parking=new Map<number,number>();
+  for(const lot of w.lots){
+    if(lot.holder!=='airwing'&&lot.holder!=='repairing')continue;
+    const baseId=wingById.get(lot.holderId)!.baseId;
+    parking.set(baseId,(parking.get(baseId)??0)+lot.quantity);
+  }
+  for(const base of airBases){
+    if((parking.get(base.id)??0)>base.capacity)
+      throw new RangeError('airbase hangar capacity exceeded');
+  }
   // A deployed soldier must exist exactly once inside the nation's exclusive POP pool.
   for(const n of w.nations){
-    const deployed=w.divisions.filter(d=>d.country===n.id).reduce((a,d)=>a+d.soldiers,0);
+    const deployed=w.divisions.filter(d=>d.country===n.id).reduce((a,d)=>a+d.soldiers,0)+
+      airWings.filter(wing=>wing.country===n.id).reduce((a,wing)=>a+wing.pilots,0);
     if(deployed>n.population.soldiers)throw new RangeError('deployed soldiers exceed POP');
   }
   const unitAssignments=new Set<number>();
