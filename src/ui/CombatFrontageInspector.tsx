@@ -44,7 +44,7 @@ export function CombatFrontageInspector({snap,selected,lang}:Props) {
         <div className="kv" data-testid={'combat-frontage-width-'+province}>
           <span>{label('戦闘幅','Combat width')}</span>
           <strong>{front?(own?.selectedWidth??0):selectionWidth}
-            {' / '}{front.capacity??terrainCapacity??label('不明','Unknown')}</strong>
+            {' / '}{front?.capacity??terrainCapacity??label('不明','Unknown')}</strong>
         </div>
         {front&&own?<div className="kv" data-testid={'combat-frontage-summary-'+province}>
           <span>{label('前線 / 予備（選択部隊）','Frontline / reserve (selected)')}</span>
