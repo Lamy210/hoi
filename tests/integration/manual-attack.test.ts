@@ -62,22 +62,38 @@ describe('explicit in-game attack orders', () => {
     expect(e.getUiSnapshot(0).battles).toContain(target);
   });
 
-  it('occupying a vacant game province requires uninterrupted presence', async () => {
+  it('paints an undefended enemy province on arrival while retaining legal ownership', async () => {
     const {e,w,c,enemy,unit,target,issue} = await fixture();
     startWar(w,c,enemy,false);
     w.units = w.units.filter(u => !(u.owner === enemy && u.loc === target));
     expect(issue(1,'attackUnits').ok).toBe(true);
-    const origin = unit.loc;
     unit.segDays = 1;
+    const legalOwner = w.prov.owner[target];
+    const earlier = w.prov.controller[target];
     e.stepTick();
-    expect(w.occupancyTimer[target]).toBe(1);
-    expect(w.prov.controller[target]).toBe(enemy);
-    expect(e.getUiSnapshot(0).occupation).toContainEqual({province:target,candidate:c,days:1});
-    unit.loc = origin;
-    w.occupancyTimer[target] = OCCUPATION_DAYS - 1;
-    e.stepTick();
+    expect(OCCUPATION_DAYS).toBe(1);
+    expect(w.prov.controller[target]).toBe(c);
+    expect(earlier).toBe(enemy);
+    expect(w.prov.owner[target]).toBe(legalOwner);
     expect(w.occupancyTimer[target]).toBe(0);
     expect(w.occupierCandidate[target]).toBe(-1);
+    expect(e.getUiSnapshot(0).controller[target]).toBe(c);
+    expect(e.getUiSnapshot(0).occupation).not.toContainEqual(expect.objectContaining({province:target}));
+  });
+
+  it('does not paint enemy territory without a surviving occupying unit', async () => {
+    const {e,w,c,enemy,unit,target} = await fixture();
+    startWar(w,c,enemy,false);
+    w.units = w.units.filter(u=>!(u.owner===enemy&&u.loc===target));
+    const origin=unit.loc;
+    unit.loc=target;
+    unit.destroyed=true;
+    e.stepTick();
     expect(w.prov.controller[target]).toBe(enemy);
+    unit.destroyed=false;
+    unit.loc=origin;
+    e.stepTick();
+    expect(w.prov.controller[target]).toBe(enemy);
+    expect(w.occupancyTimer[target]).toBe(0);
   });
 });
