@@ -2,13 +2,13 @@
 
 ## 1. 目標・制約
 - TypeScriptで決定論的/再現可能。シナリオ起点の`rulesetVersion`固定。ブラウザWeb Workerで実行可能、外部I/Oなし。
-- 本番エンジンv18の状態保存・シナリオ互換を保護。新ルールの参照サンドボックスで契約検証を先行し、`WorldState`への一括実装を禁止。
+- 未リリースの旧セーブv18との互換は不要。新ルールの参照サンドボックスで契約検証を先行し、実ゲーム本体は新しい保存形式と統合してから切り替える。
 - 状態変更と読取専用スナップショット、計算トレース、命令/承認を明確に分離。
 
 ## 2. 正規スキーマと不変条件
 | Entity | key / fields | 不変条件/保存 |
 |---|---|---|
-| `StrategyState` | rulesetVersion,tick,countries[],states[],provinces[],factories[],productionLines[],designs[],lots[],divisions[],plans[],foci[],occupations[],market[],inTransit[] | 各エンティティID一意、参照先存在、導出cacheは保存しない |
+| `StrategyState` | ruleset,seed,tick,epochDays,nations[],regions[],provinces[],factories[],lines[],designs[],lots[],divisions[],plans[],focuses[],occupations[],quotes[],wars[] | 各エンティティID一意、参照先存在、導出cacheは保存しない |
 | `PopulationCohort` | dependents,unemployed,workers,researchers,reserves,soldiers | 各値非負整数; 国家人口=Σ区分; 兵員は別勘定の追加人数ではない |
 | `AdministrativeState` | id,ownerId,provinceIds,resources,occupationShares,population | provinceは1行政州のみ; Σ occupationShares≤1; state総工場能力は重複使用不可 |
 | `Province` | id,stateId,ownerId,controllerId,terrain,infra,edges[],supply | ownerとcontrollerは独立; edgesは一意・非負; 戦域描画は派生 |
@@ -34,7 +34,7 @@
 `PopulationTotal = dependent + unemployed + worker + researcher + reserve + soldier`。動員は未就業→予備→労働者からtransfer、研究者の無断移動禁止。人口増減は出生・死亡・転入・転出イベントだけを経由。
 `LaborFill = min(1,availableWorkers/requiredWorkers)`、`ResearchCapacity = max(0.05,assignedResearchers×education×literacy×(1+bonuses))`。
 `Unemployment`はcohort内のunemployed/workingAgeから派生。人口政策や損害の反映は次tickから。
-`PriceTarget = BasePrice×clamp(sqrt((Demand+ε)/(Supply+ε)),0.25,4)`。Supply=0/ Demand>0のとき高騰。 `PriceNext = clamp((1−α)PricePrev+αPriceTarget,0.25Base,4Base)`、α=0.2。取引は資金上限で数量を減額し、seller lot / buyer lotを同量で移動する。
+`PriceTarget = BasePrice×clamp(sqrt((Demand+ε)/(Supply+ε)),0.25,4)`。参照Tickは本日終了時の資源在庫と翌日必要量を次TickのQuote需給に記録し、価格は次Tick先頭でのみ更新する。Supply=0/ Demand>0のとき高騰。 `PriceNext = clamp((1−α)PricePrev+αPriceTarget,0.25Base,4Base)`、α=0.2。取引は資金上限で数量を減額し、seller lot / buyer lotを同量で移動する。
 同tickの賃金支給→消費→GDP→賃金再計算を禁止。市場需給は前tick確定数量に由来。
 
 ## 5. 戦略爆撃→修理→資源不足→生産
@@ -50,7 +50,7 @@
 `DefPool = defender? Defense : Breakthrough`、実被弾6時間期待値:
 `Hits=0.012×[0.15×min(EffectiveAttack,DefPool)+0.55×max(0,EffectiveAttack−DefPool)]`。
 `OrgLoss=Hits×2`、`HpLoss=Hits×0.25`。当日4サブフェーズ。装甲vs貫通の追加修正は被弾計算の一箇所のみとする。
-単一戦闘の結果はORG/HP減損と同時に装備ロット減損/人員lossを書き込む。リアル戦闘エンジンは移行後に差し替え、旧v18挙動の互換ルールセットは維持する。
+参照戦闘はORG/HP低下と確定した死亡者・装備損失を一体で記録し、壊滅者の残余兵員を予備役に戻す。旧v18戦闘との後方互換は要求しない。装甲/貫通の実戦への適用、天候、戦術、同時攻撃解決は後続タスク。
 
 ## 7. 研究枠・国家方針・国家精神
 `Slots = clamp(1+I[RCI≥0.30]+I[RCI≥0.50]+I[RCI≥0.70]+I[RCI≥0.88]+focusBonus,1,6)`。
@@ -60,8 +60,8 @@
 ## 8. 補給・AI・性能上限
 - Region（補給/州）ごとにdirty revision。補給の通行網変更・爆撃・支配変更時だけ部分再計算。戦争状態の変化時は当該戦域のキャッシュ破棄。
 - 経路探索は`O((V+E)log V)`の優先キューDijkstra/A*。フロント/師団の総当たりを禁止し、最大`K=8`候補×配置可能師団/作戦、1回の再計画上限: 1000評価・32経路・16移動命令（初期値）。
-- 1師団の主作戦は1つ。manualHold>armyExplicit>armyGroup>theaterという優先順位。同点はID順。AI全委任でも平時侵攻なし、作戦開始承認なし侵攻なし。
-- AIは当日移動/戦闘直前の検証へコマンドを提出する。旧revisionの自動命令は必ず失効。
+- 1師団の主作戦は1つ（`unit.planId`と計画参加者IDは相互検証）。manualHold>armyExplicit>armyGroup>theaterという優先順位は将来の本番連携で実施する。参照TickではAUTO計画・戦争・明示承認・ORG/HP>0を必要条件とする。
+- 参照AIは最大16件/日、最大1000件の候補を評価し、計画順序・師団開始位置を日ごとに循環して飢餓を防ぐ。実コマンドの発行とrevision再検証は本番連携時に実施する。
 - 時間計測基準：基準シナリオ(2,000プロヴィンス、500師団、20戦線、5国家)で日次p95 50msは目標であり未計測。計算時間/最悪ノード数をCIに記録。
 
 ## 9. 占領
@@ -83,10 +83,10 @@
 |5| occupation-politics | 戦闘結果→土地支配/抵抗/順応/国家精神/国家方針更新 | 翌tickの所有・政策効果・人口変化へ反映 |
 
 `endTick()`: balances, finite, inventory, exclusive POP, capacity, AI attack permission invariant検査→結果commit→trace/hash。
-**注意:** 現行`registerAllSystems`は補給→戦闘→生産→前線AI→経済→人口→政治→研究→建設。新順序を直ちに本番へ入れると互換破壊となるため、本PRでは`referenceTick`で契約をテストする。
+**注意:** 現行`registerAllSystems`は補給→戦闘→生産→前線AI→経済→人口→政治→研究→建設。本PRは`runStrategyTick`で独立に契約を検証する。旧セーブ互換は不要だが、動作する本番ゲームを壊さないよう接続は別作業とする。
 
 ## 11. 移行・運用・障害/DR
-- 旧セーブの移行は行わない。新規シナリオから国別POP、施設、型番ロットを初期化し、v19以降でのみ保存/復元する。既存のセーブはバージョン違いで拒否する。
+- 旧セーブの移行は行わない。新規シナリオから国別POP、施設、型番ロットを初期化する。参照エンジンは現在v19専用。実ゲームのv19接続は後続作業。
 - 完全移行時には旧ゲームルールセットv18を廃止可能。新セーブの原子的検証/復元・ハッシュ一致を必須とする。
 - 失敗したTickは先頭スナップショットへロールバックし、国庫・在庫・人口が半端に書かれないようにする。ルール違反はErrorで停止/識別ログ。
 - ログ: rulesetVersion, phase, tick, market price delta, cash balance, population delta, stock balance, ai nodes/pathfind, attacksRejected。
