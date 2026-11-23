@@ -42,7 +42,7 @@ export function allocatedResearch(totalRP:number,weights:readonly number[],slots
   return weights.map((_,i)=>i<slots&&sum>0?totalRP*eligible[i]/sum:0);
 }
 export function nextPrice(q:Quote,alpha=0.2):number{
-  if(q.basePrice<=0||q.price<=0)throw new RangeError('price');
+  if(q.basePrice<=0||q.price<=0||!Number.isFinite(alpha)||alpha<0||alpha>1)throw new RangeError('price/alpha');
   const target=q.basePrice*clamp(Math.sqrt((nonnegative(q.demand)+0.01)/(nonnegative(q.supply)+0.01)),0.25,4);
   return clamp((1-alpha)*q.price+alpha*target,q.basePrice*0.25,q.basePrice*4);
 }
@@ -138,20 +138,23 @@ export function occupationExtractableIC(physicalIC:number,records:readonly Occup
 }
 export function validFocusTree(foci:readonly Focus[]):string[]{
   const issues:string[]=[];
-  const map=new Map(foci.map(f=>[f.id,f]));
+  const key=(country:number,id:string)=>country+'\x1f'+id;
+  const map=new Map(foci.map(f=>[key(f.country,f.id),f]));
   if(map.size!==foci.length)issues.push('duplicate focus id');
   const visiting=new Set<string>(),seen=new Set<string>();
-  const visit=(id:string):void=>{
-    if(visiting.has(id)){issues.push('focus cycle:'+id);return;}
-    if(seen.has(id))return;
-    visiting.add(id);
-    for(const req of map.get(id)?.requires??[]){
-      if(!map.has(req))issues.push('unknown focus:'+req);
-      else visit(req);
+  const visit=(k:string):void=>{
+    if(visiting.has(k)){issues.push('focus cycle:'+k.split('\x1f')[1]);return;}
+    if(seen.has(k))return;
+    visiting.add(k);
+    const focus=map.get(k);
+    for(const req of focus?.requires??[]){
+      const requested=key(focus!.country,req);
+      if(!map.has(requested))issues.push('unknown focus:'+req);
+      else visit(requested);
     }
-    visiting.delete(id);seen.add(id);
+    visiting.delete(k);seen.add(k);
   };
-  for(const f of foci)visit(f.id);
+  for(const f of foci)visit(key(f.country,f.id));
   return issues;
 }
 export function applyFocus(n:Nation,focus:Focus,all:readonly Focus[],spirits:readonly {id:string;country:number;stat:string;value:number}[]):{
@@ -184,4 +187,58 @@ export function controlledFactoryFraction(regionOwner:number,operator:number,rec
     const raw=clamp(o.share,0,1),policy=o.policy==='lenient'?0.7:o.policy==='exploit'?1.25:1;
     return sum+Math.min(raw,raw*policy*(1-o.resistance*0.004));
   },0));
+}
+
+/** Combat readiness is strict, including zero-ORG rout and destroyed divisions. */
+export function combatReady(unit:Division):boolean{
+  return !unit.destroyed&&!unit.moving&&unit.soldiers>0&&unit.hp>0&&unit.organization>0;
+}
+
+/** A formation's trained baseline is weakened by missing required equipment.
+ * Identified issued designs contribute stats; warehouse stock and research alone do not.
+ * Only the division's already-issued, model-identified lots affect the result.
+ */
+export function equippedCombatStats(
+  w:Pick<StrategyState,'designs'|'lots'>,u:Division,
+):Pick<Division,'softAttack'|'hardAttack'|'defense'|'breakthrough'>{
+  const keys=['softAttack','hardAttack','defense','breakthrough'] as const;
+  const req=u.requiredEquipment??{};
+  const total=Object.values(req).reduce((a,b)=>a+nonnegative(b),0);
+  if(total===0)return {
+    softAttack:u.softAttack,hardAttack:u.hardAttack,defense:u.defense,breakthrough:u.breakthrough,
+  };
+  const carried=w.lots.filter(l=>l.holder==='division'&&l.holderId===u.id);
+  const typeStat=new Map(w.designs.map(d=>[d.id,d]));
+  const byStat=Object.fromEntries(keys.map(k=>[k,0])) as Record<typeof keys[number],number>;
+  let fillWeight=0;
+  for(const [category,requirement] of Object.entries(req)){
+    if(requirement<=0)continue;
+    const typed=carried.filter(l=>typeStat.get(l.modelId)?.category===category);
+    let qty=0;
+    for(const lot of typed){
+      const design=typeStat.get(lot.modelId)!;
+      const used=Math.min(lot.quantity,Math.max(0,requirement-qty));
+      qty+=used;
+      for(const k of keys)byStat[k]+=used*nonnegative(design[k])/requirement;
+    }
+    fillWeight+=Math.min(1,qty/requirement)*(requirement/total);
+  }
+  const factor=0.15+0.85*clamp(fillWeight,0,1);
+  return {
+    softAttack:u.softAttack*factor+byStat.softAttack,
+    hardAttack:u.hardAttack*factor+byStat.hardAttack,
+    defense:u.defense*factor+byStat.defense,
+    breakthrough:u.breakthrough*factor+byStat.breakthrough,
+  };
+}
+
+/** Construction capacity only reserves actual labor used, not merely requested.
+ * If funding or materials are zero, consumed workers are zero as well.
+ */
+export function laborForProgress(
+  factory:Factory,progressIC:number,operationFactor:number=1,
+):number{
+  nonnegative(progressIC);
+  const total=factory.baseIC*(1-factory.damage)*clamp(operationFactor,0,1);
+  return total>0?Math.min(factory.workerDemand,factory.workerDemand*progressIC/total):0;
 }
