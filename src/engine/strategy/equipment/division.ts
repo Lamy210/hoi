@@ -4,7 +4,7 @@
  */
 import {assertStrategyState,type Design,type Division,type StrategyState} from '../model';
 import {
-  bumpEquipmentCommandRevision,holderQuantity,requireEquipmentCommandRevision,transferEquipmentLot,
+  bumpEquipmentCommandRevision,requireEquipmentCommandRevision,transferEquipmentLot,
 } from './ledger';
 
 export type GroundEquipmentCategory=Exclude<Design['category'],'aircraft'>;
