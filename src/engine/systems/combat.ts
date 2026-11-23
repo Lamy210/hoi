@@ -15,6 +15,7 @@ import { techMods } from './research';
 import {issuedModelCombatFactor,operationalCombatTechBonus} from '../military/equipmentCombat';
 import { checkAnnexation } from '../military/war';
 import {advanceBattlePreparedness,preparednessPowerFactor} from '../military/preparedness';
+import {unitProtectionPoints,protectionDamageFactor} from '../military/combatProtection';
 import { addContribution, CONTRIB_CAPITAL, CONTRIB_OCCUPATION } from '../diplomacy/peace';
 
 /** 地形修飾（balanced）。indexはTERRAIN配列の順。 */
@@ -146,6 +147,10 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
   const sumA = powersA.reduce((a, b) => a + b, 0) || 1e-9;
   const sumD = powersD.reduce((a, b) => a + b, 0) || 1e-9;
   const ratioA = sumA / (sumA + sumD);
+  // Enemy fire is distributed only over engaged divisions. Reserves outside
+  // combat width neither absorb damage nor inflate defense/breakthrough.
+  const pressureOnDefender = sumA / Math.max(1, frontD.length);
+  const pressureOnAttacker = sumD / Math.max(1, frontA.length);
 
   // 戦争貢献度（phase4-peace-conference）: 与ダメを戦力比で配分して加算（D-046）
   const warOfPair = (c1: number, c2: number) => {
@@ -165,11 +170,16 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
     }
   }
 
-  // 組織率ダメージ: 各面の総ダメージ=6×相手比率×2、前面ユニットで均等割り
+  // Organization and materiel losses depend on the original front-power
+  // ratio, then on each engaged unit's independent defensive capacity.
+  // Defense holds the province; breakthrough protects attacking divisions.
+  // Both protection factors are bounded: even entrenched armies take losses.
   const totalDmgToDef = 12 * ratioA;
   const totalDmgToAtt = 12 * (1 - ratioA);
   for (const u of frontD) {
-    const dmg = (totalDmgToDef / Math.max(1, frontD.length)) * (0.85 + 0.3 * rng.nextFloat());
+    const capacity = unitProtectionPoints(w,u,'defense',t.def);
+    const dmg = (totalDmgToDef / Math.max(1, frontD.length)) *
+      protectionDamageFactor(pressureOnDefender,capacity) * (0.85 + 0.3 * rng.nextFloat());
     u.org = Math.max(0, u.org - dmg);
     u.manpower = Math.max(0, u.manpower - dmg * 8);
     u.infEquipment = Math.max(0, u.infEquipment - dmg * 6);
@@ -180,7 +190,9 @@ function resolveBattle(w: WorldState, provIdx: number, sides: Sides): void {
     bumpCommanderExp(w, u, 0.01);
   }
   for (const u of frontA) {
-    const dmg = (totalDmgToAtt / Math.max(1, frontA.length)) * (0.85 + 0.3 * rng.nextFloat());
+    const capacity = unitProtectionPoints(w,u,'breakthrough',t.atk);
+    const dmg = (totalDmgToAtt / Math.max(1, frontA.length)) *
+      protectionDamageFactor(pressureOnAttacker,capacity) * (0.85 + 0.3 * rng.nextFloat());
     u.org = Math.max(0, u.org - dmg);
     u.manpower = Math.max(0, u.manpower - dmg * 8);
     u.infEquipment = Math.max(0, u.infEquipment - dmg * 6);
@@ -411,9 +423,17 @@ export function unitCombatTrace(w: WorldState, unitId: number): { contribs: Powe
   const ctrl = w.prov.controller[provIdx];
   const side: 'attack' | 'defend' = u.owner === ctrl ? 'defend' : 'attack';
   const contribs = unitPowerFactors(w, u, provIdx, side);
+  const role = side === 'defend' ? 'defense' : 'breakthrough';
+  const terrain = TERRAIN_DATA[w.prov.terrain[provIdx]];
+  const capacity = unitProtectionPoints(w,u,role,side==='defend'?terrain.def:terrain.atk);
+  contribs.push({
+    label:role==='defense'?'defenseCapacity':'breakthroughCapacity',
+    value:capacity,
+    formula:'independent protection points (NOT a combat-power multiplier); damage factor=1.10−0.40×min(1,capacity/incomingPerUnit)',
+  });
   return {
     contribs,
-    roll: '0.85〜1.15（PCG32派生ストリーム: combat/' + w.prov.id[provIdx] + '）',
+    roll: '0.85〜1.15（PCG32派生ストリーム: combat/' + w.prov.id[provIdx] + '）・損耗軽減倍率0.70〜1.10',
   };
 }
 

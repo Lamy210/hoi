@@ -40,6 +40,7 @@ jobs:
       - run: npx openspec validate progressive-front-advance --strict
       - run: npx openspec validate defense-counteroffensive-loop --strict
       - run: npx openspec validate entrenchment-planning-live-combat --strict
+      - run: npx openspec validate live-defense-breakthrough-damage --strict
       - run: npx openspec validate phase8-maritime-map --strict
       - run: npx openspec validate phase8-naval-fleets --strict
       - run: npx openspec validate phase8-amphibious-transport --strict
