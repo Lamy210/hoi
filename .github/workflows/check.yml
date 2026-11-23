@@ -43,6 +43,7 @@ jobs:
       - run: npx openspec validate prewar-front-and-offensive-line --strict
       - run: npx openspec validate atomic-map-front-formation --strict
       - run: npx openspec validate edit-existing-map-fronts --strict
+      - run: npx openspec validate integrated-grand-strategy-foundations --strict
       - name: Upload verified production build
         if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
         uses: actions/upload-pages-artifact@v5
