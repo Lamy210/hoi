@@ -12,6 +12,7 @@ import { equipmentModels } from './military/equipmentCatalog';
 import { contributionOf } from './diplomacy/peace';
 import { warScoreFor } from './military/war';
 import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMultiplier } from './military/unitComposition';
+import {projectCombatFronts,provinceCombatCapacity,type CombatFrontProjection} from './military/combatFrontProjection';
 import type { Alert } from './core/state';
 
 export interface UiCountry {
@@ -97,6 +98,8 @@ export interface UiCommander {
 
 export interface UiUnit {
   combatWidth: number;
+  /** Terrain frontage capacity for the unit's present province. */
+  frontageCapacity?:number;
   baseAttack: number;
   baseDefense: number;
   orgCap: number;
@@ -179,6 +182,8 @@ export interface UiSnapshot {
   armyGroups: import('./military/armies').ArmyGroup[];
   wars: UiWar[];
   battles: number[];
+  /** Current-state forecast using the identical selector as the actual battle. */
+  combatFronts?:CombatFrontProjection[];
   occupation: { province: number; candidate: number; days: number }[];
   fronts: UiFront[];
   commanders: UiCommander[];
@@ -304,6 +309,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     .map((u) => ({
       id: u.id,
       combatWidth:unitCombatWidth(w,u),
+      frontageCapacity:provinceCombatCapacity(w,u.loc),
       baseAttack:unitComposition(w,u)?.attack ?? 40*(u.maxManpower/10000),
       baseDefense:unitComposition(w,u)?.defense ?? 40*(u.maxManpower/10000),
       orgCap:unitOrgCap(w,u),
@@ -408,6 +414,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     armies: w.armies.map(a => ({...a})), armyGroups: w.armyGroups.map(g => ({...g})),
     wars,
     battles: [...w.runtime.activeBattles].sort((a,b) => a-b),
+    combatFronts:projectCombatFronts(w),
     occupation: w.occupancyTimer.flatMap((days, province) => days > 0 ? [{province, candidate: w.occupierCandidate[province], days}] : []),
     fronts,
     commanders,
