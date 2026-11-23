@@ -3,7 +3,7 @@ import {strategyFixture} from '../helpers/strategyFixture';
 import {assertStrategyState,populationSize} from '../../src/engine/strategy/model';
 import {transferPop,conscript,studySlots,researchPerDay,researchAhead,allocatedResearch,
   nextPrice,settleTrade,construct,availableIC,modelOutput,wearExpected,combatHits,
-  canAutoAttack,resistanceAfterDay,occupationExtractableIC,validFocusTree,applyFocus} from '../../src/engine/strategy/rules';
+  canAutoAttack,resistanceAfterDay,occupationExtractableIC,controlledFactoryFraction,validFocusTree,applyFocus} from '../../src/engine/strategy/rules';
 
 describe('integrated strategy rules invariants',()=>{
   it('POP動員は排他的な転籍で総人口不変、負値/不足拒否',()=>{
@@ -71,6 +71,9 @@ describe('integrated strategy rules invariants',()=>{
     const r=resistanceAfterDay({...o,resistance:100,compliance:100,policy:'exploit'},true,1000);
     expect(r.resistance).toBeLessThanOrEqual(100);
     expect(r.compliance).toBeGreaterThanOrEqual(0);
+    expect(controlledFactoryFraction(1,1,[o])).toBeCloseTo(0.2);
+    expect(controlledFactoryFraction(1,0,[o])).toBeLessThanOrEqual(0.8);
+    expect(controlledFactoryFraction(1,1,[])).toBe(1);
     const allocations=occupationExtractableIC(10,[o,{...o,occupier:1,share:0.7}]);
     expect(Object.values(allocations).reduce((a,b)=>a+b,0)).toBeLessThanOrEqual(10);
   });
