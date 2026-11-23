@@ -101,6 +101,8 @@ export interface UiCommander {
 export interface UiUnit {
   combatWidth: number;
   frontlinePriority?:number;
+  entrenchment?:number;
+  preparation?:number;
   /** Terrain frontage capacity for the unit's present province. */
   frontageCapacity?:number;
   baseAttack: number;
@@ -313,6 +315,8 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
       id: u.id,
       combatWidth:unitCombatWidth(w,u),
       frontlinePriority:u.frontlinePriority??5,
+      entrenchment:u.entrenchment??0,
+      preparation:u.preparation??0,
       frontageCapacity:provinceCombatCapacity(w,u.loc),
       baseAttack:unitComposition(w,u)?.attack ?? 40*(u.maxManpower/10000),
       baseDefense:unitComposition(w,u)?.defense ?? 40*(u.maxManpower/10000),
