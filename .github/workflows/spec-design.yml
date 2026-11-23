@@ -28,6 +28,7 @@ jobs:
       - run: npx openspec validate phase5-army-command --strict
       - run: npx openspec validate map-frontline-draft-objective --strict
       - run: npx openspec validate prewar-front-and-offensive-line --strict
+      - run: npx openspec validate atomic-map-front-formation --strict
       - run: npx openspec validate map-marquee-formation-selection --strict
       - run: npx openspec validate formation-operation-scope-preview --strict
       - run: npx openspec validate phase8-maritime-map --strict
