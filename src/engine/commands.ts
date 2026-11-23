@@ -604,6 +604,27 @@ export function registerAllCommands(): void {
     validate(w,p,issuer){const c=actorCountry(w,issuer),ids=p.units;if(c===null||issuer==='frontai')return 'badIssuer';if(typeof p.hold!=='boolean'||!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))?null:'notYourUnit';},
     apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id))u.manualHold=p.hold as boolean;},
   });
+  // Player controls which deployed division fills limited terrain frontage.
+  // Separate from supply reinforcements and manualHold; commands take effect
+  // when the following daily combat resolves, not mid-battle.
+  registerCommand('setFrontlinePriority', {
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer),ids=p.unitIds;
+      if(country===null||!w.countries.alive[country]||issuer==='frontai')return 'badIssuer';
+      if(!Number.isSafeInteger(p.priority)||(p.priority as number)<0||
+        (p.priority as number)>9)return 'badParams';
+      if(!Array.isArray(ids)||ids.length<1||ids.length>256||
+        new Set(ids).size!==ids.length||
+        !ids.every(id=>Number.isSafeInteger(id)&&id>0))return 'badParams';
+      return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===country&&!u.destroyed))
+        ?null:'notYourUnit';
+    },
+    apply(w,p){
+      const ids=new Set(p.unitIds as number[]);
+      for(const u of w.units)if(ids.has(u.id))u.frontlinePriority=p.priority as number;
+    },
+  });
+
   // Automated front orders are generation-bound and revalidated when consumed.
   registerCommand('frontMove', {
     validate(w,p,issuer){
