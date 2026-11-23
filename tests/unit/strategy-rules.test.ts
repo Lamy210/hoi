@@ -3,7 +3,8 @@ import {strategyFixture} from '../helpers/strategyFixture';
 import {assertStrategyState,populationSize} from '../../src/engine/strategy/model';
 import {transferPop,conscript,studySlots,researchPerDay,researchAhead,allocatedResearch,
   nextPrice,settleTrade,construct,availableIC,modelOutput,wearExpected,combatHits,
-  canAutoAttack,resistanceAfterDay,occupationExtractableIC,controlledFactoryFraction,validFocusTree,applyFocus} from '../../src/engine/strategy/rules';
+  canAutoAttack,resistanceAfterDay,occupationExtractableIC,controlledFactoryFraction,validFocusTree,applyFocus,
+  equippedCombatStats,combatReady,laborForProgress} from '../../src/engine/strategy/rules';
 
 describe('integrated strategy rules invariants',()=>{
   it('POP動員は排他的な転籍で総人口不変、負値/不足拒否',()=>{
@@ -88,5 +89,39 @@ describe('integrated strategy rules invariants',()=>{
     expect(()=>assertStrategyState({...w,lines:[...w.lines,w.lines[0]]})).toThrow();
     expect(()=>assertStrategyState({...w,divisions:[{...w.divisions[0],soldiers:21},w.divisions[1]]})).toThrow();
     expect(()=>assertStrategyState({...w,occupations:[...w.occupations,{...w.occupations[0],share:0.7}]})).toThrow();
+  });
+
+  it('装備を研究しただけでは師団は強化されず、師団へ配備すると火力が上がる',()=>{
+    const w=strategyFixture(),u=w.divisions[0];
+    u.requiredEquipment={infantry:10};
+    const noGear=equippedCombatStats(w,u);
+    w.nations[0].techDone.push('some-research');
+    expect(equippedCombatStats(w,u)).toEqual(noGear);
+    w.lots.push({holder:'division',holderId:1,modelId:'rifle',quantity:10});
+    expect(equippedCombatStats(w,u).softAttack).toBeGreaterThan(noGear.softAttack);
+    const newModel={...w.designs[0],id:'rifle-upgraded',softAttack:30};
+    w.designs.push(newModel);
+    w.lots.find(l=>l.holder==='division')!.modelId=newModel.id;
+    expect(equippedCombatStats(w,u).softAttack).toBeGreaterThan(60);
+    expect(combatReady({...u,organization:0})).toBe(false);
+    expect(combatReady({...u,hp:0})).toBe(false);
+    expect(combatReady(u)).toBe(true);
+  });
+  it('資材や予算のない建設の労働者消費は0で、他の製造ラインへ割り当てできる',()=>{
+    const w=strategyFixture(),f=w.factories[0];
+    const blocked=construct(f,100,0,0,10,1,1);
+    expect(blocked.progressIC).toBe(0);
+    expect(laborForProgress(f,blocked.progressIC)).toBe(0);
+    const partial=construct(f,100,4,100,10,2,1);
+    expect(laborForProgress(f,partial.progressIC)).toBeCloseTo(2);
+  });
+  it('共通汎用Focusは国家ごとに同じIDで定義でき、依存の参照は同国内だけ',()=>{
+    const w=strategyFixture(),f=w.focuses[0];
+    const other={...f,country:1,effects:[]};
+    expect(validFocusTree([f,other])).toEqual([]);
+    expect(()=>assertStrategyState({...w,focuses:[f,other]})).not.toThrow();
+    expect(()=>assertStrategyState({...w,focuses:[f,{...f}]})).toThrow();
+    const cross={...other,requires:['not-in-country-1']};
+    expect(validFocusTree([f,cross])).toContain('unknown focus:not-in-country-1');
   });
 });
