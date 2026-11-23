@@ -681,8 +681,8 @@ export function GameScreen() {
           <button type="button" data-testid="map-box-select" aria-pressed={marqueeMode} disabled={!mapReady}
             onClick={toggleMarquee}>{marqueeMode?(lang==='ja'?'範囲選択を終了':'Exit box select'):(lang==='ja'?'▱ 範囲選択':'▱ Box select')}</button>
           <button type="button" data-testid="map-front-draw" disabled={!mapReady||!frontEnemyOptions.length}
-            aria-pressed={frontDraft!==null} onClick={()=>frontDraft?setFrontDraft(null):startFrontDraft()}>
-            {frontDraft?(lang==='ja'?'戦線指定終了':'Exit front draft'):(lang==='ja'?'✎ 戦線指定':'Draw front')}</button>
+            aria-pressed={frontDraft!==null&&!frontDraft.edit} onClick={()=>frontDraft&&!frontDraft.edit?setFrontDraft(null):startFrontDraft()}>
+            {frontDraft&&!frontDraft.edit?(lang==='ja'?'戦線指定終了':'Exit front draft'):(lang==='ja'?'✎ 戦線指定':'Draw front')}</button>
           <button type="button" data-testid="map-front-edit" disabled={!mapReady||!activeFronts.length}
             aria-pressed={frontDraft?.edit!==undefined}
             onClick={()=>frontDraft?.edit?setFrontDraft(null):startFrontEdit()}>
