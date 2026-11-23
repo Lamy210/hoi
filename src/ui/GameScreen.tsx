@@ -10,6 +10,7 @@ import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
 import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, provincesAlongStroke } from './frontMapPlanning';
+import { frontCreationCandidates, type FrontCreationSource } from './frontCreationSelection';
 import type {FormationScope} from '../engine/military/formationOverview';
 import { divisionTemplate } from '../engine/military/templates';
 import type { UiUnit } from '../engine/ui';
@@ -55,6 +56,7 @@ export function GameScreen() {
   const [rosterFilter, setRosterFilter] = useState('all');
   const [marqueeMode,setMarqueeMode]=useState(false);
   const [frontDraft,setFrontDraft]=useState<{enemy:number;provinces:number[]}|null>(null);
+  const [frontDraftSource,setFrontDraftSource]=useState<FrontCreationSource>('none');
   const [frontTargetId,setFrontTargetId]=useState<number|null>(null);
   const [targetStroke,setTargetStroke]=useState<{x:number;y:number}[]>([]);
   const targetStrokeRef=useRef<{x:number;y:number}[]>([]);
@@ -272,6 +274,9 @@ export function GameScreen() {
   const gameSnap = snap;
   const ownUnits = snap.units.filter(u => u.owner === snap.playerCountry);
   const chosen = ownUnits.filter(u => selectedIds.includes(u.id));
+  const frontCreation=frontCreationCandidates(snap,frontDraftSource,selectedIds);
+  const draftHasInvalidBatch=frontDraftSource!=='none'&&
+    (!frontCreation.ids.length||frontCreation.ids.length>256);
   const visibleUnits = ownUnits.filter(u => {
     const a = snap.armies.find(a => a.id === u.armyId);
     const text = [String(u.id), meta.provIds[u.loc], meta.provNameJa[u.loc], meta.provNameEn[u.loc], a?.name ?? ''].join(' ').toLowerCase();
@@ -500,6 +505,7 @@ export function GameScreen() {
   function startFrontDraft(){
     if(!mapReady||!frontEnemyOptions.length)return;
     setFrontDraft({enemy:player.atWar[0]??frontEnemyOptions[0],provinces:[]});
+    setFrontDraftSource(selectedIds.length?'selected':'none');
     setFrontTargetId(null);
     setMarqueeMode(false);
     setMoveMode(false);setAttackMode(false);setDestination('');
@@ -542,7 +548,9 @@ export function GameScreen() {
   function commitFrontDraft(){
     if(!frontDraft||!canCommitFrontDraft(frontDraft.provinces,frontDraft.enemy,gameSnap.playerCountry,
       gameSnap.controller,frontEnemyOptions,st.pendingCommands>0))return;
-    engineClient.command('createFront',{enemy:frontDraft.enemy,provinces:frontDraft.provinces});
+    if(draftHasInvalidBatch)return;
+    engineClient.command('createFront',{enemy:frontDraft.enemy,provinces:frontDraft.provinces,
+      ...(frontDraftSource==='none'?{}:{units:frontCreation.ids})});
     setFrontDraft(null);
   }
 
@@ -658,16 +666,37 @@ export function GameScreen() {
             </select>
           </label>
           <span data-testid="map-front-draft-count">{lang==='ja'?'指定州':'Provinces'}: {frontDraft.provinces.length}</span>
+          <label>{lang==='ja'?'戦線に紐づける部隊':'Assign divisions on creation'}
+            <select data-testid="map-front-assignment-source" value={frontDraftSource}
+              onChange={e=>setFrontDraftSource(e.target.value as FrontCreationSource)}>
+              <option value="none">{lang==='ja'?'戦線のみ作成（後で編入）':'Create front only'}</option>
+              <option value="selected">{lang==='ja'?'地図・一覧で選択中の師団':'Selected divisions'}</option>
+              <option value="unassigned">{lang==='ja'?'軍未所属の師団':'Divisions without an army'}</option>
+              {snap.armyGroups.filter(g=>g.owner===snap.playerCountry).map(g=><option key={'g'+g.id} value={'group:'+g.id}>
+                {lang==='ja'?'軍集団':'Group'}: {g.name}
+              </option>)}
+              {snap.armies.filter(a=>a.owner===snap.playerCountry).map(a=><option key={'a'+a.id} value={'army:'+a.id}>
+                {lang==='ja'?'軍':'Army'}: {a.name}
+              </option>)}
+            </select>
+          </label>
+          {frontDraftSource!=='none'&&<div data-testid="map-front-assignment-preview">
+            {lang==='ja'?'同時編入':'Atomic assignment'}: {frontCreation.ids.length}
+            {frontCreation.alreadyAssigned>0&&<span> · {lang==='ja'?'既存戦線の所属を維持':'Already assigned'}: {frontCreation.alreadyAssigned}</span>}
+            {frontCreation.manualHold>0&&<span> · {lang==='ja'?'手動固定を維持':'Manual hold preserved'}: {frontCreation.manualHold}</span>}
+            {draftHasInvalidBatch&&<small className="muted">{lang==='ja'?'対象は1〜256師団を選んでください':'Select 1–256 unassigned divisions'}</small>}
+          </div>}
           <div className="muted">{lang==='ja'?'クリック:追加・解除 / 矩形ドラッグ:置換 / Shift・Ctrl:追加 / Alt:除外':
             'Click: toggle / drag: replace / Shift or Ctrl: add / Alt: remove'}</div>
           <div className="row">
-            <button data-testid="map-front-create" className="primary" disabled={!draftReady} onClick={commitFrontDraft}>
-              {lang==='ja'?'戦線を作成':'Create front'}</button>
+            <button data-testid="map-front-create" className="primary" disabled={!draftReady||draftHasInvalidBatch} onClick={commitFrontDraft}>
+              {lang==='ja'?(frontDraftSource==='none'?'戦線を作成':'戦線作成と部隊編入'):(frontDraftSource==='none'?'Create front':'Create and assign')}</button>
             <button data-testid="map-front-clear" disabled={!frontDraft.provinces.length} onClick={()=>
               setFrontDraft({...frontDraft,provinces:[]})}>{lang==='ja'?'指定解除':'Clear'}</button>
             <button data-testid="map-front-cancel" onClick={()=>setFrontDraft(null)}>{lang==='ja'?'キャンセル':'Cancel'}</button>
           </div>
-          <small className="muted">{lang==='ja'?'開戦前の戦線は一時停止で保存されます。師団の一括割当は戦線画面で実行できます。':'Pre-war fronts are saved paused. Assign divisions in the fronts panel.'}</small>
+          <small className="muted">{lang==='ja'?'作成と編入は一度に確定します。既存戦線から師団を奪わず手動固定も維持。平時の戦線は停止状態です。':
+                'Creation and assignment are atomic. Existing assignments and manual holds remain intact. Pre-war fronts start paused.'}</small>
         </div>}
         {frontTargetId!==null&&<div className="map-front-planner" data-testid="map-front-target-planner">
           <b>{lang==='ja'?'地図で攻勢目標を指定':'Pick offensive objective'}</b>
