@@ -13,6 +13,7 @@ import { contributionOf } from './diplomacy/peace';
 import { warScoreFor } from './military/war';
 import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMultiplier } from './military/unitComposition';
 import {projectCombatFronts,provinceCombatCapacity,type CombatFrontProjection} from './military/combatFrontProjection';
+import {operationalFrontProvinces} from './military/fronts';
 import type { Alert } from './core/state';
 
 export interface UiCountry {
@@ -73,6 +74,7 @@ export interface UiTechDef {
 export interface UiFront {
   revision: number;
   borderLinks: {from:number;to:number}[]; // 有効な戦線州から敵支配州への陸上隣接のみ
+  activeProvinces?: number[]; // 占領前進した師団を含む実効戦線州（保存対象外）
   paused: boolean;
   held: number;
   id: number;
@@ -357,7 +359,8 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     owner: f.owner,
     enemy: f.enemy,
     stance: f.stance,
-    borderLinks: atWar(w,f.owner,f.enemy) ? [...new Set(f.provinces)].filter(p=>w.prov.controller[p]===f.owner).sort((a,b)=>a-b).flatMap(from=>w.adj.targets.slice(w.adj.offsets[from],w.adj.offsets[from+1]).filter((to,i)=>!w.adj.strait[w.adj.offsets[from]+i]&&w.prov.controller[to]===f.enemy).sort((a,b)=>a-b).map(to=>({from,to}))) : [],
+    activeProvinces:operationalFrontProvinces(w,f),
+    borderLinks: atWar(w,f.owner,f.enemy) ? operationalFrontProvinces(w,f).flatMap(from=>w.adj.targets.slice(w.adj.offsets[from],w.adj.offsets[from+1]).filter((to,i)=>!w.adj.strait[w.adj.offsets[from]+i]&&w.prov.controller[to]===f.enemy).sort((a,b)=>a-b).map(to=>({from,to}))) : [],
     provinces: f.provinces.slice(),
     targets: f.targets.slice(),
     cap: f.cap,

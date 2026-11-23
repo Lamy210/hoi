@@ -6,6 +6,7 @@ import { registerSystem, weeklyOffset } from '../core/scheduler';
 import { findPath } from './movement';
 import { TERRAIN_DATA, unitPowerFactorsPure } from './combat';
 import { aiCmd } from '../commands';
+import { operationalFrontProvinces } from '../military/fronts';
 
 function log(w: WorldState, country: number, module: string, options: string[], scores: number[], chosen: string, reason: string): void {
   const arr = (w.runtime.decisionLog[String(country)] ||= []);
@@ -36,6 +37,7 @@ function unitsOfFront(w: WorldState, front: Front): Unit[] {
 export function runFront(w: WorldState, front: Front, rng: () => number): void {
   if (front.paused || !atWar(w, front.owner, front.enemy)) return;
   const units = unitsOfFront(w, front);
+  const frontProvinces=operationalFrontProvinces(w,front);
   const movable = units.filter((u) => u.path.length === 0 && !u.encircled && !u.manualHold && !w.runtime.activeBattles.has(u.loc));
   const provName = (p: number) => w.prov.nameJa[p] || w.prov.nameEn[p];
 
@@ -71,12 +73,12 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
   if (front.stance === 'hold') {
     // 前線州の穴埋めのみ（攻撃しない）。週4命令まで
     let orders = 0;
-    for (const fp of front.provinces) {
+    for (const fp of frontProvinces) {
       if (orders >= 4) break;
       if (w.prov.controller[fp] !== front.owner) continue;
       const present = units.filter((u) => u.loc === fp && !u.destroyed).length;
       if (present >= 1) continue;
-      const spare = movable.filter(u=>u.loc!==fp && !w.runtime.commandsSinceLastTick.some(c=>c.type==='frontMove'&&c.p.unitId===u.id) && (!front.provinces.includes(u.loc) || units.filter(x=>x.loc===u.loc).length>1)).sort((a,b)=>a.id-b.id).find(u=>findPath(w,u.loc,fp,front.owner,false)!==null);
+      const spare = movable.filter(u=>u.loc!==fp && !w.runtime.commandsSinceLastTick.some(c=>c.type==='frontMove'&&c.p.unitId===u.id) && (!frontProvinces.includes(u.loc) || units.filter(x=>x.loc===u.loc).length>1)).sort((a,b)=>a.id-b.id).find(u=>findPath(w,u.loc,fp,front.owner,false)!==null);
       if (!spare) continue;
       const path = findPath(w, spare.loc, fp, front.owner, false);
       if (path) {
@@ -95,7 +97,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
     let musterOrders = 0;
     for (const u of movable) {
       if (musterOrders >= 4) break;
-      if (front.provinces.includes(u.loc)) continue;
+      if (frontProvinces.includes(u.loc)) continue;
       // 既に敵州に隣接する位置なら集結不要
       let onFrontline = false;
       for (let i = w.adj.offsets[u.loc]; i < w.adj.offsets[u.loc + 1]; i++) {
@@ -104,7 +106,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
       if (onFrontline) continue;
       let nearest = -1;
       let nearestD = Infinity;
-      for (const fp of front.provinces) {
+      for (const fp of frontProvinces) {
         if (w.prov.controller[fp] !== front.owner) continue;
         const dx = w.prov.cx[fp] - w.prov.cx[u.loc];
         const dy = w.prov.cy[fp] - w.prov.cy[u.loc];
@@ -129,7 +131,7 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
     const threshold = baseThreshold + (rng() - 0.5) * 0.2;
     const candidates: { target: number; ratio: number }[] = [];
     const seen = new Set<number>();
-    for (const fp of front.provinces) {
+    for (const fp of frontProvinces) {
       if (w.prov.controller[fp] !== front.owner) continue;
       for (let i = w.adj.offsets[fp]; i < w.adj.offsets[fp + 1]; i++) {
         const ep = w.adj.targets[i];
@@ -147,7 +149,8 @@ export function runFront(w: WorldState, front: Front, rng: () => number): void {
             sources.push(u);
           }
         }
-        let defPower = 40;
+        // A vacant enemy province does not contain a phantom 40-power garrison.
+        let defPower = 0;
         for (const u of w.units) {
           if (u.destroyed || u.loc !== ep) continue;
           defPower += unitExpectedPower(w, u, ep, 'defend');

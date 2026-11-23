@@ -8,7 +8,7 @@ export function frontView(snap:UiSnapshot,selectedIds:readonly number[],visibili
   const selectedFronts=new Set(snap.units.filter(u=>u.owner===snap.playerCountry&&selected.has(u.id)).map(u=>u.frontId));
   const enemies=new Set(snap.countries[snap.playerCountry].atWar);
   return snap.fronts.filter(f=>f.owner===snap.playerCountry&&snap.countries[f.enemy]?.alive&&(visibility==='all'||selectedFronts.has(f.id))).map(f=>{
-    const provinces=[...new Set(f.provinces)].filter(p=>snap.controller[p]===f.owner).sort((a,b)=>a-b);
+    const provinces=[...new Set(f.activeProvinces??f.provinces)].filter(p=>snap.controller[p]===f.owner).sort((a,b)=>a-b);
     const targets=[...new Set(f.targets)].filter(p=>snap.controller[p]===f.enemy).sort((a,b)=>a-b);
     const links=f.borderLinks.filter(e=>provinces.includes(e.from)&&snap.controller[e.to]===f.enemy);
     const warring=enemies.has(f.enemy);
