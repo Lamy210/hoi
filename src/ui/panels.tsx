@@ -49,7 +49,10 @@ function TraceBox() {
       {st.trace.contribs.map((c, i) => (
         <div key={i} className="trace-contrib">
           <span className="k">{c.label==='equipmentModel'
-            ? (st.lang==='ja'?'実配備装備の品質':'Equipped model quality') : c.label}
+            ? (st.lang==='ja'?'実配備装備の品質':'Equipped model quality')
+            : c.label==='defenseCapacity' ? (st.lang==='ja'?'防御能力（損耗軽減）':'Defense capacity (loss protection)')
+            : c.label==='breakthroughCapacity' ? (st.lang==='ja'?'突破能力（損耗軽減）':'Breakthrough capacity (loss protection)')
+            : c.label}
             {' '}<span className="muted">{c.formula}</span></span>
           <span>{typeof c.value === 'number' ? Math.round(c.value * 1000) / 1000 : c.value}</span>
         </div>
