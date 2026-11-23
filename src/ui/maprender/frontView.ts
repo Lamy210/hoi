@@ -11,7 +11,8 @@ export function frontView(snap:UiSnapshot,selectedIds:readonly number[],visibili
     const provinces=[...new Set(f.provinces)].filter(p=>snap.controller[p]===f.owner).sort((a,b)=>a-b);
     const targets=[...new Set(f.targets)].filter(p=>snap.controller[p]===f.enemy).sort((a,b)=>a-b);
     const links=f.borderLinks.filter(e=>provinces.includes(e.from)&&snap.controller[e.to]===f.enemy);
-    const arrows=f.stance==='attack'&&!f.paused&&f.cap>0?links.filter(e=>targets.includes(e.to)):[];
-    return {id:f.id,provinces,targets,links,arrows,stance:f.stance,paused:f.paused,highlighted:selectedFronts.has(f.id)};
+    const warring=enemies.has(f.enemy);
+    const arrows=warring&&f.stance==='attack'&&!f.paused&&f.cap>0?links.filter(e=>targets.includes(e.to)):[];
+    return {id:f.id,provinces,targets,links,arrows,stance:f.stance,paused:f.paused,planned:!warring,highlighted:selectedFronts.has(f.id)};
   }).sort((a,b)=>Number(a.highlighted)-Number(b.highlighted)||a.id-b.id);
 }
