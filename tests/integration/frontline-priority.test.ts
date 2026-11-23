@@ -6,7 +6,7 @@ import {hashWorld} from '../../src/engine/core/hash';
 import {startWar} from '../../src/engine/military/war';
 import {frontlinePriority,selectCombatFront} from '../../src/engine/military/unitComposition';
 import {projectCombatFronts} from '../../src/engine/military/combatFrontProjection';
-import {deserializeWorld,savePayloadChecksum,SAVE_SCHEMA_VERSION} from '../../src/engine/save/serialize';
+import {deserializeWorld,savePayloadChecksum,SAVE_SCHEMA_VERSION,type SaveHeader} from '../../src/engine/save/serialize';
 
 async function battleFixture(){
   const e=await createTestEngine(),w=e.world,c=w.playerCountry;
@@ -109,10 +109,9 @@ describe('player-controlled frontline priority in the actual game',()=>{
     modified.frontlinePriority=8;
     const pack=await loadTestPack();
     const save=decode(e.serialize()) as {
-      header:{v:number;integrity:number};stores:{units:Array<{frontlinePriority?:number}>};
-      payloadChecksum:number;
+      header:SaveHeader;stores:Record<string,unknown>;payloadChecksum:number;
     };
-    save.stores.units[0].frontlinePriority=99;
+    (save.stores.units as Array<{frontlinePriority?:number}>)[0].frontlinePriority=99;
     save.payloadChecksum=savePayloadChecksum(save.header,save.stores);
     const corrupt=deserializeWorld(encode(save),pack);
     expect(corrupt.world).toBeNull();
