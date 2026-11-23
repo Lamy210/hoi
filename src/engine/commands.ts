@@ -515,6 +515,32 @@ export function registerAllCommands(): void {
     },
   });
 
+  // Existing front boundaries are revised atomically; stale UI drafts and queued AI orders
+  // cannot overwrite a newer plan. Assignments, targets, stance and pause are preserved.
+  registerCommand('updateFrontProvinces', {
+    validate(w,p,issuer) {
+      const f=frontOf(w,p.frontId as number),c=actorCountry(w,issuer);
+      if(!f)return 'noFront';
+      if(c===null||c!==f.owner||issuer==='frontai')return 'notYourFront';
+      if(p.expectedRevision!==(f.revision??1))return 'staleFrontOrder';
+      if((f.revision??1)>=Number.MAX_SAFE_INTEGER)return 'limitExceeded';
+      const provinces=p.provinces;
+      if(!Array.isArray(provinces)||!provinces.length||provinces.length>256||
+        new Set(provinces).size!==provinces.length)return 'badParams';
+      for(const province of provinces){
+        if(!Number.isInteger(province)||province<0||province>=w.prov.count)return 'badProvince';
+        if(w.prov.controller[province]!==c)return 'notControlledByYou';
+      }
+      if(!w.countries.alive[f.enemy])return 'badTarget';
+      return null;
+    },
+    apply(w,p){
+      const front=frontOf(w,p.frontId as number)!;
+      front.provinces=(p.provinces as number[]).slice().sort((a,b)=>a-b);
+      front.revision=(front.revision??1)+1;
+    },
+  });
+
   registerCommand('setFrontStance', {
     validate(w,p,issuer) {
       const f = frontOf(w,p.frontId as number), c = actorCountry(w,issuer);

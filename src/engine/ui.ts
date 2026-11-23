@@ -70,6 +70,7 @@ export interface UiTechDef {
 }
 
 export interface UiFront {
+  revision: number;
   borderLinks: {from:number;to:number}[]; // 有効な戦線州から敵支配州への陸上隣接のみ
   paused: boolean;
   held: number;
@@ -342,6 +343,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     }));
   const fronts: UiFront[] = w.fronts.map((f) => ({
     id: f.id,
+    revision: f.revision ?? 1,
     paused: f.paused ?? false,
     held: w.units.filter(u => !u.destroyed && u.frontId === f.id && u.manualHold).length,
     owner: f.owner,

@@ -65,3 +65,44 @@ export function provincesAlongStroke(
   }
   return result;
 }
+
+/** Read-only comparison. Existing AI, targets and assigned divisions remain unchanged. */
+export function frontProvinceChangeSummary(before:readonly number[],after:readonly number[]){
+  const original=new Set(before),next=new Set(after);
+  return {added:after.filter(p=>!original.has(p)).length,
+    removed:before.filter(p=>!next.has(p)).length,
+    changed:before.length!==after.length||before.some(p=>!next.has(p))};
+}
+
+/** Edit is submitted only if the exact existing front generation is still current. */
+export function canCommitFrontEdit(
+  before:readonly number[],after:readonly number[],expectedRevision:number,
+  currentRevision:number|undefined,enemy:number,owner:number,
+  controller:readonly number[],enemies:readonly number[],busy:boolean,
+):boolean{
+  return Number.isSafeInteger(expectedRevision)&&expectedRevision>=1&&
+    expectedRevision===currentRevision&&frontProvinceChangeSummary(before,after).changed&&
+    canCommitFrontDraft(after,enemy,owner,controller,enemies,busy);
+}
+
+/** Snaps clicks near projected unit/province anchors instead of picking a neighboring polygon.
+ * Only the requested controller is eligible, and tie breaking is stable by province ID.
+ */
+export function nearestProjectedProvince(
+  controller:readonly number[],owner:number,
+  project:(province:number)=>ScreenPoint|null,
+  point:ScreenPoint,radius=18,
+):number|null{
+  if(![point.x,point.y,radius].every(Number.isFinite)||radius<0)return null;
+  let best:number|null=null,bestDistance=radius*radius;
+  for(let province=0;province<controller.length;province++){
+    if(controller[province]!==owner)continue;
+    const p=project(province);
+    if(!p||![p.x,p.y].every(Number.isFinite))continue;
+    const d=(p.x-point.x)**2+(p.y-point.y)**2;
+    if(d<bestDistance || (d===bestDistance&&(best===null||province<best))){
+      best=province;bestDistance=d;
+    }
+  }
+  return best;
+}
