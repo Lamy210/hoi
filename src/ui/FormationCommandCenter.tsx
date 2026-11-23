@@ -32,7 +32,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const resume=formationOperationPreview(scoped,'resume');
   const assign=formationOperationPreview(scoped,'assignFront',front?.id);
   const unassign=formationOperationPreview(scoped,'unassignFront');
-  const releasingIds=scoped.filter(u=>u.manualHold&&assign.ids.includes(u.id)).map(u=>u.id);
+  const releasingIds=front&&player.atWar.includes(front.enemy)?scoped.filter(u=>u.manualHold&&assign.ids.includes(u.id)).map(u=>u.id):[];
   const targetSignature=focus?.kind+':'+focus?.id+':'+chosenFront+':'+targetScope+
     ':'+assign.ids.join(',')+':'+releasingIds.join(',');
   // The acknowledgement is scoped to the exact division IDs and their hold state.
