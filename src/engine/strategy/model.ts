@@ -47,7 +47,8 @@ export interface Lot {
 }
 export interface Division {
   id:number; country:number; province:number; planId:number|null;
-  manualHold:boolean; moving:boolean; inBattle:boolean;
+  manualHold:boolean; moving:boolean; inBattle:boolean; destroyed?:boolean;
+  casualtyCarry?:number; requiredEquipment?:Record<string,number>;
   soldiers:number; organization:number; hp:number; hardness:number;
   supply:number; softAttack:number; hardAttack:number;
   defense:number; breakthrough:number;
@@ -80,7 +81,7 @@ export interface Quote {
   supply:number; demand:number;
 }
 export interface StrategyState {
-  ruleset:'strategy-v1'; seed:number; tick:number;
+  ruleset:'strategy-v1'; seed:number; tick:number; epochDays:number;
   nations:Nation[]; provinces:Province[]; regions:Region[];
   factories:Factory[]; construction:Construction[];
   designs:Design[]; lines:Line[]; lots:Lot[]; divisions:Division[];
@@ -107,13 +108,18 @@ export function atWar(w:Pick<StrategyState,'wars'>,a:number,b:number):boolean{
   return w.wars.some(x=>(x.a===a&&x.b===b)||(x.a===b&&x.b===a));
 }
 export function assertStrategyState(w:StrategyState):void{
-  if(w.ruleset!=='strategy-v1'||!Number.isSafeInteger(w.tick)||w.tick<0)throw new RangeError('version/tick');
+  if(w.ruleset!=='strategy-v1'||!Number.isSafeInteger(w.tick)||w.tick<0||!Number.isSafeInteger(w.epochDays))throw new RangeError('version/tick/epoch');
   const ids=(xs:ReadonlyArray<{id:number|string}>,label:string)=>{
     if(new Set(xs.map(x=>x.id)).size!==xs.length)throw new RangeError('duplicate '+label);
   };
   ids(w.nations,'nation');ids(w.provinces,'province');ids(w.regions,'region');
   ids(w.factories,'factory');ids(w.construction,'construction');ids(w.designs,'design');
-  ids(w.lines,'line');ids(w.divisions,'division');ids(w.plans,'plan');ids(w.focuses,'focus');
+  ids(w.lines,'line');ids(w.divisions,'division');ids(w.plans,'plan');
+  // Focus definitions are reusable in every country; only (country,id) is unique.
+  const focusKeys=w.focuses.map(f=>f.country+'\x1f'+f.id);
+  if(new Set(focusKeys).size!==focusKeys.length)throw new RangeError('duplicate country focus');
+  if(w.focuses.some(f=>!Number.isSafeInteger(f.country)||!w.nations.some(n=>n.id===f.country)||!f.id))
+    throw new RangeError('invalid focus reference');
   const countries=new Set(w.nations.map(x=>x.id));
   const regions=new Set(w.regions.map(x=>x.id));
   const provinces=new Set(w.provinces.map(x=>x.id));
@@ -163,7 +169,11 @@ export function assertStrategyState(w:StrategyState):void{
       throw new RangeError('design');
     for(const amount of Object.values(d.materials))nonnegative(amount);
   }
+  const lotKeys=new Set<string>();
   for(const l of w.lots){
+    const key=l.holder+'\x1f'+l.holderId+'\x1f'+l.modelId;
+    if(lotKeys.has(key))throw new RangeError('duplicate equipment lot');
+    lotKeys.add(key);
     if(!designs.has(l.modelId)||!Number.isSafeInteger(l.quantity)||l.quantity<0)
       throw new RangeError('lot');
     if((l.holder==='warehouse'&&!countries.has(l.holderId))||
@@ -172,6 +182,8 @@ export function assertStrategyState(w:StrategyState):void{
   }
   for(const u of w.divisions){
     if(!countries.has(u.country)||!provinces.has(u.province))throw new RangeError('division reference');
+    if(u.casualtyCarry!==undefined&&(u.casualtyCarry<0||u.casualtyCarry>=1||!Number.isFinite(u.casualtyCarry)))throw new RangeError('invalid casualty carry');
+    if(u.requiredEquipment && Object.values(u.requiredEquipment).some(v=>!Number.isSafeInteger(v)||v<0))throw new RangeError('equipment requirements');
     for(const v of [u.soldiers,u.organization,u.hp,u.supply,u.hardness,u.softAttack,u.hardAttack,u.defense,u.breakthrough])
       nonnegative(v);
     if(u.hardness>1||u.supply>1)throw new RangeError('division ratio');
@@ -181,23 +193,45 @@ export function assertStrategyState(w:StrategyState):void{
     const deployed=w.divisions.filter(d=>d.country===n.id).reduce((a,d)=>a+d.soldiers,0);
     if(deployed>n.population.soldiers)throw new RangeError('deployed soldiers exceed POP');
   }
+  const unitAssignments=new Set<number>();
   for(const p of w.plans){
     if(!countries.has(p.country)||!countries.has(p.enemy)||p.country===p.enemy||
       p.provinces.some(x=>!provinces.has(x))||p.targets.some(x=>!provinces.has(x))||
       p.divisionIds.some(id=>!divisions.has(id)||w.divisions.find(d=>d.id===id)?.country!==p.country)||!Number.isSafeInteger(p.revision)||p.revision<1)
       throw new RangeError('plan reference');
     if(p.planning<0||p.planning>0.25||!Number.isFinite(p.planning))throw new RangeError('planning');
+    if(new Set(p.divisionIds).size!==p.divisionIds.length)throw new RangeError('duplicate plan member');
+    for(const id of p.divisionIds){
+      if(unitAssignments.has(id))throw new RangeError('division assigned to multiple plans');
+      unitAssignments.add(id);
+      if(w.divisions.find(d=>d.id===id)?.planId!==p.id)throw new RangeError('division plan id mismatch');
+    }
   }
+  for(const u of w.divisions){
+    if(u.planId!==null&&!unitAssignments.has(u.id))throw new RangeError('dangling division plan');
+  }
+  const quoteKeys=new Set<string>();
   for(const q of w.quotes){
+    const key=q.country+'\x1f'+q.good;
+    if(quoteKeys.has(key))throw new RangeError('duplicate quote');
+    quoteKeys.add(key);
     if(!countries.has(q.country)||q.price<=0||q.basePrice<=0)
       throw new RangeError('quote references');
     for(const v of [q.price,q.basePrice,q.supply,q.demand])nonnegative(v);
   }
+  const occupationKeys=new Set<string>();
   for(const o of w.occupations){
+    const key=o.regionId+'\x1f'+o.occupier;
+    if(occupationKeys.has(key))throw new RangeError('duplicate occupation');
+    occupationKeys.add(key);
     if(!regions.has(o.regionId)||!countries.has(o.occupier))throw new RangeError('occupation references');
     if(o.share<0||o.share>1||o.resistance<0||o.resistance>100||
       o.compliance<0||o.compliance>100||o.garrisonSupply<0||o.garrisonSupply>1)
       throw new RangeError('occupation ratio');
+  }
+  for(const n of w.nations){
+    const pop=w.regions.filter(r=>r.owner===n.id).reduce((a,r)=>a+r.population,0);
+    if(pop!==populationSize(n.population))throw new RangeError('regional population mismatch');
   }
   for(const r of w.regions){
     const shares=w.occupations.filter(o=>o.regionId===r.id).reduce((a,b)=>a+b.share,0);
