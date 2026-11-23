@@ -5,7 +5,7 @@ import {applyCommands} from '../../src/engine/core/command';
 import {getSystems} from '../../src/engine/core/scheduler';
 import {hashWorld} from '../../src/engine/core/hash';
 import {forecastProductionLines} from '../../src/engine/systems/production';
-import {deserializeWorld,savePayloadChecksum} from '../../src/engine/save/serialize';
+import {deserializeWorld,savePayloadChecksum,SAVE_SCHEMA_VERSION} from '../../src/engine/save/serialize';
 import {recordModelProduction,validateModelProductionLedger} from '../../src/engine/systems/modelProductionLedger';
 
 const production=()=>getSystems().find(sys=>sys.name==='production')!;
@@ -67,7 +67,7 @@ describe('v16 typed manufacturing history, not inventory',()=>{
     production().fn(w);
     const original=e.serialize();
     const blob=decode(original) as any;
-    expect(blob.header.v).toBe(18);
+    expect(blob.header.v).toBe(SAVE_SCHEMA_VERSION);
     const v15=decode(original) as any;
     v15.header.v=15;
     delete v15.stores.modelProduction;delete v15.stores.modelStock;delete v15.stores.issuedEquipment;
