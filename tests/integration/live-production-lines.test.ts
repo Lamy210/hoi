@@ -73,6 +73,8 @@ describe('opt-in model-aware two-goods production (v15)',()=>{
     expect(hashWorld(e.world)).toBe(initialHash);
     const legacy=decode(valid) as any;
     legacy.header.v=14;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete legacy.stores.garrisons; delete legacy.stores.counters.nextGarrisonId;
     delete legacy.stores.productionMode;delete legacy.stores.modelProduction;delete legacy.stores.modelStock;delete legacy.stores.issuedEquipment;
     legacy.header.integrity=hashWorld(w,false,true,true,true,true,true,true,true,true,false);
     legacy.payloadChecksum=savePayloadChecksum(legacy.header,legacy.stores);
