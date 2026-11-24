@@ -908,6 +908,7 @@ export function GameScreen() {
         )}
       </div>
       <ArmyCommandDock snap={snap} lang={lang} selectedIds={selectedIds}
+        selectedProvince={selProv} provinceNames={lang==='ja'?meta.provNameJa:meta.provNameEn}
         pending={st.pendingCommands} focus={focusedFormation}
         onFocus={setFocusedFormation}
         onSelect={ids=>selectUnits(ids,false)}
