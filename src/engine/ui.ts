@@ -15,6 +15,7 @@ import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMu
 import {projectCombatFronts,provinceCombatCapacity,type CombatFrontProjection} from './military/combatFrontProjection';
 import {operationalFrontProvinces} from './military/fronts';
 import {projectMaritimeCatalog,type UiMaritimeCatalog} from './naval/portProjection';
+import {NAVAL_MODELS,type NavalModel} from './naval/models';
 import type { Alert } from './core/state';
 
 export interface UiCountry {
@@ -206,6 +207,8 @@ export interface UiSnapshot {
 export interface UiMeta {
   /** Static, optional maritime data. Controller is always read from UiSnapshot. */
   maritime?:UiMaritimeCatalog;
+  /** Phase8B game-only model definitions; construction is not enabled. */
+  navalModels?:NavalModel[];
   packId: string;
   packNameEn: string;
   packNameJa: string;
@@ -226,7 +229,8 @@ export interface UiMeta {
 
 export function buildUiMeta(w: WorldState, pack: import('./scenario/types').Pack): UiMeta {
   return {
-    ...(pack.maritime?{maritime:projectMaritimeCatalog(pack)}:{}),
+    ...(pack.maritime?{maritime:projectMaritimeCatalog(pack),
+      navalModels:NAVAL_MODELS.map(m=>({...m}))}:{}),
     packId: pack.manifest.id,
     packNameEn: pack.manifest.nameEn,
     packNameJa: pack.manifest.nameJa,
