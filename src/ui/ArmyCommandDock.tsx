@@ -46,7 +46,7 @@ export function ArmyCommandDock({
   const busy=pending!==0;
   const ownGarrisons=snap.garrisons.filter(g=>g.owner===country);
   const garrisonAssigned=new Set(ownGarrisons.flatMap(g=>g.unitIds));
-  const candidateGuardUnits=targetUnits.filter(u=>!u.destroyed&&u.frontId<0&&!garrisonAssigned.has(u.id));
+  const candidateGuardUnits=targetUnits.filter(u=>u.frontId<0&&!garrisonAssigned.has(u.id));
   const canCreateGarrison=!busy&&garrisonTargets.length>0&&garrisonTargets.length<=MAX_GARRISON_TARGETS&&
     targetUnits.length>0&&targetUnits.length<=MAX_GARRISON_UNITS&&candidateGuardUnits.length===targetUnits.length;
   const selectedTarget=selectedProvince!==null&&snap.controller[selectedProvince]===country?selectedProvince:null;
