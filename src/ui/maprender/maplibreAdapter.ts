@@ -4,6 +4,7 @@
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { createUnitOverlay } from './unitOverlay';
+import {createPortOverlay} from './portOverlay';
 import type { MapDataSource, MapRenderer } from './types';
 
 interface FCFeature {
@@ -51,8 +52,11 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
   );
   map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
   const units = createUnitOverlay(container, p => { const pt = map.project([ds.provLabelX[p], ds.provLabelY[p]]); return [pt.x, pt.y]; });
+  const ports=createPortOverlay(container,p=>{const xy=map.project([ds.provLabelX[p],ds.provLabelY[p]]);return [xy.x,xy.y];});
   map.on('move', units.refresh);
   map.on('resize', units.refresh);
+  map.on('move', ports.refresh);
+  map.on('resize', ports.refresh);
 
   async function init(): Promise<void> {
     const lod1fc = (await ds.loadGeometry(1)) as unknown as FC;
@@ -147,6 +151,7 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
     whenReady: () => ready,
     setUnitOverlay: units.set,
     setFrontOverlay: units.setFronts,
+    setPortOverlay: ports.set,
     setColors(next: string[], dirty: Set<number>) {
       colors = next;
       if (dirty.size === 0) return;
@@ -196,6 +201,9 @@ export function createMaplibreRenderer(container: HTMLElement, ds: MapDataSource
     dispose() {
       map.off('move', units.refresh);
       map.off('resize', units.refresh);
+      map.off('move', ports.refresh);
+      map.off('resize', ports.refresh);
+      ports.dispose();
       units.dispose();
       map.remove();
     },

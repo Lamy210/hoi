@@ -8,6 +8,7 @@ import { engineClient, loadGeometry, loadDecoration } from './engineClient';
 import { startPacer, stopPacer } from './pacer';
 import { ArmyManagement, DivisionResources } from './ArmyManagement';
 import {ArmyCommandDock} from './ArmyCommandDock';
+import {PortDirectory} from './PortDirectory';
 import { OrderOfBattleExplorer } from './OrderOfBattle';
 import { divisionsInRectangle, mergeDivisionSelection, type ScreenRect, type SelectionMergeMode } from './mapSelection';
 import { provincesInRectangle, updateFrontDraftProvinces, canCommitFrontDraft, canCommitFrontEdit, frontProvinceChangeSummary, provincesAlongStroke, nearestProjectedProvince } from './frontMapPlanning';
@@ -45,6 +46,7 @@ export function GameScreen() {
   const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
   const [mapError, setMapError] = useState<string | null>(null);
   const [mapReady, setMapReady] = useState(false);
+  const [portsVisible,setPortsVisible]=useState(true);
   const [search, setSearch] = useState<string | null>(null);
   const [moveMode, setMoveMode] = useState(false);
   const [attackMode, setAttackMode] = useState(false);
@@ -191,6 +193,31 @@ export function GameScreen() {
   useEffect(() => {
     rendererRef.current?.setSelected(appStore.get().snap?.units.find(u => u.id === st.selection.unitId)?.loc ?? st.selection.prov);
   }, [st.selection.prov, st.selection.unitId]);
+
+  // Maritime markers are a read-only overlay. Their province coordinates are
+  // projected by whichever renderer is active (Canvas2D or MapLibre).
+  useEffect(()=>{
+    const r=rendererRef.current,m=appStore.get().meta,snap=appStore.get().snap;
+    if(!r||!mapReady||!m||!snap)return;
+    const selected=snap.units.find(u=>u.id===appStore.get().selection.unitId)?.loc
+      ??appStore.get().selection.prov;
+    const ports=portsVisible?(m.maritime?.ports??[]).map(p=>{
+      const zone=m.maritime?.seaZones.find(z=>z.id===p.zoneId);
+      const c=snap.controller[p.province];
+      const country=c>=0?snap.countries[c]:undefined;
+      return {
+        id:p.id,province:p.province,capacity:p.capacity,selected:selected===p.province,
+        controlledByPlayer:c===snap.playerCountry,
+        label:'⚓ '+(st.lang==='ja'?m.provNameJa[p.province]:m.provNameEn[p.province])+
+          ' · '+(zone?(st.lang==='ja'?zone.nameJa:zone.nameEn):p.zoneId)+
+          ' · '+(country?(st.lang==='ja'?country.nameJa:country.nameEn):'–'),
+      };
+    }):[];
+    r.setPortOverlay(ports,prov=>{
+      appStore.set({selection:{prov,unitId:null,country:null},trace:null});
+      rendererRef.current?.focusProvince(prov);
+    });
+  },[mapReady,st.meta,st.snap,st.lang,st.selection.prov,st.selection.unitId,portsVisible]);
 
   // 重要アラートで自動一時停止（設定で無効化はMVPでは未対応・常時有効）
   const lastAlertLenRef = useRef(0);
@@ -684,6 +711,10 @@ export function GameScreen() {
         <div className="map-tools" aria-label={t(lang, 'map.controls')}>
           <button aria-label={t(lang, 'map.zoomIn')} data-testid="map-zoom-in" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(1.25)}>＋</button>
           <button aria-label={t(lang, 'map.zoomOut')} data-testid="map-zoom-out" disabled={!mapReady} onClick={() => rendererRef.current?.zoomBy(0.8)}>－</button>
+          <button type="button" data-testid="map-port-visibility" aria-pressed={portsVisible}
+            disabled={!meta.maritime?.ports.length} onClick={()=>setPortsVisible(v=>!v)}>
+            ⚓ {lang==='ja'?'港':'Ports'} ({meta.maritime?.ports.length??0})
+          </button>
           <select data-testid="front-visibility" aria-label={lang==='ja'?'戦線表示':'Front visibility'} value={frontVisibility} onChange={e=>setFrontVisibility(e.target.value as FrontVisibility)}><option value="all">{lang==='ja'?'全戦線':'All fronts'}</option><option value="selected">{lang==='ja'?'選択部隊の戦線':'Selected fronts'}</option><option value="off">{lang==='ja'?'戦線非表示':'Hide fronts'}</option></select>
           <button data-testid="map-reset" disabled={!mapReady} onClick={() => rendererRef.current?.resetView()}>{t(lang, 'map.reset')}</button>
           <button type="button" data-testid="map-box-select" aria-pressed={marqueeMode} disabled={!mapReady}
@@ -892,6 +923,8 @@ export function GameScreen() {
             </>}
           </section>
           <ContextPanel />
+          <PortDirectory meta={meta} snap={snap} lang={lang}
+            selectedProvince={selProv} onSelect={chooseProvince}/>
         </div>
         {search !== null && (
           <div className="search-results">
