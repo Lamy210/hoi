@@ -49,6 +49,8 @@ describe('師団募集・配備', () => {
     delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
     delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction; delete old.stores.modelStock; delete old.stores.issuedEquipment;
     old.header.v = 4;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete old.stores.garrisons; delete old.stores.counters.nextGarrisonId;
     old.header.integrity = hashWorld(e.world, true);
     delete old.stores.armies; delete old.stores.armyGroups;
     delete old.stores.counters.nextArmyId; delete old.stores.counters.nextArmyGroupId;
