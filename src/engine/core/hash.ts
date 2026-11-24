@@ -325,7 +325,11 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
     }
   }
   // v21 adds the defensive-area orders without changing historical hashes.
-  if(!legacy&&includeGarrisons){
+  if(!legacy&&includeGarrisons&&includePreparedness&&includeFrontlinePriority&&
+    includeIssuedEquipment&&includeModelStock&&includeModelProduction&&
+    includeProductionMode&&includeProductionPlans&&includeQueuedTraining&&
+    includeReinforcementPriority&&includeCustomTraining&&includeCustomTemplates&&
+    includeFormationCommanders&&includeFrontControl&&includeHierarchy){
     h=mixStr(h,'area-garrisons-v21');
     h=mixFloat(h,w.nextGarrisonId);
     for(const g of w.garrisons){
