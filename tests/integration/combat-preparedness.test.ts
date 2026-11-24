@@ -95,7 +95,7 @@ describe('live combat preparedness v20',()=>{
   });
 
   it('saves bounded levels, detects tampering, and preserves historical v19 integrity',async()=>{
-    expect(SAVE_SCHEMA_VERSION).toBe(20);
+    expect(SAVE_SCHEMA_VERSION).toBe(21);
     const {e,w,u}=await ready();
     u.entrenchment=MAX_ENTRENCHMENT;
     u.preparation=MAX_PREPARATION;
