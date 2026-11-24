@@ -48,6 +48,7 @@ jobs:
       - run: npx openspec validate frontline-reserve-rotation --strict
       - run: npx openspec validate bottom-army-group-command-dock --strict
       - run: npx openspec validate bottom-front-execution-controls --strict
+      - run: npx openspec validate designated-area-garrison-v21 --strict
       - run: npx openspec validate map-marquee-formation-selection --strict
       - run: npx openspec validate map-frontline-draft-objective --strict
       - run: npx openspec validate prewar-front-and-offensive-line --strict
