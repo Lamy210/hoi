@@ -22,7 +22,18 @@ export interface MapFrontOverlay {
   /** Peace-time or post-war orders are visible but never executable until explicitly resumed. */
   planned?: boolean;
 }
+/** Physical port, only when the selected pack declares a verified maritime catalog. */
+export interface MapPortMarker {
+  id:string;
+  province:number;
+  label:string;
+  capacity:number;
+  controlledByPlayer:boolean;
+  selected:boolean;
+}
 export interface MapRenderer {
+  /** Overlay is inert when the selected pack has no maritime catalog. */
+  setPortOverlay(ports:MapPortMarker[],onSelect:(province:number)=>void):void;
   setFrontOverlay(fronts: MapFrontOverlay[]): void;
   setUnitOverlay(markers: MapUnitMarker[], routes: number[][]): void;
   /** 準備完了まで待機（初回描画可能になったらresolve） */
