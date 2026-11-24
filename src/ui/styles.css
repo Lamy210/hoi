@@ -101,6 +101,16 @@ input, select {
 .army-dock-orders select {max-width:min(205px,30vw);}
 .army-dock-orders small {flex:1 0 100%;font-size:11px;}
 .army-command-dock button:disabled {opacity:.48;cursor:not-allowed;}
+.army-dock-garrison { border-top:1px solid #516982; padding:4px 0; font-size:12px; max-height:190px; overflow:auto; }
+.army-dock-garrison summary { cursor:pointer; font-weight:600; user-select:none; }
+.army-dock-garrison-controls { display:flex; flex-wrap:wrap; align-items:end; gap:6px; padding:7px 0; }
+.army-dock-garrison-controls label { display:grid; gap:3px; }
+.army-dock-garrison-controls select { max-width:min(260px,52vw); }
+.army-dock-garrison-controls small { flex:1 0 100%; }
+.army-dock-garrison-order { display:flex; align-items:center; flex-wrap:wrap; gap:6px; background:#203449; border:1px solid #49657e; border-radius:4px; padding:5px; margin-top:4px; }
+.army-dock-garrison-order span:first-child { flex:1 1 160px; }
+.army-command-dock:has(.army-dock-garrison[open]) { max-height:min(54vh,480px); overflow-y:auto; }
+
 @media(max-width:700px){
   .army-command-dock {padding:4px 6px;max-height:32vh;}
   .army-dock-orders {flex-wrap:nowrap;overflow-x:auto;}
