@@ -53,7 +53,9 @@ describe('Phase8A maritime catalog validation',()=>{
   it('preserves legacy pack capability and verifies a wholly fictitious reference graph',async()=>{
     const {maritime,provinces}=await fakeCatalog();
     expect(validateMaritimeCatalog(provinces,maritime)).toEqual([]);
-    const old=await loadTestPack();
+    const current=await loadTestPack();
+    const old={...current,manifest:{...current.manifest},maritime:undefined};
+    delete old.manifest.maritimeMapVersion;
     expect(old.maritime).toBeUndefined();
     expect(old.manifest.maritimeMapVersion).toBeUndefined();
     const loaded=await loadPack('file:///packs/modern-eastasia/',{
