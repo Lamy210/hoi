@@ -70,6 +70,8 @@ describe('v16 typed manufacturing history, not inventory',()=>{
     expect(blob.header.v).toBe(SAVE_SCHEMA_VERSION);
     const v15=decode(original) as any;
     v15.header.v=15;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete v15.stores.garrisons; delete v15.stores.counters.nextGarrisonId;
     delete v15.stores.modelProduction;delete v15.stores.modelStock;delete v15.stores.issuedEquipment;
     v15.header.integrity=hashWorld(w,false,true,true,true,true,true,true,true,true,true,false);
     v15.payloadChecksum=savePayloadChecksum(v15.header,v15.stores);

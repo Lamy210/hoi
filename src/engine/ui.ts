@@ -191,6 +191,7 @@ export interface UiSnapshot {
   combatFronts?:CombatFrontProjection[];
   occupation: { province: number; candidate: number; days: number }[];
   fronts: UiFront[];
+  garrisons: import('./military/garrisons').GarrisonOrder[];
   commanders: UiCommander[];
   techs: UiTechDef[];
   equipmentModels: import('./scenario/types').EquipmentModelDef[];
@@ -426,6 +427,7 @@ export function buildUiSnapshot(w: WorldState, sinceAlertId: number): UiSnapshot
     combatFronts:projectCombatFronts(w),
     occupation: w.occupancyTimer.flatMap((days, province) => days > 0 ? [{province, candidate: w.occupierCandidate[province], days}] : []),
     fronts,
+    garrisons:w.garrisons.map(g=>({...g,provinces:g.provinces.slice(),unitIds:g.unitIds.slice()})),
     commanders,
     techs: techs.map((t) => ({ id: t.id, cat: t.cat, req: t.req.slice(), days: t.days, year: t.year, nameJa: t.nameJa, nameEn: t.nameEn, mods: { ...t.mods } })),
     equipmentModels: equipmentModels().map(m => ({ ...m })),

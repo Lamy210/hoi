@@ -70,6 +70,8 @@ describe('persisted v14 production-line planning',()=>{
     expect(deserializeWorld(encode(tampered),pack).violations.length).toBeGreaterThan(0);
     // The pre-v14 payload hash excludes plans; restored state is migrated deterministically.
     const old=copy();old.header.v=13;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete old.stores.garrisons; delete old.stores.counters.nextGarrisonId;
     delete old.stores.productionLines;delete old.stores.counters.nextProductionLineId;delete old.stores.productionMode;delete old.stores.modelProduction; delete old.stores.modelStock; delete old.stores.issuedEquipment;
     const oldWorld=e.world;
     // Historical integrity hash uses the exact v13 gated fields.

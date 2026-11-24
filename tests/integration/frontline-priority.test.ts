@@ -86,7 +86,7 @@ describe('player-controlled frontline priority in the actual game',()=>{
   });
 
   it('v19優先度とセーブハッシュを往復・変更検知し旧v18ハッシュ互換を保つ',async()=>{
-    expect(SAVE_SCHEMA_VERSION).toBe(20);
+    expect(SAVE_SCHEMA_VERSION).toBe(21);
     const e=await createTestEngine(),w=e.world,c=w.playerCountry;
     const ids=w.units.filter(u=>u.owner===c).slice(0,2).map(u=>u.id);
     expect(ids).toHaveLength(2);
@@ -122,6 +122,8 @@ describe('player-controlled frontline priority in the actual game',()=>{
     const legacy=await createTestEngine();
     const old=decode(legacy.serialize()) as typeof save;
     old.header.v=18;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete old.stores.garrisons; delete (old.stores.counters as Record<string,unknown>).nextGarrisonId;
     old.header.integrity=hashWorld(legacy.world,false,
       true,true,true,true,true,true,true,true,true,true,true,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);

@@ -94,6 +94,8 @@ describe('custom division templates v10',()=>{
     delete old.stores.counters.nextCustomTemplateId;
     delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction; delete old.stores.modelStock; delete old.stores.issuedEquipment;
     old.header.v=9;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete old.stores.garrisons; delete old.stores.counters.nextGarrisonId;
     old.header.integrity=hashWorld(w,false,true,true,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);
     expect(e.loadFrom(encode(old)).ok).toBe(true);

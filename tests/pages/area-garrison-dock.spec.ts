@@ -1,0 +1,35 @@
+import {expect,test} from '@playwright/test';
+
+test('下部軍団指揮バーから地点指定防衛を作成し停止・再開・解除できる',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-KOR').click();
+  await page.getByTestId('btn-start').click();
+  await expect(page.getByTestId('army-command-dock')).toBeVisible();
+  await page.getByTestId('roster-mode-list').click();
+  const id=await page.locator('[data-unit-id]').first().getAttribute('data-unit-id');
+  expect(id).toBeTruthy();
+  await page.getByTestId('unit-roster-'+id).click();
+  await page.getByTestId('dock-garrison-toggle').click();
+  const select=page.getByTestId('dock-garrison-province');
+  const first=await select.locator('option').nth(1).getAttribute('value');
+  expect(first).not.toBeNull();
+  await select.selectOption(first!);
+  await page.getByTestId('dock-garrison-add-province').click();
+  await expect(page.getByTestId('dock-garrison-targets')).not.toContainText('地点未指定');
+  await expect(page.getByTestId('dock-garrison-create')).toBeEnabled();
+  await page.getByTestId('dock-garrison-create').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('dock-garrison-order-1')).toContainText('自動防衛中');
+  await expect(page.getByTestId('dock-garrison-order-1')).toContainText('1 師団');
+  await page.getByTestId('dock-garrison-pause-1').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('dock-garrison-order-1')).toContainText('停止中');
+  await page.getByTestId('dock-garrison-pause-1').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('dock-garrison-order-1')).toContainText('自動防衛中');
+  await page.getByTestId('dock-garrison-delete-1').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('dock-garrison-order-1')).toHaveCount(0);
+});

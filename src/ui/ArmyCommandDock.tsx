@@ -4,11 +4,14 @@ import {ARMY_COLORS,MAX_ARMIES,MAX_GROUPS,MAX_ARMY_UNITS,MAX_GROUP_ARMIES} from 
 import {formationUnits,type FormationScope} from '../engine/military/formationOverview';
 import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 import {engineClient} from './engineClient';
+import {MAX_GARRISON_TARGETS,MAX_GARRISON_UNITS} from '../engine/military/garrisons';
 
 type Props={
   snap:UiSnapshot;
   lang:'ja'|'en';
   selectedIds:readonly number[];
+  selectedProvince:number|null;
+  provinceNames:readonly string[];
   pending:number;
   focus:FormationScope|null;
   onFocus:(value:FormationScope|null)=>void;
@@ -22,7 +25,7 @@ type Props={
  * Unit assignment and the new formation are atomic in the same command.
  */
 export function ArmyCommandDock({
-  snap,lang,selectedIds,pending,focus,onFocus,onSelect,onDrawFront,onDrawObjective,
+  snap,lang,selectedIds,selectedProvince,provinceNames,pending,focus,onFocus,onSelect,onDrawFront,onDrawObjective,
 }:Props){
   const ja=lang==='ja',label=(j:string,e:string)=>ja?j:e,country=snap.playerCountry;
   const armies=snap.armies.filter(a=>a.owner===country).sort((a,b)=>a.id-b.id);
@@ -33,12 +36,22 @@ export function ArmyCommandDock({
   const [draftName,setDraftName]=useState('');
   const [deployFrontId,setDeployFrontId]=useState('');
   const [deployMode,setDeployMode]=useState<FrontDeploymentMode>('even');
+  const [garrisonTargets,setGarrisonTargets]=useState<number[]>([]);
+  const [garrisonProvince,setGarrisonProvince]=useState('');
   const fronts=snap.fronts.filter(f=>f.owner===country);
   const currentFront=fronts.find(f=>String(f.id)===deployFrontId)??fronts[0];
   const targetUnits=focus?formationUnits(snap,focus):selected;
   const deployable=targetUnits.length>0&&targetUnits.length<=256&&
     targetUnits.every(u=>!u.moving&&!u.inBattle&&!u.encircled&&!u.manualHold);
   const busy=pending!==0;
+  const ownGarrisons=snap.garrisons.filter(g=>g.owner===country);
+  const garrisonAssigned=new Set(ownGarrisons.flatMap(g=>g.unitIds));
+  const candidateGuardUnits=targetUnits.filter(u=>u.frontId<0&&!garrisonAssigned.has(u.id));
+  const canCreateGarrison=!busy&&garrisonTargets.length>0&&garrisonTargets.length<=MAX_GARRISON_TARGETS&&
+    targetUnits.length>0&&targetUnits.length<=MAX_GARRISON_UNITS&&candidateGuardUnits.length===targetUnits.length;
+  const selectedTarget=selectedProvince!==null&&snap.controller[selectedProvince]===country?selectedProvince:null;
+  const dropdownTarget=garrisonProvince!==''?Number(garrisonProvince):null;
+  const possibleTarget=dropdownTarget??selectedTarget;
   const atWar=!!currentFront&&snap.countries[country].atWar.includes(currentFront.enemy);
   const heldUnits=targetUnits.filter(u=>u.manualHold);
   const activeName=edit?(edit.kind==='army'?armies:groups).find(f=>f.id===edit.id)?.name:null;
@@ -65,6 +78,10 @@ export function ArmyCommandDock({
     if(!edit||busy||!draftName.trim()||draftName.trim()===activeName)return;
     engineClient.command('renameFormation',{kind:edit.kind,id:edit.id,name:draftName.trim()});
     setEdit(null);setDraftName('');
+  };
+  const addGarrisonTarget=()=>{
+    if(possibleTarget===null||snap.controller[possibleTarget]!==country||garrisonTargets.includes(possibleTarget)||garrisonTargets.length>=MAX_GARRISON_TARGETS)return;
+    setGarrisonTargets([...garrisonTargets,possibleTarget].sort((a,b)=>a-b));
   };
   const choose=(scope:FormationScope)=>{
     onFocus(scope);
@@ -165,5 +182,48 @@ export function ArmyCommandDock({
           ?label('停止中は攻勢を実行しません。開戦後に戦線を再開してください。','A paused front does not attack. Resume it after war starts.')
           :label('進軍方向を地図で指定してから攻勢開始。敵支配州に向けて戦線AIが毎週命令します。','Draw an offensive destination, then start the offensive. Front AI issues orders weekly.')}</small>
     </div>
+    <details className="army-dock-garrison" data-testid="dock-garrison-panel">
+      <summary data-testid="dock-garrison-toggle">{label('指定地点を防衛','Area defense')} ({ownGarrisons.length})</summary>
+      <div className="army-dock-garrison-controls">
+        <label>{label('防衛地点を指定','Guarded province')}
+          <select data-testid="dock-garrison-province" value={garrisonProvince}
+            onChange={e=>setGarrisonProvince(e.target.value)}>
+            <option value="">{label('州を選択','Choose province')}</option>
+            {snap.controller.map((owner,index)=>owner===country?<option key={index} value={index}>{provinceNames[index]}</option>:null)}
+          </select>
+        </label>
+        <button data-testid="dock-garrison-add-province" disabled={busy||possibleTarget===null||
+          snap.controller[possibleTarget]!==country||garrisonTargets.includes(possibleTarget)}
+          onClick={addGarrisonTarget}>{label('防衛地点に追加','Add target')}</button>
+        <span data-testid="dock-garrison-targets">{garrisonTargets.map(p=>provinceNames[p]).join(' · ')||label('地点未指定','No targets')}</span>
+        <button data-testid="dock-garrison-clear-targets" disabled={busy||!garrisonTargets.length}
+          onClick={()=>setGarrisonTargets([])}>{label('地点クリア','Clear')}</button>
+        <button data-testid="dock-garrison-create" disabled={!canCreateGarrison}
+          onClick={()=>{
+            if(!canCreateGarrison)return;
+            engineClient.command('createGarrison',{
+              provinces:garrisonTargets,unitIds:targetUnits.map(u=>u.id),
+            });
+            setGarrisonTargets([]);
+          }}>{label('選択部隊で駐屯作戦を作成','Create area defense')} ({targetUnits.length})</button>
+        <small className="muted">{label('地図で選択した州を優先して追加します。軍団・軍集団にフォーカス中はその所属師団、そうでなければ選択師団が対象です。戦線と駐屯の二重割当はできません。',
+          'Map-selected province takes precedence. Uses focused formation or selected divisions. A division cannot serve a frontline and garrison simultaneously.')}</small>
+      </div>
+      {ownGarrisons.map(g=><div key={g.id} className="army-dock-garrison-order"
+        data-testid={'dock-garrison-order-'+g.id}>
+        <span><strong>#{g.id}</strong> {g.provinces.map(p=>provinceNames[p]).join(' · ')}</span>
+        <span>{g.unitIds.length} {label('師団','divisions')} · {g.paused?label('停止中','Paused'):label('自動防衛中','Active')}</span>
+        <button data-testid={'dock-garrison-select-'+g.id}
+          onClick={()=>onSelect(g.unitIds)}>{label('師団選択','Select units')}</button>
+        <button data-testid={'dock-garrison-pause-'+g.id} disabled={busy}
+          onClick={()=>engineClient.command('setGarrisonPaused',{
+            orderId:g.id,expectedRevision:g.revision,paused:!g.paused,
+          })}>{g.paused?label('再開','Resume'):label('停止','Pause')}</button>
+        <button data-testid={'dock-garrison-delete-'+g.id} disabled={busy}
+          onClick={()=>engineClient.command('deleteGarrison',{
+            orderId:g.id,expectedRevision:g.revision,
+          })}>{label('解除','Remove')}</button>
+      </div>)}
+    </details>
   </section>;
 }

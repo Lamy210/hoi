@@ -30,7 +30,7 @@ function hashUnit(h: number, u: Unit): number {
   return h;
 }
 
-export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true, includeIssuedEquipment = true, includeFrontlinePriority = true, includePreparedness = true): number {
+export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true, includeFrontControl = true, includeFormationCommanders = true, includeCustomTemplates = true, includeCustomTraining = true, includeReinforcementPriority = true, includeQueuedTraining = true, includeProductionPlans = true, includeProductionMode = true, includeModelProduction = true, includeModelStock = true, includeIssuedEquipment = true, includeFrontlinePriority = true, includePreparedness = true, includeGarrisons = true): number {
   let h = 0x811c9dc5;
   h = mixInt(h, w.seed);
   h = mixInt(h, w.difficulty);
@@ -322,6 +322,23 @@ export function hashWorld(w: WorldState, legacy = false, includeHierarchy = true
     for(const u of w.units){
       h=mixInt(h,u.entrenchment??0);
       h=mixInt(h,u.preparation??0);
+    }
+  }
+  // v21 adds the defensive-area orders without changing historical hashes.
+  if(!legacy&&includeGarrisons&&includePreparedness&&includeFrontlinePriority&&
+    includeIssuedEquipment&&includeModelStock&&includeModelProduction&&
+    includeProductionMode&&includeProductionPlans&&includeQueuedTraining&&
+    includeReinforcementPriority&&includeCustomTraining&&includeCustomTemplates&&
+    includeFormationCommanders&&includeFrontControl&&includeHierarchy){
+    h=mixStr(h,'area-garrisons-v21');
+    h=mixFloat(h,w.nextGarrisonId);
+    for(const g of w.garrisons){
+      h=mixFloat(h,g.id); h=mixInt(h,g.owner);
+      h=mixBool(h,g.paused); h=mixFloat(h,g.revision);
+      h=mixInt(h,g.provinces.length);
+      for(const p of g.provinces)h=mixInt(h,p);
+      h=mixInt(h,g.unitIds.length);
+      for(const id of g.unitIds)h=mixFloat(h,id);
     }
   }
   return h >>> 0;

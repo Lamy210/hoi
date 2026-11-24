@@ -1,0 +1,12 @@
+# Tasks
+- [x] v21 GarrisonOrderとカウンタ、世界ハッシュへ追加
+- [x] 作成・停止・解除・AI移動の検証付きコマンド
+- [x] 週次の合法経路への駐屯自動展開
+- [x] 最後の守備隊を保護し手動固定/戦闘中の師団を尊重
+- [x] 既存戦線割当・自動配置との二重任務禁止
+- [x] 下部ドックで選択州の複数指定と作戦管理
+- [x] v21セーブ/ロード参照検証・v20互換
+- [x] 実戦ゲーム統合テスト・Playwright
+- [x] OpenSpec strictのCI登録
+- [ ] TypeScript/Vitest/Build/Playwright/OpenSpecが全成功
+- [ ] レビュー後Squashマージ

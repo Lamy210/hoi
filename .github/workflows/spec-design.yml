@@ -44,6 +44,7 @@ jobs:
       - run: npx openspec validate frontline-reserve-rotation --strict
       - run: npx openspec validate bottom-army-group-command-dock --strict
       - run: npx openspec validate bottom-front-execution-controls --strict
+      - run: npx openspec validate designated-area-garrison-v21 --strict
       - run: npx openspec validate phase8-maritime-map --strict
       - run: npx openspec validate phase8-naval-fleets --strict
       - run: npx openspec validate phase8-amphibious-transport --strict

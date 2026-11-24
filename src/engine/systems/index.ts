@@ -5,6 +5,7 @@ import { registerTrainingSystem } from './training';
 import { registerProductionSystem } from './production';
 import { registerAISystem } from '../ai/ai';
 import { registerFrontSystem } from './fronts';
+import { registerGarrisonSystem } from './garrisons';
 import { registerCommanderGrowthSystem } from '../military/commanders';
 import { registerEconomySystems } from './economy';
 import { registerPopulationSystem } from './population';
@@ -27,6 +28,7 @@ export function registerAllSystems(): void {
   registerTrainingSystem();
   // 日次+週内分散: 戦線AI（プレイヤー戦線とAI戦線に同一ロジック）
   registerFrontSystem();
+  registerGarrisonSystem();
   // phase3: 経済・人口・政治・研究・建設・スコア
   registerEconomySystems();
   registerPopulationSystem();

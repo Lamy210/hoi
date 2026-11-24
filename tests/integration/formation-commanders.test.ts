@@ -84,7 +84,9 @@ describe('exclusive formation commanders',()=>{
     const old=decode(e.serialize()) as any;
     delete old.stores.customTemplates; delete old.stores.counters.nextCustomTemplateId;
     delete old.stores.productionLines; delete old.stores.counters.nextProductionLineId; delete old.stores.productionMode; delete old.stores.modelProduction; delete old.stores.modelStock; delete old.stores.issuedEquipment;
-    old.header.v=8;old.header.integrity=hashWorld(w,false,true,true,false);
+    old.header.v=8;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete old.stores.garrisons; delete old.stores.counters.nextGarrisonId;old.header.integrity=hashWorld(w,false,true,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);
     expect(e.loadFrom(encode(old)).ok).toBe(true);
     expect(e.world.units.find(x=>x.id===u.id)?.commanderId).toBe(cmdr.id);

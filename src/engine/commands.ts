@@ -13,6 +13,7 @@ import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } fro
 import { autoAssignCommander, releaseCommander } from './military/commanders';
 import { AUTO_ATTACK_MIN_ORG, COUNTERATTACK_MIN_ORG, autoFrontProvinces, frontOf } from './military/fronts';
 import { planFrontDeployment } from './military/frontDeployment';
+import {validateGarrisonCreation} from './military/garrisons';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
 import { MAX_ART_SHARE } from './systems/production';
@@ -490,6 +491,7 @@ export function registerAllCommands(): void {
         if (!Array.isArray(ids) || ids.length === 0 || ids.length > 256 ||
           new Set(ids).size !== ids.length || ids.some(id => !Number.isSafeInteger(id))) return 'badParams';
         if (ids.some(id => !w.units.some(u => u.id === id && u.owner === country && !u.destroyed))) return 'notYourUnit';
+        if (ids.some(id=>w.garrisons.some(g=>g.unitIds.includes(id))))return 'unitAlreadyAssigned';
       }
       const cap = p.cap as number | undefined;
       if (cap !== undefined && (!Number.isInteger(cap) || cap < 1 || cap > 8)) return 'badParams';
@@ -586,6 +588,7 @@ export function registerAllCommands(): void {
       if(!w.countries.alive[f.enemy])return 'badTarget';
       if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';
       for(const id of ids)if(!w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))return 'notYourUnit';
+      if(ids.some(id=>w.garrisons.some(g=>g.unitIds.includes(id))))return 'unitAlreadyAssigned';
       return null;
     },
     apply(w,p){
@@ -669,6 +672,77 @@ export function registerAllCommands(): void {
       return null;
     },
     apply(w,p){const f=frontOf(w,p.frontId as number)!,u=w.units.find(x=>x.id===p.unitId)!;const target=p.target as number;u.path=w.prov.controller[target]===f.enemy?[u.loc,target]:findPath(w,u.loc,target,f.owner,false)!;u.segIdx=0;u.segProgress=0;u.segDays=segmentDays(w,u.path[0],u.path[1],u);},
+  });
+
+  // Area garrisons guard owned locations and must never share control with
+  // combat fronts. Unit assignments and creation happen in one atomic command.
+  registerCommand('createGarrison', {
+    validate(w,p,issuer){
+      const owner=actorCountry(w,issuer);
+      if(owner===null||issuer==='frontai')return 'badIssuer';
+      return validateGarrisonCreation(w,owner,p.provinces,p.unitIds);
+    },
+    apply(w,p,issuer){
+      const owner=actorCountry(w,issuer)!;
+      w.garrisons.push({
+        id:w.nextGarrisonId++,owner,
+        provinces:(p.provinces as number[]).slice().sort((a,b)=>a-b),
+        unitIds:(p.unitIds as number[]).slice().sort((a,b)=>a-b),
+        paused:false,revision:1,
+      });
+    },
+  });
+  registerCommand('setGarrisonPaused', {
+    validate(w,p,issuer){
+      const owner=actorCountry(w,issuer),g=w.garrisons.find(g=>g.id===p.orderId);
+      if(!g)return 'noGarrison';
+      if(issuer==='frontai'||owner!==g.owner)return 'notYourGarrison';
+      if(typeof p.paused!=='boolean')return 'badParams';
+      if(p.expectedRevision!==g.revision)return 'staleGarrisonOrder';
+      if(g.revision>=Number.MAX_SAFE_INTEGER)return 'limitExceeded';
+      return null;
+    },
+    apply(w,p){
+      const g=w.garrisons.find(g=>g.id===p.orderId)!;
+      g.paused=p.paused as boolean;
+      g.revision++;
+    },
+  });
+  registerCommand('deleteGarrison', {
+    validate(w,p,issuer){
+      const owner=actorCountry(w,issuer),g=w.garrisons.find(g=>g.id===p.orderId);
+      if(!g)return 'noGarrison';
+      if(issuer==='frontai'||owner!==g.owner)return 'notYourGarrison';
+      return p.expectedRevision===g.revision?null:'staleGarrisonOrder';
+    },
+    apply(w,p){
+      w.garrisons=w.garrisons.filter(g=>g.id!==p.orderId);
+    },
+  });
+  registerCommand('garrisonMove', {
+    validate(w,p,issuer){
+      const g=w.garrisons.find(g=>g.id===p.orderId),c=actorCountry(w,issuer);
+      if(issuer==='player'||!g||g.paused||g.revision!==p.revision||
+        c!==g.owner)return 'staleGarrisonOrder';
+      const u=w.units.find(u=>u.id===p.unitId&&!u.destroyed);
+      if(!u||u.owner!==g.owner||!g.unitIds.includes(u.id)||u.frontId>=0||
+        u.manualHold||u.encircled||u.path.length||
+        w.runtime.activeBattles.has(u.loc)||w.prov.controller[u.loc]!==g.owner)
+        return 'staleGarrisonOrder';
+      const target=p.target as number;
+      if(!Number.isSafeInteger(target)||!g.provinces.includes(target)||
+        w.prov.controller[target]!==g.owner||target===u.loc)return 'staleGarrisonOrder';
+      const route=findPath(w,u.loc,target,g.owner,false);
+      if(!route||route.length<2)return 'noPath';
+      return null;
+    },
+    apply(w,p){
+      const g=w.garrisons.find(g=>g.id===p.orderId)!;
+      const u=w.units.find(u=>u.id===p.unitId)!;
+      const route=findPath(w,u.loc,p.target as number,g.owner,false)!;
+      u.path=route;u.segIdx=0;u.segProgress=0;
+      u.segDays=segmentDays(w,route[0],route[1],u);
+    },
   });
 
   registerCommand('setTaxRate', {
