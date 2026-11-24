@@ -16,10 +16,13 @@ test('東アジアシナリオの7港を地図・港湾一覧から選択でき�
   await expect(page.locator('[data-port-id]')).toHaveCount(0);
   await page.getByTestId('map-port-visibility').click();
   await expect(page.locator('[data-port-id]')).toHaveCount(7);
-  await page.getByTestId('port-directory').locator('summary').click();
+  await page.getByTestId('port-directory').locator('summary').first().click();
   const busan=page.getByTestId('port-directory-port-busan');
   await expect(busan).toContainText('釜山');
   await expect(busan).toContainText('110');
+  await page.getByTestId('naval-model-directory').locator('summary').click();
+  await expect(page.getByTestId('naval-model-convoy-basic')).toContainText('汎用輸送船');
+  await expect(page.getByTestId('naval-model-escort-basic')).toContainText('護衛艦');
   await busan.click();
   await expect(page.getByTestId('province-panel')).toContainText('釜山');
   await expect(page.getByTestId('port-marker-port-busan')).toHaveAttribute('aria-pressed','true');

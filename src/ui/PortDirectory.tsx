@@ -37,5 +37,17 @@ export function PortDirectory({meta,snap,lang,selectedProvince,onSelect}:Props){
         </button>;
       })}
     </div>
+    {meta.navalModels&&<details data-testid="naval-model-directory" className="naval-model-directory">
+      <summary>{label('艦種モデル（建造未実装）','Naval models (construction unavailable)')} ({meta.navalModels.length})</summary>
+      <p className="muted">{label('以下はゲーム内の抽象的な仮パラメータです。造船・艦隊編成・航行・上陸はまだ操作できません。',
+        'These are abstract game parameters. Construction, fleet formation, navigation and landings are not yet available.')}</p>
+      {meta.navalModels.map(model=><div key={model.id} data-testid={'naval-model-'+model.id}
+        className="naval-model-entry">
+        <b>{ja?model.nameJa:model.nameEn}</b>
+        <span>{label('役割','Role')}: {model.role} · {label('輸送枠','Cargo slots')}: {model.transportCapacity}</span>
+        <span>{label('護衛','Escort')}: {model.escortPower} · {label('戦闘','Combat')}: {model.navalPower}</span>
+        <span>{label('産業コスト','Industry cost')}: {model.industryCost} · {label('乗員','Crew')}: {model.crew} · {label('建造日数','Build days')}: {model.buildDays}</span>
+      </div>)}
+    </details>}
   </details>;
 }
