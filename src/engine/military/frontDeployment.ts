@@ -51,6 +51,7 @@ export function planFrontDeployment(
   for(const id of [...selected].sort((a,b)=>a-b)){
     const unit=w.units.find(u=>u.id===id&&!u.destroyed);
     if(!unit||unit.owner!==country)return failure('notYourUnit');
+    if(w.garrisons.some(g=>g.unitIds.includes(unit.id)))return failure('unitAlreadyAssigned');
     // A deployment must not overwrite an explicit manual path or hold.
     if(unit.manualHold||unit.path.length||unit.encircled||w.runtime.activeBattles.has(unit.loc))return failure('unitBusy');
     units.push(unit);
