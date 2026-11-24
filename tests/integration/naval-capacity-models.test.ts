@@ -1,5 +1,7 @@
 import {describe,expect,it} from 'vitest';
 import {NAVAL_MODELS,navalModel,validateNavalModels} from '../../src/engine/naval/models';
+import {loadTestPack} from '../helpers';
+import {createEngine} from '../../src/engine/engine';
 import {calculateNavalTransportCapacity,type NavalShipAsset,
   type NavalCapacityReservation} from '../../src/engine/naval/transportCapacity';
 
@@ -13,6 +15,15 @@ const reservation=(id:number,shipIds:number[],requiredCapacity:number,
 });
 
 describe('Phase8B naval model catalog',()=>{
+  it('exposes models only as read-only metadata in maritime-capable scenarios',async()=>{
+    const pack=await loadTestPack();
+    const game=createEngine(pack,{seed:2026,playerCountryId:'KOR',difficulty:1});
+    const info=game.getUiMeta();
+    expect(info.navalModels?.length).toBe(4);
+    expect(info.navalModels?.find(m=>m.role==='transport')?.transportCapacity).toBe(20);
+    expect(game.getUiSnapshot(0)).not.toHaveProperty('navalShips');
+  });
+
   it('defines four internally consistent, immutable abstract models',()=>{
     expect(validateNavalModels(NAVAL_MODELS)).toEqual([]);
     expect(NAVAL_MODELS.map(m=>m.id)).toEqual([
