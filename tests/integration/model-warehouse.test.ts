@@ -90,7 +90,9 @@ describe('v17 model warehouse is a subset of the aggregate two-goods stock',()=>
       expect(hashWorld(restored.world),'tick '+w.tick).toBe(hashWorld(w));
     }
     const v16=decode(encoded) as any;
-    v16.header.v=16;delete v16.stores.modelStock;delete v16.stores.issuedEquipment;
+    v16.header.v=16;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete v16.stores.garrisons; delete v16.stores.counters.nextGarrisonId;delete v16.stores.modelStock;delete v16.stores.issuedEquipment;
     // The v16 fixture must not contain future-version unit readiness fields.
     for(const unit of v16.stores.units){
       delete unit.entrenchment;
