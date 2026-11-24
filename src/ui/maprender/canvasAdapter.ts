@@ -2,6 +2,7 @@
 // LOD 2段階: ズーム閾値で簡略化ジオメトリへ切替（プロヴィンスID集合は不変）。
 // ホバー/選択はポイント-in-ポリゴン（Path2D）で解決する。
 import { createUnitOverlay } from './unitOverlay';
+import {createPortOverlay} from './portOverlay';
 import type { MapDataSource, MapRenderer } from './types';
 import { TERRAIN_COLORS, terrainOf } from './terrainColors';
 import { mercatorY, fitMercator, zoomCamera } from './camera';
@@ -26,6 +27,7 @@ export function createCanvasRenderer(
   container.appendChild(canvas);
   const ctx = canvas.getContext('2d')!;
   const units = createUnitOverlay(container, p => toPixel(ds.provLabelX[p], ds.provLabelY[p]));
+  const ports = createPortOverlay(container, p => toPixel(ds.provLabelX[p], ds.provLabelY[p]));
 
   let features: FeatureRec[] = [];
   let featuresLod2: FeatureRec[] | null = null;
@@ -51,6 +53,7 @@ export function createCanvasRenderer(
     canvas.dataset.cameraY = String(camera.offsetY);
     canvas.dataset.lod = camera.scale / baseScale < 1.4 ? '2' : '1';
     units.refresh();
+    ports.refresh();
   }
 
   function fitBounds(): void {
@@ -304,6 +307,7 @@ export function createCanvasRenderer(
     whenReady: () => ready,
     setUnitOverlay: units.set,
     setFrontOverlay: units.setFronts,
+    setPortOverlay: ports.set,
     setColors(next: string[], dirty: Set<number>) {
       colors = next;
       if (dirty.size === 0) return;
@@ -339,6 +343,7 @@ export function createCanvasRenderer(
       disposed = true;
       resizeObserver.disconnect();
       units.dispose();
+      ports.dispose();
       canvas.remove();
     },
     setMode(m: 'political' | 'terrain' | 'supply', nextColors: string[]) {
