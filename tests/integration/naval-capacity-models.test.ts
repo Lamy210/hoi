@@ -37,7 +37,7 @@ describe('Phase8B naval model catalog',()=>{
   });
 
   it('rejects model duplication, invalid float/NaN, role mismatch and insufficient names',()=>{
-    const bad=structuredClone(NAVAL_MODELS);
+    const bad=NAVAL_MODELS.map(m=>({...m}));
     bad.push({...bad[0]});
     bad[0].industryCost=Number.NaN;
     bad[1].transportCapacity=100;
