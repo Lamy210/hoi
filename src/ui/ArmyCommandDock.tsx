@@ -51,7 +51,7 @@ export function ArmyCommandDock({
     targetUnits.length>0&&targetUnits.length<=MAX_GARRISON_UNITS&&candidateGuardUnits.length===targetUnits.length;
   const selectedTarget=selectedProvince!==null&&snap.controller[selectedProvince]===country?selectedProvince:null;
   const dropdownTarget=garrisonProvince!==''?Number(garrisonProvince):null;
-  const possibleTarget=selectedTarget??dropdownTarget;
+  const possibleTarget=dropdownTarget??selectedTarget;
   const atWar=!!currentFront&&snap.countries[country].atWar.includes(currentFront.enemy);
   const heldUnits=targetUnits.filter(u=>u.manualHold);
   const activeName=edit?(edit.kind==='army'?armies:groups).find(f=>f.id===edit.id)?.name:null;
