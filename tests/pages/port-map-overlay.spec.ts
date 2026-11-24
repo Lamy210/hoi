@@ -2,17 +2,27 @@ import {expect,test} from '@playwright/test';
 import fs from 'node:fs';
 import ts from 'typescript';
 
-test('旧シナリオに港を捏造せず、港表示切替は無効',async({page})=>{
+test('東アジアシナリオの7港を地図・港湾一覧から選択でき、表示切替も働く',async({page})=>{
   await page.goto('/hoi/');
   await page.getByTestId('btn-new-game').click();
   await page.getByTestId('btn-to-country').click();
   await page.getByTestId('country-KOR').click();
   await page.getByTestId('btn-start').click();
   await expect(page.getByTestId('map')).toBeVisible();
-  await expect(page.getByTestId('map-port-visibility')).toBeDisabled();
-  await expect(page.getByTestId('map-port-visibility')).toContainText('(0)');
-  await expect(page.getByTestId('port-directory')).toHaveCount(0);
+  await expect(page.getByTestId('map-port-visibility')).toBeEnabled();
+  await expect(page.getByTestId('map-port-visibility')).toContainText('(7)');
+  await expect(page.locator('[data-port-id]')).toHaveCount(7);
+  await page.getByTestId('map-port-visibility').click();
   await expect(page.locator('[data-port-id]')).toHaveCount(0);
+  await page.getByTestId('map-port-visibility').click();
+  await expect(page.locator('[data-port-id]')).toHaveCount(7);
+  await page.getByTestId('port-directory').locator('summary').click();
+  const busan=page.getByTestId('port-directory-port-busan');
+  await expect(busan).toContainText('釜山');
+  await expect(busan).toContainText('110');
+  await busan.click();
+  await expect(page.getByTestId('province-panel')).toContainText('釜山');
+  await expect(page.getByTestId('port-marker-port-busan')).toHaveAttribute('aria-pressed','true');
 });
 
 test('港マーカーは投影位置と選択を保持し、廃止された港だけを削除する',async({page})=>{

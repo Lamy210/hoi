@@ -419,8 +419,8 @@ input, select {
 .front-plan.prewar .front-label { fill:#a4dcff; }
 
 /* Phase8A port catalog: province-anchored map symbols, not sea transport orders. */
-.port-overlay {position:absolute;inset:0;z-index:3;overflow:hidden;pointer-events:none;}
-.port-marker {position:absolute;transform:translate(-25%,-120%);pointer-events:auto;
+.port-overlay {position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none;} /* Units z=2 must remain clickable. */
+.port-marker {position:absolute;transform:translate(10px,-130%);pointer-events:auto;
   background:#17354d;color:#eff8fc;border:2px solid #94c8e6;border-radius:6px;
   padding:1px 4px;font:bold 16px sans-serif;line-height:23px;min-width:29px;min-height:29px;
   box-shadow:0 1px 4px #08111bdd;cursor:pointer;}

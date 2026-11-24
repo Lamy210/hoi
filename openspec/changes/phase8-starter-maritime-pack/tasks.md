@@ -1,0 +1,12 @@
+# Tasks
+- [x] 公的な港湾主体の資料から実港が存在する行政州を7件収集
+- [x] 7港・4海域・5ルートをパックへ登録（容量はゲーム用仮値）
+- [x] manifest capability/pack version更新
+- [x] SHA-256検証用チェックサム追加
+- [x] file://オフライン読み込みへのカタログ同梱
+- [x] 旧maritimeなしテストをlegacy fixtureに切り離す
+- [x] 現行パックで表示/切替/選択をPlaywright検証
+- [x] 港の所在出典・未検証部分・仮値を文書化
+- [x] strict OpenSpecをCIへ追加
+- [ ] CI全成功
+- [ ] レビュー・Squashマージ

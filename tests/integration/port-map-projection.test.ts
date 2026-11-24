@@ -24,7 +24,9 @@ async function fixture(){
 }
 describe('maritime map UI projection',()=>{
   it('never invents ports on a legacy coastal-only pack',async()=>{
-    const pack=await loadTestPack();
+    const current=await loadTestPack();
+    const pack={...current,maritime:undefined,manifest:{...current.manifest}};
+    delete pack.manifest.maritimeMapVersion;
     const projection=projectMaritimeCatalog(pack);
     expect(projection).toBeUndefined();
     const game=createEngine(pack,{seed:2026,playerCountryId:'KOR',difficulty:1});
