@@ -23,6 +23,8 @@ export interface UiMaritimeCatalog {
   routes:{id:string;a:string;b:string;cost:number;gateId?:string}[];
 }
 
+const compareId=(a:string,b:string):number=>a<b?-1:a>b?1:0;
+
 export function projectMaritimeCatalog(pack:Pack):UiMaritimeCatalog|undefined {
   const maritime=pack.maritime;
   if(!maritime)return undefined;
@@ -33,16 +35,16 @@ export function projectMaritimeCatalog(pack:Pack):UiMaritimeCatalog|undefined {
     return {id:p.id,province,provinceId:p.provinceId,
       zoneId:p.zoneId,capacity:p.capacity,
       repairSlots:p.repairSlots,dockyardSlots:p.dockyardSlots};
-  }).sort((a,b)=>a.province-b.province||a.id.localeCompare(b.id));
+  }).sort((a,b)=>a.province-b.province||compareId(a.id,b.id));
   return {
     ports,
     seaZones:maritime.seaZones.map(z=>({
       id:z.id,nameJa:z.nameJa,nameEn:z.nameEn,
       neighbors:z.neighbors.slice().sort(),
-    })).sort((a,b)=>a.id.localeCompare(b.id)),
+    })).sort((a,b)=>compareId(a.id,b.id)),
     routes:maritime.navEdges.map(e=>({
       id:e.id,a:e.a,b:e.b,cost:e.cost,
       ...(e.gateId?{gateId:e.gateId}:{}),
-    })).sort((a,b)=>a.id.localeCompare(b.id)),
+    })).sort((a,b)=>compareId(a.id,b.id)),
   };
 }
