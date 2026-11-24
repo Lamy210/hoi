@@ -256,6 +256,8 @@ export interface WorldState {
   customTemplates: import('../military/customTemplates').CustomTemplateRevision[];
   nextCustomTemplateId: number;
   fronts: Front[];
+  /** v21: Persistent designated-area defense operations. */
+  garrisons: import('../military/garrisons').GarrisonOrder[];
   commanders: Commander[];
   productionShare: number[]; // 国ごとの火砲配分率 0..0.5
   /** Phase6A planning-only: legacy productionShare still drives actual stock. */
@@ -312,6 +314,7 @@ export interface WorldState {
   nextWarId: number;
   nextAlertId: number;
   nextFrontId: number;
+  nextGarrisonId: number;
   nextCommanderId: number;
   nextConstructionId: number;
   nextTreatyId: number;
