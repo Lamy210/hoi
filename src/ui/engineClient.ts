@@ -38,7 +38,7 @@ async function fetchJsonStatic<T>(url: string): Promise<T> {
 
 async function loadPackViaImport(): Promise<Pack> {
   // file://モード: バンドルへ静的取り込み（動的importでコード分割）
-  const [manifest, provinces, countries, edges, meta, sources, events, techs, equipmentModels] = await Promise.all([
+  const [manifest, provinces, countries, edges, meta, sources, events, techs, equipmentModels, seaZones, ports, navEdges, seaGates] = await Promise.all([
     import('../../public/packs/modern-eastasia/manifest.json'),
     import('../../public/packs/modern-eastasia/provinces.json'),
     import('../../public/packs/modern-eastasia/countries.json'),
@@ -48,6 +48,10 @@ async function loadPackViaImport(): Promise<Pack> {
     import('../../public/packs/modern-eastasia/events.json'),
     import('../../public/packs/modern-eastasia/techs.json'),
     import('../../public/packs/modern-eastasia/equipment-models.json'),
+    import('../../public/packs/modern-eastasia/sea-zones.json'),
+    import('../../public/packs/modern-eastasia/ports.json'),
+    import('../../public/packs/modern-eastasia/nav-edges.json'),
+    import('../../public/packs/modern-eastasia/sea-gates.json'),
   ]);
   return {
     baseUrl: PACK_BASE,
@@ -61,6 +65,12 @@ async function loadPackViaImport(): Promise<Pack> {
     events: events.default as unknown as Pack['events'],
     techs: techs.default as unknown as Pack['techs'],
     equipmentModels: equipmentModels.default as unknown as Pack['equipmentModels'],
+    maritime:{
+      seaZones:seaZones.default as unknown as NonNullable<Pack['maritime']>['seaZones'],
+      ports:ports.default as unknown as NonNullable<Pack['maritime']>['ports'],
+      navEdges:navEdges.default as unknown as NonNullable<Pack['maritime']>['navEdges'],
+      gates:seaGates.default as unknown as NonNullable<Pack['maritime']>['gates'],
+    },
   };
 }
 
