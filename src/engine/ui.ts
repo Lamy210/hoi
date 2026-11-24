@@ -14,6 +14,7 @@ import { warScoreFor } from './military/war';
 import { unitComposition,unitCombatWidth,unitOrgCap,unitSupplyDemand,unitSpeedMultiplier } from './military/unitComposition';
 import {projectCombatFronts,provinceCombatCapacity,type CombatFrontProjection} from './military/combatFrontProjection';
 import {operationalFrontProvinces} from './military/fronts';
+import {projectMaritimeCatalog,type UiMaritimeCatalog} from './naval/portProjection';
 import type { Alert } from './core/state';
 
 export interface UiCountry {
@@ -203,6 +204,8 @@ export interface UiSnapshot {
 }
 
 export interface UiMeta {
+  /** Static, optional maritime data. Controller is always read from UiSnapshot. */
+  maritime?:UiMaritimeCatalog;
   packId: string;
   packNameEn: string;
   packNameJa: string;
@@ -223,6 +226,7 @@ export interface UiMeta {
 
 export function buildUiMeta(w: WorldState, pack: import('./scenario/types').Pack): UiMeta {
   return {
+    ...(pack.maritime?{maritime:projectMaritimeCatalog(pack)}:{}),
     packId: pack.manifest.id,
     packNameEn: pack.manifest.nameEn,
     packNameJa: pack.manifest.nameJa,
