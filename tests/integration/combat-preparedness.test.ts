@@ -115,6 +115,8 @@ describe('live combat preparedness v20',()=>{
     }
     const legacy=decode(bytes) as any;
     legacy.header.v=19;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete legacy.stores.garrisons; delete legacy.stores.counters.nextGarrisonId;
     for(const unit of legacy.stores.units){
       delete unit.entrenchment;
       delete unit.preparation;
