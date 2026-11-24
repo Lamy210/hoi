@@ -122,6 +122,8 @@ describe('player-controlled frontline priority in the actual game',()=>{
     const legacy=await createTestEngine();
     const old=decode(legacy.serialize()) as typeof save;
     old.header.v=18;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete old.stores.garrisons; delete old.stores.counters.nextGarrisonId;
     old.header.integrity=hashWorld(legacy.world,false,
       true,true,true,true,true,true,true,true,true,true,true,true,false);
     old.payloadChecksum=savePayloadChecksum(old.header,old.stores);
