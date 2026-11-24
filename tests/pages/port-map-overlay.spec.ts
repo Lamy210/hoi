@@ -1,4 +1,6 @@
 import {expect,test} from '@playwright/test';
+import fs from 'node:fs';
+import ts from 'typescript';
 
 test('旧シナリオに港を捏造せず、港表示切替は無効',async({page})=>{
   await page.goto('/hoi/');
@@ -15,9 +17,23 @@ test('旧シナリオに港を捏造せず、港表示切替は無効',async({pa
 
 test('港マーカーは投影位置と選択を保持し、廃止された港だけを削除する',async({page})=>{
   await page.goto('/hoi/');
-  await page.evaluate(async()=>{
-    const path='/src/ui/maprender/portOverlay.ts';
-    const {createPortOverlay}=await import(/* @vite-ignore */ path);
+  // E2E runs against Vite preview (built output): raw /src TS modules
+  // cannot be imported there. Compile the *real production source* in the
+  // test process and exercise its DOM API in the browser instead.
+  const source=fs.readFileSync('src/ui/maprender/portOverlay.ts','utf8')
+    .replace(/^import type .*;\s*$/gm,'')
+    .replace('export function createPortOverlay(','function createPortOverlay(');
+  const browserJs=ts.transpileModule(source,{
+    compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.None},
+  }).outputText;
+  await page.addScriptTag({content:browserJs+'\nwindow.__testCreatePortOverlay=createPortOverlay;'});
+  await page.evaluate(()=>{
+    const createPortOverlay=(window as typeof window&{
+      __testCreatePortOverlay:(container:HTMLElement,project:(p:number)=>[number,number])=>{
+        set:(markers:any[],cb:(province:number)=>void)=>void;
+        dispose:()=>void;
+      }
+    }).__testCreatePortOverlay;
     const container=document.createElement('div');
     container.dataset.testid='synthetic-port-container';
     container.style.cssText='position:fixed;left:10px;top:120px;width:400px;height:280px;background:#233044;z-index:99999';
