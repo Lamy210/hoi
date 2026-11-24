@@ -2,8 +2,9 @@
 // manifest/スキーマ/参照整合/checksumを検証し、違反は全件収集して拒否する。
 
 import { fnv1a32 } from '../core/rng';
+import {validateMaritimeCatalog} from '../naval/maritimeCatalog';
 import { TERRAIN } from '../core/state';
-import type { EventDef, Pack, PackChecksums, PackCountry, PackEdge, PackManifest, PackProvince, PackSources, TechDef, EquipmentModelDef } from './types';
+import type { EventDef, Pack, PackChecksums, PackCountry, PackEdge, PackManifest, PackProvince, PackSources, TechDef, EquipmentModelDef, MaritimeCatalog, PackSeaZone, PackPort, PackNavEdge, PackMaritimeGate } from './types';
 
 export class PackValidationError extends Error {
   violations: string[];
@@ -78,7 +79,8 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
   const verify = opts.verifyChecksums !== false && cryptoAvailable;
   const required = ['manifest.json', 'provinces.json', 'countries.json', 'adjacency.json',
     'meta.json', 'SOURCES.json', 'geometry-lod1.json', 'geometry-lod2.json', 'decoration.json'];
-  const optional = ['events.json', 'techs.json', 'equipment-models.json'];
+  const maritimeFiles=['sea-zones.json','ports.json','nav-edges.json','sea-gates.json'] as const;
+  const optional = ['events.json', 'techs.json', 'equipment-models.json',...maritimeFiles];
   let sums: PackChecksums = {};
   const payloads = new Map<string, string>();
   if (verify) {
@@ -137,6 +139,30 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
   const events = await readOptional<EventDef>('events.json');
   const techs = await readOptional<TechDef>('techs.json');
   const equipmentModels = await readOptional<EquipmentModelDef>('equipment-models.json');
+  // Maritime data is opt-in and all-or-nothing. Never infer a port from a
+  // generic coastal flag, and never silently enable naval moves for legacy packs.
+  let maritime:MaritimeCatalog|undefined;
+  if(manifest.maritimeMapVersion!==undefined){
+    if(manifest.maritimeMapVersion!==1)
+      violations.push('unsupported maritime map version: '+manifest.maritimeMapVersion);
+    if(verify)for(const asset of maritimeFiles)
+      if(!Object.hasOwn(sums,asset))violations.push('missing maritime checksum: '+asset);
+    if(manifest.maritimeMapVersion===1&&!violations.length){
+      try{
+        maritime={
+          seaZones:await read<PackSeaZone[]>('sea-zones.json'),
+          ports:await read<PackPort[]>('ports.json'),
+          navEdges:await read<PackNavEdge[]>('nav-edges.json'),
+          gates:await read<PackMaritimeGate[]>('sea-gates.json'),
+        };
+        violations.push(...validateMaritimeCatalog(provinces,maritime));
+      }catch(error){
+        violations.push('maritime catalog loading failed: '+String(error));
+      }
+    }
+  }else if(verify&&maritimeFiles.some(asset=>Object.hasOwn(sums,asset))){
+    violations.push('maritime assets require a manifest capability');
+  }
 
   if (![provinces, countries, edges, events, techs, equipmentModels].every(Array.isArray)) {
     throw new PackValidationError(['invalid pack array structure']);
@@ -270,6 +296,7 @@ export async function loadPack(baseUrl: string, opts: LoadPackOptions = {}): Pro
   if (violations.length > 0) throw new PackValidationError(violations);
 
   return { baseUrl: base, manifest, provinces, countries, edges, relations: meta.relations, viewBbox: meta.viewBbox, sources, events, techs, equipmentModels,
+    ...(maritime?{maritime}:{}),
     ...(verify ? { verifiedChecksums: sums } : {}) };
 }
 
@@ -279,6 +306,7 @@ export function packFingerprint(pack: Pack): string {
   h = fnv1a32(h + pack.manifest.id + pack.manifest.version);
   h = fnv1a32(h + String(pack.provinces.length) + String(pack.countries.length) + String(pack.edges.length));
   for (const p of pack.provinces) h = fnv1a32(h + p.id + p.owner + p.terrain + String(p.infra) + String(p.population));
+  if(pack.maritime)h=fnv1a32(h+String(pack.manifest.maritimeMapVersion)+JSON.stringify(pack.maritime));
   return (h >>> 0).toString(16);
 }
 

@@ -8,6 +8,8 @@ export interface PackManifest {
   engineCompat: string;
   epoch: [number, number, number];
   daysPerMonth: number;
+  /** Phase8A: set only if all four maritime catalog assets are present. */
+  maritimeMapVersion?: 1;
   descriptionEn: string;
   descriptionJa: string;
 }
@@ -45,6 +47,43 @@ export interface PackEdge {
   b: string;
   km: number;
   strait: boolean;
+}
+
+/** Phase8A maritime catalog. IDs are stable, independent of province indices.
+ * These are scenario abstractions, not geographic navigation instructions.
+ */
+export interface PackSeaZone {
+  id:string;
+  nameJa:string;
+  nameEn:string;
+  polygonRef:string;
+  neighbors:string[];
+}
+export interface PackPort {
+  id:string;
+  provinceId:string;
+  zoneId:string;
+  capacity:number;
+  repairSlots:number;
+  dockyardSlots:number;
+}
+export interface PackNavEdge {
+  id:string;
+  a:string;
+  b:string;
+  cost:number;
+  gateId?:string;
+}
+export interface PackMaritimeGate {
+  id:string;
+  landProvinceIds:string[];
+  seaEdgeIds:string[];
+}
+export interface MaritimeCatalog {
+  seaZones:PackSeaZone[];
+  ports:PackPort[];
+  navEdges:PackNavEdge[];
+  gates:PackMaritimeGate[];
 }
 
 export interface PackSources {
@@ -131,6 +170,7 @@ export interface EquipmentModelDef {
 export interface Pack {
   verifiedChecksums?: PackChecksums;
   equipmentModels?: EquipmentModelDef[]; // 検証時の固定マニフェスト（描画アセットの再取得にも使用）
+  maritime?:MaritimeCatalog;
   techs: TechDef[];
   events: EventDef[];
   baseUrl: string;
