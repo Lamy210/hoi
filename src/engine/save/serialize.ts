@@ -6,6 +6,7 @@ import { commandIssuerKey, validSequence, legacyWatermarks } from '../core/seque
 import { previewTemplate } from '../military/templateStats';
 import { validateCustomTemplates } from '../military/customTemplates';
 import { validateHierarchy } from '../military/armies';
+import { validateGarrisons } from '../military/garrisons';
 import { legacyProductionLineState, validateProductionLineState } from '../systems/productionLineState';
 import { validateModelProductionLedger } from '../systems/modelProductionLedger';
 import { validateModelWarehouse } from '../systems/modelWarehouse';
@@ -17,7 +18,7 @@ import { recomputeSupply } from '../systems/logistics';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
-export const SAVE_SCHEMA_VERSION = 20;
+export const SAVE_SCHEMA_VERSION = 21;
 
 export interface SaveHeader {
   v: number;
@@ -81,6 +82,7 @@ function packStores(w: WorldState): Record<string, unknown> {
     trainingQueue: w.trainingQueue,
     customTemplates: w.customTemplates,
     fronts: w.fronts,
+    garrisons: w.garrisons,
     commanders: w.commanders,
     productionShare: w.productionShare,
     productionLines: w.productionLines,
@@ -124,6 +126,7 @@ function packStores(w: WorldState): Record<string, unknown> {
       nextWarId: w.nextWarId,
       nextAlertId: w.nextAlertId,
       nextFrontId: w.nextFrontId,
+      nextGarrisonId: w.nextGarrisonId,
       nextCommanderId: w.nextCommanderId,
       nextConstructionId: w.nextConstructionId,
       nextTreatyId: w.nextTreatyId,
@@ -186,7 +189,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if (!isRecord(blob)) return { world: null, violations: ['invalid save root'] };
   const h = blob.header;
   if (!isRecord(h)) return { world: null, violations: ['header missing or invalid'] };
-  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 19 && h.v !== 18 && h.v !== 17 && h.v !== 16 && h.v !== 15 && h.v !== 14 && h.v !== 13 && h.v !== 12 && h.v !== 11 && h.v !== 10 && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
+  if (h.v !== SAVE_SCHEMA_VERSION && h.v !== 20 && h.v !== 19 && h.v !== 18 && h.v !== 17 && h.v !== 16 && h.v !== 15 && h.v !== 14 && h.v !== 13 && h.v !== 12 && h.v !== 11 && h.v !== 10 && h.v !== 9 && h.v !== 8 && h.v !== 7 && h.v !== 6 && h.v !== 5 && h.v !== 4) violations.push('unsupported save version: ' + h.v);
   if (h.schema !== 'orbis-save') violations.push('unknown schema: ' + h.schema);
   if (h.packId !== pack.manifest.id) violations.push('pack mismatch: ' + h.packId + ' != ' + pack.manifest.id);
   if (h.schemaFingerprint !== packFingerprint(pack)) violations.push('pack content changed since save');
@@ -264,6 +267,11 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     return {world:null,violations:['missing v18 issued equipment ledger']};
   if(h.v<18&&s.issuedEquipment!==undefined)
     return {world:null,violations:['legacy save contains v18 issued equipment']};
+  if(h.v>=21&&(!Array.isArray(s.garrisons)||
+      !validSequence(s.counters.nextGarrisonId)))
+    return {world:null,violations:['missing v21 garrison stores']};
+  if(h.v<21&&(s.garrisons!==undefined||s.counters.nextGarrisonId!==undefined))
+    return {world:null,violations:['legacy save contains v21 garrison stores']};
   const owner: number[] = s.prov.owner;
   const controller: number[] = s.prov.controller;
   if (!Array.isArray(owner) || owner.length !== provCount) violations.push('owner array size mismatch');
@@ -415,6 +423,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     trainingQueue: s.trainingQueue ?? [],
     customTemplates: s.customTemplates ?? [], nextCustomTemplateId: s.counters.nextCustomTemplateId ?? 1,
     fronts: s.fronts ?? [],
+    garrisons: h.v>=21?s.garrisons:[],
     commanders: s.commanders ?? [],
     productionShare: s.productionShare ?? pack.countries.map(() => 0.2),
     productionMode: h.v>=15 ? s.productionMode : pack.countries.map(()=>'legacy' as const),
@@ -455,6 +464,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     nextWarId: s.counters.nextWarId,
     nextAlertId: s.counters.nextAlertId,
     nextFrontId: s.counters.nextFrontId ?? 1,
+    nextGarrisonId: h.v>=21?s.counters.nextGarrisonId:1,
     nextCommanderId: s.counters.nextCommanderId ?? 1,
     nextConstructionId: s.counters.nextConstructionId ?? 1,
     nextTreatyId: s.counters.nextTreatyId ?? 1,
@@ -488,7 +498,9 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
   if(templateErrors.length)return {world:null,violations:templateErrors};
   const hierarchyErrors = validateHierarchy(w);
   if (hierarchyErrors.length) return { world: null, violations: hierarchyErrors };
-  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10, h.v >= 11, h.v >= 12, h.v >= 13, h.v >= 14, h.v >= 15, h.v >= 16, h.v >= 17, h.v >= 18, h.v >= 19, h.v >= 20);
+  const garrisonErrors=validateGarrisons(w);
+  if(garrisonErrors.length)return {world:null,violations:garrisonErrors};
+  const actual = hashWorld(w, h.v < 6, h.v >= 7, h.v >= 8, h.v >= 9, h.v >= 10, h.v >= 11, h.v >= 12, h.v >= 13, h.v >= 14, h.v >= 15, h.v >= 16, h.v >= 17, h.v >= 18, h.v >= 19, h.v >= 20, h.v >= 21);
   if (actual !== h.integrity) {
     return { world: null, violations: ['integrity mismatch: expected ' + h.integrity + ' got ' + actual] };
   }
