@@ -102,6 +102,8 @@ describe('v18 identifiable equipment across training and deployed units',()=>{
     expect(v18.header.v).toBe(SAVE_SCHEMA_VERSION);
     const migrated=decode(original) as any;
     migrated.header.v=17;
+    // Undo the v21 fields before emulating an actual historical save.
+    delete migrated.stores.garrisons; delete migrated.stores.counters.nextGarrisonId;
     delete migrated.stores.issuedEquipment;
     migrated.header.integrity=hashWorld(w,false,true,true,true,true,true,true,true,true,true,true,true,false);
     migrated.payloadChecksum=savePayloadChecksum(migrated.header,migrated.stores);
