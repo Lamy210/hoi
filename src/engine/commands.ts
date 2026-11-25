@@ -13,6 +13,7 @@ import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } fro
 import { autoAssignCommander, releaseCommander } from './military/commanders';
 import { AUTO_ATTACK_MIN_ORG, COUNTERATTACK_MIN_ORG, autoFrontProvinces, frontOf } from './military/fronts';
 import { planFrontDeployment } from './military/frontDeployment';
+import {planGroupFrontAssignments} from './military/groupFrontAssignments';
 import {validateGarrisonCreation} from './military/garrisons';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
@@ -600,6 +601,30 @@ export function registerAllCommands(): void {
       }
     },
   });
+  // Multi-army assignment is a single journaled command, not a sequence of
+  // per-army commands that could leave the group partially reassigned.
+  registerCommand('assignGroupFronts', {
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai')return 'badIssuer';
+      return planGroupFrontAssignments(w,country,p.groupId,p.assignments).reason;
+    },
+    apply(w,p,issuer){
+      const country=actorCountry(w,issuer)!;
+      const plan=planGroupFrontAssignments(w,country,p.groupId,p.assignments);
+      if(plan.reason)throw new Error('validated army group front plan no longer valid: '+plan.reason);
+      const targets=new Map(plan.orders.map(order=>[order.unitId,order.frontId]));
+      for(const unit of w.units){
+        const target=targets.get(unit.id);
+        if(target!==undefined){
+          // Preserve explicit holds and routes: this is organizational assignment,
+          // not consent to replace manual movement or resume automation.
+          unit.frontId=target;
+        }
+      }
+    },
+  });
+
   registerCommand('unassignFromFront', {
     validate(w,p,issuer){const c=actorCountry(w,issuer),ids=p.units;if(c===null||issuer==='frontai')return 'badIssuer';if(!Array.isArray(ids)||!ids.length||ids.length>256||new Set(ids).size!==ids.length)return 'badParams';return ids.every(id=>w.units.some(u=>u.id===id&&u.owner===c&&!u.destroyed))?null:'notYourUnit';},
     apply(w,p){const ids=new Set(p.units as number[]);for(const u of w.units)if(ids.has(u.id))u.frontId=-1;},
