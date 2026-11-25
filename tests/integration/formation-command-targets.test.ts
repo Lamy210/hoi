@@ -2,9 +2,31 @@ import {describe,expect,it} from 'vitest';
 import {createTestEngine} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
 import {hashWorld} from '../../src/engine/core/hash';
-import {formationUnits,scopedFormationUnits,formationOperationPreview} from '../../src/engine/military/formationOverview';
+import {formationUnits,scopedFormationUnits,formationOperationPreview,canDeployFormation} from '../../src/engine/military/formationOverview';
 
 describe('formation command target selection and change preview',()=>{
+  it('prevents deployment of garrison divisions and busy units before issuing commands',async()=>{
+    const e=await createTestEngine(),w=e.world,country=w.playerCountry;
+    const snap=e.getUiSnapshot(0);
+    const unit=snap.units.find(u=>u.owner===country)!;
+    const front={id:777,owner:country,provinces:[unit.loc],revision:1};
+    const eligible={...snap,fronts:[...snap.fronts,front as typeof snap.fronts[number]]};
+    expect(canDeployFormation(eligible,[unit],front.id)).toBe(true);
+    const guarded={...eligible,garrisons:[...eligible.garrisons,{
+      id:1,owner:country,provinces:[unit.loc],unitIds:[unit.id],paused:true,revision:1,
+    }]};
+    expect(canDeployFormation(guarded,[unit],front.id)).toBe(false);
+    expect(canDeployFormation(eligible,[{...unit,manualHold:true}],front.id)).toBe(false);
+    expect(canDeployFormation(eligible,[{...unit,moving:true}],front.id)).toBe(false);
+    expect(canDeployFormation(eligible,[{...unit,inBattle:true}],front.id)).toBe(false);
+    expect(canDeployFormation(eligible,[{...unit,encircled:true}],front.id)).toBe(false);
+    expect(canDeployFormation(eligible,[unit],999999)).toBe(false);
+    expect(canDeployFormation({...eligible,controller:eligible.controller.map(()=>-1)},[unit],front.id)).toBe(false);
+    expect(canDeployFormation(eligible,[],front.id)).toBe(false);
+    expect(canDeployFormation(eligible,[{...unit,owner:country+1}],front.id)).toBe(false);
+    void w;
+  });
+
   it('scopes only owned formation divisions and produces deterministic non-mutating command sets',async()=>{
     const e=await createTestEngine(),w=e.world,c=w.playerCountry;
     const own=w.units.filter(u=>u.owner===c).slice(0,2);
