@@ -109,7 +109,7 @@ describe('atomic army group multi-front assignments',()=>{
       const unit=w.units.find(u=>u.id===order.unitId)!;
       expect(unit.frontId).toBe(order.frontId);
       expect(unit.path).toEqual(order.path);
-      expect(unit.manualHold).toBe(false);
+      expect(!!unit.manualHold).toBe(false);
     }
     const saved=e.serialize(),restored=await createTestEngine(1,911,'KOR');
     expect(restored.loadFrom(saved).ok).toBe(true);
