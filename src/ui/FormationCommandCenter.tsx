@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import type {UiSnapshot} from '../engine/ui';
 import type {FormationScope,FormationTargetScope} from '../engine/military/formationOverview';
-import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview,canDeployFormation} from '../engine/military/formationOverview';
+import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview,canDeployFormation,toggleFormationArmySelection} from '../engine/military/formationOverview';
 import {engineClient} from './engineClient';
 import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 
@@ -83,15 +83,29 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
         <div className="formation-command-center-actions">
           {childArmies.map(army=>{
             const members=units.filter(u=>u.armyId===army.id);
-            return <button key={army.id} data-testid={'formation-target-army-'+army.id}
-              disabled={!members.length||members.length>256}
-              onClick={()=>{onSelect(members.map(u=>u.id));setTargetScope('selected');setAcknowledgedSignature(null);}}>
-              {army.name} ({members.length})
-            </button>;
+            const memberIds=members.map(u=>u.id);
+            const allSelected=memberIds.length>0&&memberIds.every(id=>selectedIds.includes(id));
+            const nextSelection=toggleFormationArmySelection(units,army.id,selectedIds);
+            return <span key={army.id}>
+              <button data-testid={'formation-target-army-'+army.id}
+                disabled={!members.length||members.length>256||pending!==0}
+                onClick={()=>{onSelect(memberIds);setTargetScope('selected');setAcknowledgedSignature(null);}}>
+                {army.name} ({members.length})
+              </button>
+              <button data-testid={'formation-toggle-army-'+army.id}
+                aria-pressed={allSelected} disabled={nextSelection===null||pending!==0}
+                onClick={()=>{
+                  const next=toggleFormationArmySelection(units,army.id,selectedIds);
+                  if(next===null)return;
+                  onSelect(next);setTargetScope('selected');setAcknowledgedSignature(null);
+                }}>
+                {allSelected?label('選択解除','Remove'):label('追加選択','Add')}
+              </button>
+            </span>;
           })}
         </div>
-        <small>{label('軍を選ぶと、その師団だけを命令対象に設定します。複数軍への同時命令ではありません。',
-          'Choose an army to target its divisions. This does not issue orders to several armies at once.')}</small>
+        <small>{label('軍名で単独選択、追加選択で複数軍をまとめて対象にできます。所属外師団は除外し、256師団を上限とします。',
+          'Choose one army by name or add multiple armies to the target selection. Out-of-group divisions are excluded; maximum 256 divisions.')}</small>
       </div>}
       <div className="formation-command-target">
         <label htmlFor="formation-target-scope">{label('命令の対象','Order targets')}</label>
