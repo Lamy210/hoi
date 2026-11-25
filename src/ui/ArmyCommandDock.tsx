@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import type {UiSnapshot} from '../engine/ui';
 import {ARMY_COLORS,MAX_ARMIES,MAX_GROUPS,MAX_ARMY_UNITS,MAX_GROUP_ARMIES} from '../engine/military/armies';
-import {formationUnits,type FormationScope} from '../engine/military/formationOverview';
+import {formationUnits,canDeployFormation,type FormationScope} from '../engine/military/formationOverview';
 import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 import {engineClient} from './engineClient';
 import {MAX_GARRISON_TARGETS,MAX_GARRISON_UNITS} from '../engine/military/garrisons';
@@ -41,8 +41,7 @@ export function ArmyCommandDock({
   const fronts=snap.fronts.filter(f=>f.owner===country);
   const currentFront=fronts.find(f=>String(f.id)===deployFrontId)??fronts[0];
   const targetUnits=focus?formationUnits(snap,focus):selected;
-  const deployable=targetUnits.length>0&&targetUnits.length<=256&&
-    targetUnits.every(u=>!u.moving&&!u.inBattle&&!u.encircled&&!u.manualHold);
+  const deployable=canDeployFormation(snap,targetUnits,currentFront?.id);
   const busy=pending!==0;
   const ownGarrisons=snap.garrisons.filter(g=>g.owner===country);
   const garrisonAssigned=new Set(ownGarrisons.flatMap(g=>g.unitIds));
