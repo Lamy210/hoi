@@ -44,6 +44,8 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
     groupFrontIds.size<=256&&
     units.filter(u=>groupFrontIds.has(u.id)).every(u=>
       !u.moving&&!u.inBattle&&!u.encircled&&!groupFrontGarrisonIds.has(u.id));
+  const groupFrontDeployEligible=groupFrontEligible&&groupFrontAssignments.every(a=>
+    canDeployFormation(snap,units.filter(u=>a.unitIds.includes(u.id)),a.frontId));
   const scoped=scopedFormationUnits(units,targetScope,selectedIds);
   const ids=scoped.map(u=>u.id);
   const enabled=!!formation&&scoped.length>0&&scoped.length<=256&&pending===0;
@@ -140,8 +142,14 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
             })}>
             {label('軍ごとの戦線割当を一括適用','Assign armies to fronts atomically')} ({groupFrontAssignments.length})
           </button>
-          <small>{label('2軍以上を指定してください。全軍の所属と戦線を検証し、一部だけの割当は行いません。手動固定・移動経路は保持します。移動中・戦闘中・包囲中・駐屯中の師団を含む場合は実行できません。',
-            'Choose at least two armies. All assignments are validated atomically. Manual holds and paths are preserved. Moving, fighting, encircled or garrison units prevent execution.')}</small>
+          <button data-testid="formation-group-front-deploy" disabled={!groupFrontDeployEligible}
+            onClick={()=>focus.kind==='group'&&groupFrontDeployEligible&&engineClient.command('deployGroupFronts',{
+              groupId:focus.id,assignments:groupFrontAssignments,strategy:deploymentMode,
+            })}>
+            {label('指定した戦線へ一括展開','Deploy armies to designated fronts')} ({groupFrontAssignments.length})
+          </button>
+          <small>{label('割当は所属だけ更新します。展開は下の配置方式（均等・戦略・最短移動）で全経路を検証し、まとめて移動を開始します。手動固定・移動中・戦闘中・包囲中・駐屯中の師団は展開対象にできません。',
+            'Assignment changes membership only. Deployment uses the placement mode below (even / strategic / nearest), validates every path and starts movement together. Held, moving, fighting, encircled or garrison divisions cannot deploy.')}</small>
         </div>
       </div>}
       <div className="formation-command-target">

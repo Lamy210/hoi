@@ -14,6 +14,7 @@ import { autoAssignCommander, releaseCommander } from './military/commanders';
 import { AUTO_ATTACK_MIN_ORG, COUNTERATTACK_MIN_ORG, autoFrontProvinces, frontOf } from './military/fronts';
 import { planFrontDeployment } from './military/frontDeployment';
 import {planGroupFrontAssignments} from './military/groupFrontAssignments';
+import {planGroupFrontDeployment} from './military/groupFrontDeployment';
 import {validateGarrisonCreation} from './military/garrisons';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
@@ -621,6 +622,32 @@ export function registerAllCommands(): void {
           // not consent to replace manual movement or resume automation.
           unit.frontId=target;
         }
+      }
+    },
+  });
+
+  // Atomic multi-front route deployment: all fronts and paths are checked
+  // before changing any division. Manual holds and existing paths are never
+  // implicitly replaced by group orders.
+  registerCommand('deployGroupFronts', {
+    validate(w,p,issuer){
+      const country=actorCountry(w,issuer);
+      if(country===null||issuer==='frontai'||!w.countries.alive[country])return 'badIssuer';
+      return planGroupFrontDeployment(w,country,p.groupId,p.assignments,p.strategy).reason;
+    },
+    apply(w,p,issuer){
+      const country=actorCountry(w,issuer)!;
+      const plan=planGroupFrontDeployment(w,country,p.groupId,p.assignments,p.strategy);
+      if(plan.reason)throw new Error('validated group deployment plan no longer valid: '+plan.reason);
+      const orders=new Map(plan.orders.map(order=>[order.unitId,order]));
+      for(const unit of w.units){
+        const order=orders.get(unit.id);
+        if(!order)continue;
+        unit.frontId=order.frontId;
+        unit.path=order.path;
+        unit.segIdx=0;
+        unit.segProgress=0;
+        unit.segDays=order.path.length>1?segmentDays(w,order.path[0],order.path[1],unit):0;
       }
     },
   });
