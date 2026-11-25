@@ -30,6 +30,26 @@ export function canDeployFormation(
     !u.inBattle && !u.encircled);
 }
 
+/**
+ * Toggle the entire army within the currently focused formation.
+ * Out-of-formation selection never leaks into a group command.
+ * A null result means the selection is invalid or would exceed command limits.
+ */
+export function toggleFormationArmySelection(
+  units: readonly UiUnit[], armyId: number, selectedIds: readonly number[], maxUnits = 256,
+): number[] | null {
+  const members = units.filter(u => u.armyId === armyId).map(u => u.id);
+  if (!members.length) return null;
+  const scoped = new Set(units.map(u => u.id));
+  const next = new Set(selectedIds.filter(id => scoped.has(id)));
+  const fullySelected = members.every(id => next.has(id));
+  for (const id of members) {
+    if (fullySelected) next.delete(id);
+    else next.add(id);
+  }
+  return next.size <= maxUnits ? [...next].sort((a, b) => a - b) : null;
+}
+
 export function formationOperationalSummary(units:readonly UiUnit[]){
   const resources=summarizeDivisions(units);
   let moving=0,combat=0,encircled=0,manualHold=0,frontAssigned=0,needsAttention=0;
