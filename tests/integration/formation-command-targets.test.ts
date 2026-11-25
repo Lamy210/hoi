@@ -2,9 +2,32 @@ import {describe,expect,it} from 'vitest';
 import {createTestEngine} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
 import {hashWorld} from '../../src/engine/core/hash';
-import {formationUnits,scopedFormationUnits,formationOperationPreview,canDeployFormation} from '../../src/engine/military/formationOverview';
+import {formationUnits,scopedFormationUnits,formationOperationPreview,canDeployFormation,toggleFormationArmySelection} from '../../src/engine/military/formationOverview';
 
 describe('formation command target selection and change preview',()=>{
+  it('toggles multiple army memberships deterministically without leaking foreign selections',async()=>{
+    const e=await createTestEngine();
+    const snap=e.getUiSnapshot(0),country=snap.playerCountry;
+    const units=snap.units.filter(u=>u.owner===country).slice(0,2);
+    expect(units.length).toBe(2);
+    const [a,b]=units;
+    const c={...b,id:Math.max(...snap.units.map(u=>u.id))+1};
+    const inGroup=[
+      {...a,armyId:1},
+      {...b,armyId:1},
+      {...c,armyId:2},
+    ];
+    const first=toggleFormationArmySelection(inGroup,1,[999999]);
+    expect(first).toEqual([a.id,b.id].sort((x,y)=>x-y));
+    const both=toggleFormationArmySelection(inGroup,2,first!);
+    expect(both).toEqual([a.id,b.id,c.id].sort((x,y)=>x-y));
+    expect(toggleFormationArmySelection(inGroup,1,both!)).toEqual([c.id]);
+    expect(toggleFormationArmySelection([...inGroup].reverse(),2,first!)).toEqual(both);
+    expect(toggleFormationArmySelection(inGroup,3,both!)).toBeNull();
+    expect(toggleFormationArmySelection(inGroup,2,first!,2)).toBeNull();
+    expect(toggleFormationArmySelection(inGroup,1,[a.id])).toEqual([a.id,b.id].sort((x,y)=>x-y));
+  });
+
   it('prevents deployment of garrison divisions and busy units before issuing commands',async()=>{
     const e=await createTestEngine(),w=e.world,country=w.playerCountry;
     const snap=e.getUiSnapshot(0);
