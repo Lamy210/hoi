@@ -85,7 +85,7 @@ describe('atomic army group multi-front assignments',()=>{
   });
 
   it('rejects group membership changes not present in the submitted snapshot',async()=>{
-    const {w,issue,units,assignments}=await fixture();
+    const {issue,units,assignments}=await fixture();
     expect(issue('assignArmy',{armyId:2,unitIds:[units[0].id]}).ok).toBe(true);
     const before=units.map(u=>u.frontId);
     expect(issue('assignGroupFronts',{groupId:1,assignments}).reason).toBe('staleFormation');
