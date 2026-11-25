@@ -29,6 +29,10 @@ test('軍集団指揮画面で2師団を集計し自動作戦の保留と再開�
   await expect(page.getByTestId('formation-focused-name')).toContainText('北方軍集団');
   await expect(page.getByTestId('formation-count')).toHaveText('2');
   await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
+  await expect(page.getByTestId('formation-group-armies')).toBeVisible();
+  await page.getByTestId('formation-target-army-1').click();
+  await expect(page.getByTestId('formation-target-scope')).toHaveValue('selected');
+  await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
   await expect(page.getByTestId('formation-command-preview')).toContainText('保留');
   await page.getByTestId('formation-target-scope').selectOption('selected');
   await expect(page.getByTestId('formation-target-count')).toContainText('2 / 2');
