@@ -3,6 +3,7 @@ import {createTestEngine} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
 import {hashWorld} from '../../src/engine/core/hash';
 import {planGroupFrontAssignments} from '../../src/engine/military/groupFrontAssignments';
+import {planGroupFrontDeployment} from '../../src/engine/military/groupFrontDeployment';
 
 async function fixture(){
   const e=await createTestEngine(1,911,'KOR'),w=e.world,c=w.playerCountry;
@@ -91,5 +92,69 @@ describe('atomic army group multi-front assignments',()=>{
     const before=units.map(u=>u.frontId);
     expect(issue('assignGroupFronts',{groupId:1,assignments}).reason).toBe('staleFormation');
     expect(units.map(u=>u.frontId)).toEqual(before);
+  });
+
+  it('atomically deploys two armies to separate fronts with ordinary routes and reproducible saves',async()=>{
+    const {e,w,c,units,issue,assignments}=await fixture();
+    const origin=w.prov.id.indexOf('KR-41');
+    expect(origin).toBeGreaterThanOrEqual(0);
+    for(const u of units)u.loc=origin;
+    const before=hashWorld(w);
+    const planned=planGroupFrontDeployment(w,c,1,assignments,'nearest');
+    expect(planned.reason).toBeNull();
+    expect(planned.orders).toHaveLength(2);
+    expect(hashWorld(w)).toBe(before);
+    expect(issue('deployGroupFronts',{groupId:1,assignments,strategy:'nearest'}).ok).toBe(true);
+    for(const order of planned.orders){
+      const unit=w.units.find(u=>u.id===order.unitId)!;
+      expect(unit.frontId).toBe(order.frontId);
+      expect(unit.path).toEqual(order.path);
+      expect(unit.manualHold).toBe(false);
+    }
+    const saved=e.serialize(),restored=await createTestEngine(1,911,'KOR');
+    expect(restored.loadFrom(saved).ok).toBe(true);
+    expect(hashWorld(restored.world)).toBe(hashWorld(w));
+    for(let d=0;d<5;d++){
+      e.stepTick();restored.stepTick();
+      expect(hashWorld(restored.world),'day '+d).toBe(hashWorld(w));
+    }
+  });
+
+  it('combines two armies targeting the same front to preserve even distribution',async()=>{
+    const {w,c,units,assignments,issue}=await fixture();
+    const origin=w.prov.id.indexOf('KR-41'),other=w.prov.id.indexOf('KR-11');
+    for(const u of units)u.loc=origin;
+    w.fronts[0].provinces=[origin,other];
+    const sameFront=assignments.map(a=>({...a,
+      frontId:assignments[0].frontId,expectedRevision:assignments[0].expectedRevision,
+    }));
+    const plan=planGroupFrontDeployment(w,c,1,[...sameFront].reverse(),'even');
+    expect(plan.reason).toBeNull();
+    expect(new Set(plan.orders.map(o=>o.target)).size).toBe(2);
+    expect(issue('deployGroupFronts',{groupId:1,assignments:sameFront,strategy:'even'}).ok).toBe(true);
+    expect(units.every(u=>u.frontId===sameFront[0].frontId)).toBe(true);
+  });
+
+  it('rejects late invalid fronts and busy divisions without partially deploying earlier armies',async()=>{
+    const {w,c,units,assignments,issue}=await fixture();
+    const initial=units.map(u=>({frontId:u.frontId,path:[...u.path]}));
+    const bad=[
+      {assignments,strategy:'invalid',reason:'badParams'},
+      {assignments:[{...assignments[0],expectedRevision:999},assignments[1]],strategy:'even',reason:'staleFrontOrder'},
+      {assignments:[{...assignments[0],unitIds:[999999]},assignments[1]],strategy:'even',reason:'staleFormation'},
+    ];
+    for(const entry of bad){
+      expect(planGroupFrontDeployment(w,c,1,entry.assignments,entry.strategy).reason).toBe(entry.reason);
+      expect(issue('deployGroupFronts',{groupId:1,assignments:entry.assignments,strategy:entry.strategy}).reason).toBe(entry.reason);
+      expect(units.map(u=>({frontId:u.frontId,path:[...u.path]}))).toEqual(initial);
+    }
+    w.fronts[1].provinces=[];
+    expect(planGroupFrontDeployment(w,c,1,assignments,'even').reason).toBe('noFrontProvinces');
+    expect(issue('deployGroupFronts',{groupId:1,assignments,strategy:'even'}).reason).toBe('noFrontProvinces');
+    expect(units.map(u=>({frontId:u.frontId,path:[...u.path]}))).toEqual(initial);
+    w.fronts[1].provinces=[w.prov.id.indexOf('KR-11')];
+    units[1].manualHold=true;
+    expect(issue('deployGroupFronts',{groupId:1,assignments,strategy:'even'}).reason).toBe('unitBusy');
+    expect(units.map(u=>({frontId:u.frontId,path:[...u.path]}))).toEqual(initial);
   });
 });
