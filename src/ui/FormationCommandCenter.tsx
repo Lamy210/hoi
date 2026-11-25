@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import type {UiSnapshot} from '../engine/ui';
 import type {FormationScope,FormationTargetScope} from '../engine/military/formationOverview';
-import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview} from '../engine/military/formationOverview';
+import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview,canDeployFormation} from '../engine/military/formationOverview';
 import {engineClient} from './engineClient';
 import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 
@@ -31,7 +31,8 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const ids=scoped.map(u=>u.id);
   const enabled=!!formation&&scoped.length>0&&scoped.length<=256&&pending===0;
   const deploymentBusy=scoped.some(u=>u.manualHold||u.moving||u.inBattle||u.encircled);
-  const deployEnabled=enabled&&!!front&&!deploymentBusy&&front.provinces.some(p=>snap.controller[p]===country);
+  const garrisonBusy=scoped.some(u=>snap.garrisons.some(g=>g.unitIds.includes(u.id)));
+  const deployEnabled=enabled&&canDeployFormation(snap,scoped,front?.id);
   const hold=formationOperationPreview(scoped,'hold');
   const resume=formationOperationPreview(scoped,'resume');
   const assign=formationOperationPreview(scoped,'assignFront',front?.id);
@@ -137,7 +138,10 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           </button>
         </div>
         <small data-testid="formation-deployment-hint">
-          {deploymentBusy
+          {garrisonBusy
+            ? label('駐屯作戦に所属する師団を含みます。駐屯作戦を解除してから戦線へ配置してください。',
+              'Contains garrison-assigned divisions. Remove their garrison orders before deployment.')
+            :deploymentBusy
             ? label('移動中・戦闘中・包囲中・手動固定中の師団を含みます。全員が待機状態になってから実行してください。',
               'Contains moving, engaged, encircled or manually held units. All must be idle before deployment.')
             : label('移動経路は事前検証され、一括成功または全件拒否されます。移動は瞬間移動ではありません。',
