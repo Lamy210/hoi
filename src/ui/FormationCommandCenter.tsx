@@ -81,6 +81,8 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           <option value="all">{label('所属する全師団','All divisions')}</option>
           <option value="attention">{label('要注意の師団のみ','Attention needed')}</option>
           <option value="withoutFront">{label('戦線未配属のみ','Without a front')}</option>
+          <option value="manualHold">{label('手動固定中のみ','Manually held only')}</option>
+          <option value="idle">{label('自動配置可能な待機師団のみ','Idle and deployable only')}</option>
           <option value="selected">{label('地図・一覧で選択中のみ','Selected on map / roster')}</option>
         </select>
         <small data-testid="formation-target-count" aria-live="polite">
