@@ -29,7 +29,7 @@ export function formationOperationalSummary(units:readonly UiUnit[]){
 }
 
 /** Operation targeting is a read-only projection of the current snapshot. */
-export type FormationTargetScope = 'all'|'attention'|'withoutFront'|'manualHold'|'idle'|'selected';
+export type FormationTargetScope = 'all'|'attention'|'lowSupply'|'understrength'|'withoutFront'|'manualHold'|'idle'|'selected';
 export type FormationOperation = 'hold'|'resume'|'assignFront'|'unassignFront';
 
 export function scopedFormationUnits(
@@ -38,6 +38,9 @@ export function scopedFormationUnits(
   const chosen = new Set(selectedIds);
   return units.filter(u => {
     if (scope === 'selected') return chosen.has(u.id);
+    if (scope === 'lowSupply') return u.supply < 0.5;
+    if (scope === 'understrength') return u.manpower < u.maxManpower ||
+      u.infEquipment < u.maxInfEquipment || u.artEquipment < u.maxArtEquipment;
     if (scope === 'withoutFront') return u.frontId < 0;
     if (scope === 'manualHold') return u.manualHold;
     if (scope === 'idle') return !u.manualHold && !u.moving && !u.inBattle && !u.encircled;

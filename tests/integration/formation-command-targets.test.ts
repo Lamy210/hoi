@@ -26,6 +26,17 @@ describe('formation command target selection and change preview',()=>{
     ];
     expect(scopedFormationUnits(scoped,'all').map(u=>u.id)).toEqual(members.map(u=>u.id));
     expect(scopedFormationUnits(scoped,'attention').map(u=>u.id)).toEqual([first.id]);
+    expect(scopedFormationUnits(scoped,'lowSupply').map(u=>u.id)).toEqual([first.id]);
+    expect(scopedFormationUnits(scoped,'understrength').map(u=>u.id)).toEqual(
+      scoped.filter(u=>u.manpower<u.maxManpower||u.infEquipment<u.maxInfEquipment||u.artEquipment<u.maxArtEquipment).map(u=>u.id));
+    expect(scopedFormationUnits([
+      {...first,supply:1,manpower:first.maxManpower,infEquipment:first.maxInfEquipment,artEquipment:first.maxArtEquipment},
+      {...second,supply:0.49},
+    ],'lowSupply').map(u=>u.id)).toEqual([second.id]);
+    expect(scopedFormationUnits([
+      {...first,manpower:first.maxManpower,infEquipment:first.maxInfEquipment,artEquipment:first.maxArtEquipment},
+      {...second,manpower:second.maxManpower-1},
+    ],'understrength').map(u=>u.id)).toEqual([second.id]);
     expect(scopedFormationUnits(scoped,'withoutFront').map(u=>u.id)).toEqual([second.id]);
     expect(scopedFormationUnits(scoped,'manualHold').map(u=>u.id)).toEqual([first.id]);
     expect(scopedFormationUnits(scoped,'idle').map(u=>u.id)).toEqual([second.id]);

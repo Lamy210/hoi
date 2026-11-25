@@ -80,6 +80,8 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           value={targetScope} onChange={e=>setTargetScope(e.target.value as FormationTargetScope)}>
           <option value="all">{label('所属する全師団','All divisions')}</option>
           <option value="attention">{label('要注意の師団のみ','Attention needed')}</option>
+          <option value="lowSupply">{label('補給不足のみ','Low supply only')}</option>
+          <option value="understrength">{label('人員・装備不足のみ','Understrength only')}</option>
           <option value="withoutFront">{label('戦線未配属のみ','Without a front')}</option>
           <option value="manualHold">{label('手動固定中のみ','Manually held only')}</option>
           <option value="idle">{label('自動配置可能な待機師団のみ','Idle and deployable only')}</option>
