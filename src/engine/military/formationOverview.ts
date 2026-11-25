@@ -50,6 +50,24 @@ export function toggleFormationArmySelection(
   return next.size <= maxUnits ? [...next].sort((a, b) => a - b) : null;
 }
 
+/** Read-only army-level breakdown for planning a group-wide front operation. */
+export function armyDeploymentReadiness(
+  units: readonly UiUnit[], armyId: number, targetFrontId?: number,
+): {total:number;assigned:number;unassigned:number;otherFront:number;held:number;busy:number} {
+  const members=units.filter(u=>u.armyId===armyId);
+  let assigned=0,unassigned=0,otherFront=0,held=0,busy=0;
+  for(const u of members){
+    if(u.frontId<0)unassigned++;
+    else {
+      assigned++;
+      if(targetFrontId!==undefined&&u.frontId!==targetFrontId)otherFront++;
+    }
+    if(u.manualHold)held++;
+    if(u.moving||u.inBattle||u.encircled)busy++;
+  }
+  return {total:members.length,assigned,unassigned,otherFront,held,busy};
+}
+
 export function formationOperationalSummary(units:readonly UiUnit[]){
   const resources=summarizeDivisions(units);
   let moving=0,combat=0,encircled=0,manualHold=0,frontAssigned=0,needsAttention=0;
