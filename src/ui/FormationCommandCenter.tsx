@@ -22,6 +22,9 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
     ?snap.armyGroups.find(g=>g.id===focus.id&&g.owner===country)
     :snap.armies.find(a=>a.id===focus.id&&a.owner===country)):undefined;
   const units=formation&&focus?formationUnits(snap,focus):[];
+  const childArmies=focus?.kind==='group'&&formation
+    ?snap.armies.filter(a=>a.owner===country&&a.groupId===focus.id).sort((a,b)=>a.id-b.id)
+    :[];
   const summary=formationOperationalSummary(units);
   const commander=formation?.commanderId===undefined?undefined:
     snap.commanders.find(c=>c.id===formation.commanderId&&c.country===country);
@@ -75,6 +78,21 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
         {label('歩兵装備','Infantry')}: {fmt(Math.max(0,summary.maxInfantry-summary.infantry))} ·
         {label('火砲','Artillery')}: {fmt(Math.max(0,summary.maxArtillery-summary.artillery))}</small>
       </div>
+      {focus.kind==='group'&&<div className="formation-command-target" data-testid="formation-group-armies">
+        <strong>{label('軍集団内の軍を選択','Select an army in this group')}</strong>
+        <div className="formation-command-center-actions">
+          {childArmies.map(army=>{
+            const members=units.filter(u=>u.armyId===army.id);
+            return <button key={army.id} data-testid={'formation-target-army-'+army.id}
+              disabled={!members.length||members.length>256}
+              onClick={()=>{onSelect(members.map(u=>u.id));setTargetScope('selected');setAcknowledgedSignature(null);}}>
+              {army.name} ({members.length})
+            </button>;
+          })}
+        </div>
+        <small>{label('軍を選ぶと、その師団だけを命令対象に設定します。複数軍への同時命令ではありません。',
+          'Choose an army to target its divisions. This does not issue orders to several armies at once.')}</small>
+      </div>}
       <div className="formation-command-target">
         <label htmlFor="formation-target-scope">{label('命令の対象','Order targets')}</label>
         <select id="formation-target-scope" data-testid="formation-target-scope"
