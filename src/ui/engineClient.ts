@@ -120,12 +120,20 @@ export async function loadScenarioPack(): Promise<{ pack: Pack; checksumVerified
   return { pack, checksumVerified: cryptoAvailable };
 }
 
-let packCache: { pack: Pack; checksumVerified: boolean } | null = null;
+type LoadedPack = { pack: Pack; checksumVerified: boolean };
+let packPromise: Promise<LoadedPack> | null = null;
 
-/** 国家選択画面などで使用するキャッシュつきパック取得 */
-export async function getPack(): Promise<{ pack: Pack; checksumVerified: boolean }> {
-  if (!packCache) packCache = await loadScenarioPack();
-  return packCache;
+/**
+ * 国家選択画面・地図描画からの並行呼び出しで、同一パックを重複取得しない。
+ * 失敗をキャッシュするとリロードなしでは復旧できなくなるため、失敗時のみ解除する。
+ */
+export function getPack(): Promise<LoadedPack> {
+  if (packPromise) return packPromise;
+  packPromise = loadScenarioPack().catch((error: unknown) => {
+    packPromise = null;
+    throw error;
+  });
+  return packPromise;
 }
 
 /** 地図ジオメトリの読み込み（http: fetch / file: 静的取り込み） */
