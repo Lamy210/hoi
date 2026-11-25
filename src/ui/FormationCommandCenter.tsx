@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import type {UiSnapshot} from '../engine/ui';
 import type {FormationScope,FormationTargetScope} from '../engine/military/formationOverview';
-import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview} from '../engine/military/formationOverview';
+import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview,canDeployFormation} from '../engine/military/formationOverview';
 import {engineClient} from './engineClient';
 import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 
@@ -31,7 +31,7 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
   const ids=scoped.map(u=>u.id);
   const enabled=!!formation&&scoped.length>0&&scoped.length<=256&&pending===0;
   const deploymentBusy=scoped.some(u=>u.manualHold||u.moving||u.inBattle||u.encircled);
-  const deployEnabled=enabled&&!!front&&!deploymentBusy&&front.provinces.some(p=>snap.controller[p]===country);
+  const deployEnabled=enabled&&canDeployFormation(snap,scoped,front?.id);
   const hold=formationOperationPreview(scoped,'hold');
   const resume=formationOperationPreview(scoped,'resume');
   const assign=formationOperationPreview(scoped,'assignFront',front?.id);
