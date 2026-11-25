@@ -13,6 +13,23 @@ export function formationUnits(snap:UiSnapshot,scope:FormationScope):UiUnit[] {
   return snap.units.filter(u=>u.owner===country&&u.armyId!==null&&armyIds.has(u.armyId))
     .sort((a,b)=>a.id-b.id);
 }
+/**
+ * UI-only preflight for an atomic front deployment. The engine remains the
+ * authority for paths, ownership and revision checks at command application.
+ */
+export function canDeployFormation(
+  snap: UiSnapshot, units: readonly UiUnit[], frontId: number | undefined,
+): boolean {
+  const country = snap.playerCountry;
+  const front = snap.fronts.find(f => f.id === frontId && f.owner === country);
+  if (!front || !front.provinces.some(p => snap.controller[p] === country)) return false;
+  if (!units.length || units.length > 256) return false;
+  const garrisonIds = new Set(snap.garrisons.flatMap(g => g.unitIds));
+  return units.every(u => u.owner === country &&
+    !garrisonIds.has(u.id) && !u.manualHold && !u.moving &&
+    !u.inBattle && !u.encircled);
+}
+
 export function formationOperationalSummary(units:readonly UiUnit[]){
   const resources=summarizeDivisions(units);
   let moving=0,combat=0,encircled=0,manualHold=0,frontAssigned=0,needsAttention=0;
