@@ -52,3 +52,4 @@ jobs:
       - run: npx openspec validate phase8-maritime-map --strict
       - run: npx openspec validate phase8-naval-fleets --strict
       - run: npx openspec validate phase8-amphibious-transport --strict
+      - run: npx openspec validate atomic-army-group-front-assignments --strict
