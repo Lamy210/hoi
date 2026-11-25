@@ -27,6 +27,16 @@ describe('formation command target selection and change preview',()=>{
     expect(scopedFormationUnits(scoped,'all').map(u=>u.id)).toEqual(members.map(u=>u.id));
     expect(scopedFormationUnits(scoped,'attention').map(u=>u.id)).toEqual([first.id]);
     expect(scopedFormationUnits(scoped,'withoutFront').map(u=>u.id)).toEqual([second.id]);
+    expect(scopedFormationUnits(scoped,'manualHold').map(u=>u.id)).toEqual([first.id]);
+    expect(scopedFormationUnits(scoped,'idle').map(u=>u.id)).toEqual([second.id]);
+    expect(scopedFormationUnits([
+      {...first,manualHold:false,moving:true},
+      {...second,inBattle:true},
+    ],'idle')).toEqual([]);
+    expect(scopedFormationUnits([
+      {...first,manualHold:false,encircled:true},
+      {...second,manualHold:true},
+    ],'idle')).toEqual([]);
     expect(scopedFormationUnits(scoped,'selected',[second.id,999999,second.id]).map(u=>u.id))
       .toEqual([second.id]);
     expect(scopedFormationUnits(scoped,'selected',[999999])).toEqual([]);
