@@ -1,7 +1,7 @@
 import {useState} from 'react';
 import type {UiSnapshot} from '../engine/ui';
 import type {FormationScope,FormationTargetScope} from '../engine/military/formationOverview';
-import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview,canDeployFormation,toggleFormationArmySelection} from '../engine/military/formationOverview';
+import {formationUnits,formationOperationalSummary,scopedFormationUnits,formationOperationPreview,canDeployFormation,toggleFormationArmySelection,armyDeploymentReadiness} from '../engine/military/formationOverview';
 import {engineClient} from './engineClient';
 import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 
@@ -84,9 +84,10 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
           {childArmies.map(army=>{
             const members=units.filter(u=>u.armyId===army.id);
             const memberIds=members.map(u=>u.id);
+            const readiness=armyDeploymentReadiness(units,army.id,front?.id);
             const allSelected=memberIds.length>0&&memberIds.every(id=>selectedIds.includes(id));
             const nextSelection=toggleFormationArmySelection(units,army.id,selectedIds);
-            return <span key={army.id}>
+            return <span key={army.id} data-testid={'formation-army-readiness-'+army.id}>
               <button data-testid={'formation-target-army-'+army.id}
                 disabled={!members.length||members.length>256||pending!==0}
                 onClick={()=>{onSelect(memberIds);setTargetScope('selected');setAcknowledgedSignature(null);}}>
@@ -101,6 +102,9 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
                 }}>
                 {allSelected?label('選択解除','Remove'):label('追加選択','Add')}
               </button>
+              <small>{label('配属','Assigned')}: {readiness.assigned} · {label('未配属','Unassigned')}: {readiness.unassigned} ·
+                {label('手動固定','Held')}: {readiness.held} · {label('作戦中','Busy')}: {readiness.busy}
+                {front&&readiness.otherFront>0?' · '+label('別戦線','Other front')+': '+readiness.otherFront:''}</small>
             </span>;
           })}
         </div>

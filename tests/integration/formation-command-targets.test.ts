@@ -2,9 +2,34 @@ import {describe,expect,it} from 'vitest';
 import {createTestEngine} from '../helpers';
 import {applyCommands} from '../../src/engine/core/command';
 import {hashWorld} from '../../src/engine/core/hash';
-import {formationUnits,scopedFormationUnits,formationOperationPreview,canDeployFormation,toggleFormationArmySelection} from '../../src/engine/military/formationOverview';
+import {formationUnits,scopedFormationUnits,formationOperationPreview,canDeployFormation,toggleFormationArmySelection,armyDeploymentReadiness} from '../../src/engine/military/formationOverview';
 
 describe('formation command target selection and change preview',()=>{
+  it('summarizes each army front assignment without mutating or counting unrelated divisions',async()=>{
+    const e=await createTestEngine();
+    const snap=e.getUiSnapshot(0),c=snap.playerCountry;
+    const own=snap.units.filter(u=>u.owner===c).slice(0,2);
+    expect(own).toHaveLength(2);
+    const [first,second]=own;
+    const units=[
+      {...first,armyId:1,frontId:7,manualHold:true,moving:false,inBattle:false,encircled:false},
+      {...second,armyId:1,frontId:-1,manualHold:false,moving:true,inBattle:false,encircled:false},
+      {...second,id:second.id+100000,armyId:2,frontId:8,manualHold:false,moving:false,inBattle:true,encircled:false},
+    ];
+    expect(armyDeploymentReadiness(units,1,9)).toEqual({
+      total:2,assigned:1,unassigned:1,otherFront:1,held:1,busy:1,
+    });
+    expect(armyDeploymentReadiness([...units].reverse(),1,7)).toEqual({
+      total:2,assigned:1,unassigned:1,otherFront:0,held:1,busy:1,
+    });
+    expect(armyDeploymentReadiness(units,2)).toEqual({
+      total:1,assigned:1,unassigned:0,otherFront:0,held:0,busy:1,
+    });
+    expect(armyDeploymentReadiness(units,1234)).toEqual({
+      total:0,assigned:0,unassigned:0,otherFront:0,held:0,busy:0,
+    });
+  });
+
   it('toggles multiple army memberships deterministically without leaking foreign selections',async()=>{
     const e=await createTestEngine();
     const snap=e.getUiSnapshot(0),country=snap.playerCountry;
