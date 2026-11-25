@@ -11,6 +11,7 @@ type Props={snap:UiSnapshot;lang:Lang;focus:FormationScope|null;pending:number;
 
 export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSelect}:Props){
   const [chosenFront,setChosenFront]=useState('');
+  const [groupFrontSelections,setGroupFrontSelections]=useState<Record<number,string>>({});
   const [deploymentMode,setDeploymentMode]=useState<FrontDeploymentMode>('even');
   const [targetScope,setTargetScope]=useState<FormationTargetScope>('all');
   const [acknowledgedSignature,setAcknowledgedSignature]=useState<string|null>(null);
@@ -30,6 +31,19 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
     snap.commanders.find(c=>c.id===formation.commanderId&&c.country===country);
   const frontOptions=snap.fronts.filter(f=>f.owner===country&&snap.countries[f.enemy]?.alive);
   const front=frontOptions.find(f=>String(f.id)===chosenFront);
+  const groupFrontAssignments=childArmies.flatMap(army=>{
+    const target=frontOptions.find(f=>String(f.id)===groupFrontSelections[army.id]);
+    const unitIds=units.filter(u=>u.armyId===army.id).map(u=>u.id);
+    return target&&unitIds.length
+      ?[{armyId:army.id,frontId:target.id,expectedRevision:target.revision,unitIds}]
+      :[];
+  });
+  const groupFrontIds=new Set(groupFrontAssignments.flatMap(a=>a.unitIds));
+  const groupFrontGarrisonIds=new Set(snap.garrisons.flatMap(g=>g.unitIds));
+  const groupFrontEligible=focus?.kind==='group'&&pending===0&&groupFrontAssignments.length>=2&&
+    groupFrontIds.size<=256&&
+    units.filter(u=>groupFrontIds.has(u.id)).every(u=>
+      !u.moving&&!u.inBattle&&!u.encircled&&!groupFrontGarrisonIds.has(u.id));
   const scoped=scopedFormationUnits(units,targetScope,selectedIds);
   const ids=scoped.map(u=>u.id);
   const enabled=!!formation&&scoped.length>0&&scoped.length<=256&&pending===0;
@@ -102,6 +116,15 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
                 }}>
                 {allSelected?label('選択解除','Remove'):label('追加選択','Add')}
               </button>
+              <select data-testid={'formation-group-front-'+army.id}
+                aria-label={label('軍の割当先','Army front')+' '+army.name} disabled={pending!==0}
+                value={groupFrontSelections[army.id]??''}
+                onChange={e=>setGroupFrontSelections(current=>({...current,[army.id]:e.target.value}))}>
+                <option value="">{label('割当先なし','No assignment')}</option>
+                {frontOptions.map(option=><option key={option.id} value={option.id}>
+                  #{option.id} {ja?snap.countries[option.enemy].nameJa:snap.countries[option.enemy].nameEn}
+                </option>)}
+              </select>
               <small>{label('配属','Assigned')}: {readiness.assigned} · {label('未配属','Unassigned')}: {readiness.unassigned} ·
                 {label('手動固定','Held')}: {readiness.held} · {label('作戦中','Busy')}: {readiness.busy}
                 {front&&readiness.otherFront>0?' · '+label('別戦線','Other front')+': '+readiness.otherFront:''}</small>
@@ -110,6 +133,16 @@ export function FormationCommandCenter({snap,lang,focus,pending,selectedIds,onSe
         </div>
         <small>{label('軍名で単独選択、追加選択で複数軍をまとめて対象にできます。所属外師団は除外し、256師団を上限とします。',
           'Choose one army by name or add multiple armies to the target selection. Out-of-group divisions are excluded; maximum 256 divisions.')}</small>
+        <div className="formation-command-center-actions" data-testid="formation-group-front-controls">
+          <button data-testid="formation-group-front-assign" disabled={!groupFrontEligible}
+            onClick={()=>focus.kind==='group'&&groupFrontEligible&&engineClient.command('assignGroupFronts',{
+              groupId:focus.id,assignments:groupFrontAssignments,
+            })}>
+            {label('軍ごとの戦線割当を一括適用','Assign armies to fronts atomically')} ({groupFrontAssignments.length})
+          </button>
+          <small>{label('2軍以上を指定してください。全軍の所属と戦線を検証し、一部だけの割当は行いません。手動固定・移動経路は保持します。移動中・戦闘中・包囲中・駐屯中の師団を含む場合は実行できません。',
+            'Choose at least two armies. All assignments are validated atomically. Manual holds and paths are preserved. Moving, fighting, encircled or garrison units prevent execution.')}</small>
+        </div>
       </div>}
       <div className="formation-command-target">
         <label htmlFor="formation-target-scope">{label('命令の対象','Order targets')}</label>
