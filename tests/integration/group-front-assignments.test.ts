@@ -61,7 +61,8 @@ describe('atomic army group multi-front assignments',()=>{
     const initial=units.map(u=>u.frontId);
     const invalid=[
       {groupId:1,assignments:[assignments[0],assignments[0]],reason:'badParams'},
-      {groupId:1,assignments:[{...assignments[0],expectedRevision:0},assignments[1]],reason:'staleFrontOrder'},
+      {groupId:1,assignments:[{...assignments[0],expectedRevision:0},assignments[1]],reason:'badParams'},
+      {groupId:1,assignments:[{...assignments[0],expectedRevision:999},assignments[1]],reason:'staleFrontOrder'},
       {groupId:1,assignments:[{...assignments[0],unitIds:[999999]},assignments[1]],reason:'staleFormation'},
       {groupId:1,assignments:[{...assignments[0],frontId:999999},assignments[1]],reason:'noFront'},
       {groupId:999999,assignments,reason:'notYourArmy'},
