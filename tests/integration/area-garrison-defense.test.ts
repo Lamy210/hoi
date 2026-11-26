@@ -58,6 +58,46 @@ describe('designated province garrison and deterministic movement',()=>{
     expect(planGarrisonMoves(w,w.garrisons[0])).toHaveLength(1);
   });
 
+  it('rejects a direct AI movement that would strip the last guard from a target',async()=>{
+    const {w,unit,target,cmd}=await fixture();
+    const source=unit.loc;
+    expect(cmd('createGarrison',{provinces:[source,target],unitIds:[unit.id]}).ok).toBe(true);
+    expect(planGarrisonMoves(w,w.garrisons[0])).toEqual([]);
+    const originalPath=[...unit.path];
+    // Without command-boundary validation this legitimate AI issuer could
+    // remove the last defender even though the periodic planner would not.
+    const result=cmd('garrisonMove',{
+      orderId:1,revision:1,unitId:unit.id,target,
+    },'frontai');
+    expect(result).toMatchObject({ok:false,reason:'staleGarrisonOrder'});
+    expect(unit.loc).toBe(source);
+    expect(unit.path).toEqual(originalPath);
+    expect(w.garrisons[0].unitIds).toEqual([unit.id]);
+  });
+
+  it('revalidates the guard count between two queued AI movements',async()=>{
+    const {w,unit,own,target,cmd}=await fixture();
+    const source=unit.loc,other=own.find(u=>u.id!==unit.id)!;
+    other.loc=source;other.path=[];other.frontId=-1;other.manualHold=false;
+    expect(cmd('createGarrison',{
+      provinces:[source,target],unitIds:[unit.id,other.id],
+    }).ok).toBe(true);
+    // Both orders were legal when two defenders stood at the source.
+    // After the first command starts moving, the second must be rejected.
+    const first=cmd('garrisonMove',{
+      orderId:1,revision:1,unitId:unit.id,target,
+    },'frontai');
+    expect(first.ok).toBe(true);
+    expect(unit.path.length).toBeGreaterThan(1);
+    const second=cmd('garrisonMove',{
+      orderId:1,revision:1,unitId:other.id,target,
+    },'frontai');
+    expect(second).toMatchObject({ok:false,reason:'staleGarrisonOrder'});
+    expect(other.loc).toBe(source);
+    expect(other.path).toEqual([]);
+    expect(unit.path[unit.path.length-1]).toBe(target);
+  });
+
   it('rejects foreign divisions, duplicate targets and double assignment without mutation',async()=>{
     const {w,c,unit,target,cmd}=await fixture();
     const foreign=w.units.find(u=>u.owner!==c&&!u.destroyed)!;
