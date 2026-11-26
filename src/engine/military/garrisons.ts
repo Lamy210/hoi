@@ -1,7 +1,7 @@
 // Persistent defensive area orders. Never silently move divisions assigned to
 // frontline operations or under explicit manual control.
 import type {Unit,WorldState} from '../core/state';
-import {createGarrisonRouteLookup} from './garrisonRouteCache';
+import {createGarrisonRouteLookup,type GarrisonRouteCacheStats} from './garrisonRouteCache';
 import {rankGarrisonTargets} from './garrisonPriorities';
 import {estimateGarrisonTravelDays,optimizeGarrisonBatch,selectGarrisonReserveCandidates} from './garrisonBatchOptimization';
 
@@ -106,11 +106,13 @@ export function isLastGarrisonGuard(
 
 /** Stable one-tick planning: defend threatened and strategically important targets
  * first, never strip their last guard. Only legitimate land paths are considered. */
-export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan[]{
+export function planGarrisonMoves(
+  w:WorldState,g:GarrisonOrder,routeStats?:GarrisonRouteCacheStats,
+):GarrisonMovePlan[] {
   if(g.paused||!w.countries.alive[g.owner])return [];
   const targets=rankGarrisonTargets(w,g).map(t=>t.province);
   // A fresh lookup per plan prevents stale paths across world-state changes.
-  const routeLookup=createGarrisonRouteLookup(w,g.owner);
+  const routeLookup=createGarrisonRouteLookup(w,g.owner,undefined,routeStats);
   const units=g.unitIds.map(id=>w.units.find(u=>u.id===id))
     .filter((u):u is Unit=>!!u&&!u.destroyed&&u.owner===g.owner);
   // Planned arrivals cover future assignments, but cannot hold the province
