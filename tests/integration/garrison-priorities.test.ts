@@ -46,7 +46,8 @@ describe('threat-aware garrison target priorities',()=>{
       status:'active',offeredBy:-1,offerType:-1,offerDemands:[],endTick:-1,contrib:{}};
     w.wars.push(war);
     const ranked=rankGarrisonTargets(w,order);
-    expect(ranked[0]).toMatchObject({province:border,reason:'hostileBorder',hostileNeighbors:1});
+    expect(ranked[0]).toMatchObject({province:border,hostileNeighbors:1});
+    expect(ranked[0].reason).toBe(ranked[0].hostileDivisions>0?'hostileForces':'hostileBorder');
     expect(ranked[1]).toMatchObject({province:capital,reason:'capital'});
     expect(planGarrisonMoves(w,order)[0]?.target).toBe(border);
     war.status='ended';
