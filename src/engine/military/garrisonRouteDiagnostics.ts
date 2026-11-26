@@ -55,13 +55,18 @@ export function diagnoseGarrisonRoutes(
     w.prov.controller[p]!==country).sort((a,b)=>a-b);
   const targets=[...ranked.map(p=>p.province),...lost];
   const activeTargets=new Set(ranked.map(p=>p.province));
-  const coverage=new Map([...activeTargets].map(p=>[p,0]));
+  // Assigned arrivals cover the future objective, but they are not present
+  // guards who can release the last stationary division from its post.
+  const stationed=new Map([...activeTargets].map(p=>[p,0]));
   const guards=new Set<number>(),incoming=new Set<number>();
   for(const u of units){
     const dest=u.path.length>1?u.path[u.path.length-1]:u.loc;
-    if(coverage.has(dest))coverage.set(dest,coverage.get(dest)!+1);
     if(u.path.length>1)incoming.add(dest);
-    else guards.add(u.loc);
+    else {
+      guards.add(u.loc);
+      if(stationed.has(u.loc))
+        stationed.set(u.loc,stationed.get(u.loc)!+1);
+    }
   }
   let pathChecks=0;
   let truncated=false;
@@ -84,7 +89,7 @@ export function diagnoseGarrisonRoutes(
     const candidates=units.filter(u=>
       !u.manualHold&&!u.encircled&&!u.path.length&&!w.runtime.activeBattles.has(u.loc)&&
       w.prov.controller[u.loc]===country&&u.frontId<0&&u.loc!==province&&
-      (!coverage.has(u.loc)||coverage.get(u.loc)!>1)
+      (!stationed.has(u.loc)||stationed.get(u.loc)!>1)
     ).sort((a,b)=>a.id-b.id);
     if(!candidates.length){
       results.push({province,status:'noEligibleUnits'});continue;
