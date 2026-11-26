@@ -28,11 +28,20 @@ export function projectGarrisonCoverage(
   const available=units.some(u=>!u.moving&&!u.manualHold&&!u.inBattle&&!u.encircled);
   const reason:CoverageGapReason=order.paused?'paused':
     !units.length?'noUnits':!available?'noAvailableUnits':'awaitingOrders';
+  const guards=new Map<number,number[]>(),arrivals=new Map<number,number[]>();
+  for(const u of units){
+    const index=u.moving?arrivals:guards;
+    const province=u.moving?u.target:u.loc;
+    if(province<0)continue;
+    const list=index.get(province)??[];
+    list.push(u.id);
+    index.set(province,list);
+  }
+  for(const index of [guards,arrivals])
+    for(const list of index.values())list.sort((a,b)=>a-b);
   return [...new Set(order.provinces)].sort((a,b)=>a-b).map(province=>{
-    const guardingUnitIds=units.filter(u=>!u.moving&&u.loc===province)
-      .map(u=>u.id).sort((a,b)=>a-b);
-    const incomingUnitIds=units.filter(u=>u.moving&&u.target===province)
-      .map(u=>u.id).sort((a,b)=>a-b);
+    const guardingUnitIds=guards.get(province)??[];
+    const incomingUnitIds=arrivals.get(province)??[];
     const status:CoverageStatus=snapshot.controller[province]!==order.owner?'lost':
       guardingUnitIds.length?'guarded':incomingUnitIds.length?'incoming':'uncovered';
     return {province,status,guardingUnitIds,incomingUnitIds,
