@@ -60,7 +60,7 @@ describe('per-planning-invocation garrison land-route cache',()=>{
   });
 
   it('deduplicates stacked divisions across greedy selection and allocation without changing outcomes',async()=>{
-    const {w,owner,busan,incheon,seoul,a,b,reserve}=await fixture();
+    const {e,w,owner,busan,incheon,seoul,a,b,reserve}=await fixture();
     const before=hashWorld(w);
     let requests=0,searches=0;
     const shared=createGarrisonRouteLookup(w,owner,(...args)=>{
@@ -98,7 +98,14 @@ describe('per-planning-invocation garrison land-route cache',()=>{
     expect(planned.map(p=>p.target)).toEqual([busan,incheon]);
     expect(planGarrisonMoves(w,w.garrisons[0])).toEqual(planned);
     expect(hashWorld(w)).toBe(hash);
-    const saved=w.garrisons[0].unitIds;
-    expect(saved).toEqual([a.id,b.id,reserve.id]);
+    const serialized=e.serialize();
+    const restored=await createTestEngine(1,20261127,'KOR');
+    expect(restored.loadFrom(serialized).ok).toBe(true);
+    expect(hashWorld(restored.world)).toBe(hash);
+    expect(planGarrisonMoves(restored.world,restored.world.garrisons[0])).toEqual(planned);
+    for(let day=0;day<7;day++){
+      e.stepTick();restored.stepTick();
+      expect(hashWorld(restored.world),'day '+day).toBe(hashWorld(w));
+    }
   });
 });
