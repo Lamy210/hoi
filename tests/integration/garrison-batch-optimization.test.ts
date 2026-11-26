@@ -83,7 +83,7 @@ describe('bounded garrison batch assignment optimization',()=>{
 
   it('uses an unselected nearby reserve when it improves the chosen two-port assignment',async()=>{
     const {w,a,b,d,busan,incheon,province,g}=await fixture();
-    a.loc=province('KR-45');b.loc=province('KR-46');d.loc=province('KR-27');
+    a.loc=province('KR-45');b.loc=province('KR-46');d.loc=province('KR-11');
     g.unitIds=[a.id,b.id,d.id];
     const original=[pathPlan(w,a,busan),pathPlan(w,b,incheon)];
     const before=hashWorld(w);
