@@ -315,12 +315,16 @@ export function ArmyCommandDock({
                     ' · '+label('登録港容量','Catalogued port capacity')+': '+p.portCapacity:''}
                   {p.status==='routeAvailable'&&p.candidateUnitId!==undefined?
                     ' · '+label('候補師団','Candidate division')+' #'+p.candidateUnitId:''}
+                  {p.status==='routeAvailable'&&p.estimatedDays!==undefined?
+                    ' · '+label('予想移動日数','Estimated travel days')+': '+p.estimatedDays.toFixed(1):''}
                 </small>;
               })}
               {diagnosis.truncated&&<small>{label('診断上限に達したため、一部地点は未確認です。',
                 'Route check limit reached; some targets were not checked.')}</small>}
               <small>{label('防衛優先度は敵隣接の有無・隣接敵師団数・敵接触数・首都・登録港容量・沿岸・インフラ・人口の順です。港容量はシナリオ上の優先度指標で、補給能力を意味しません。',
                 'Priority uses hostile contact, adjacent hostile divisions, hostile borders, capital, catalogued port capacity, coast, infrastructure and population. Port capacity is a scenario priority proxy, not supply throughput.')}</small>
+              <small>{label('予想日数は最初に到達できる候補師団の現在の移動条件で算出します。最短候補や実際の到着日を保証せず、週次AIの一括割当とは異なることがあります。',
+                'ETA uses the first reachable candidate under current conditions, not necessarily the fastest candidate or weekly optimized assignment.')}</small>
               <small>{label('この診断は移動命令を出しません。実際の作戦時は経路・状態を再検証します。',
                 'Read-only check. Route legality and state are revalidated when issuing orders.')}</small>
             </div>}
