@@ -72,7 +72,9 @@ test('登録済みの自国港だけを一括で駐屯対象に追加して作�
   await expect(diagnosis).toBeVisible();
   await expect(diagnosis).toContainText('陸路診断結果');
   await expect(diagnosis).toContainText('防衛優先 #1');
-  await expect(diagnosis).toContainText('沿岸');
+  await expect(diagnosis).toContainText('登録港');
+  await expect(diagnosis).toContainText('登録港容量: 110');
+  await expect(diagnosis).toContainText('登録港容量: 80');
   await expect(diagnosis).toContainText('敵隣接の有無・隣接敵師団数');
   await expect(page.locator('[data-testid^="dock-garrison-route-1-"]')).toHaveCount(2);
   // Diagnosis is read-only; it must not queue any game command.

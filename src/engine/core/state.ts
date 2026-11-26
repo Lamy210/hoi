@@ -321,6 +321,8 @@ export interface WorldState {
 
   // ランタイム（セーブ対象外）
   runtime: {
+    /** Immutable scenario-derived port capacity index; not persisted. */
+    portCapacities?: number[];
     supplyEff: number[]; // province → 0..1（controller国に対する効率）
     graphEff: Map<number, number[]>; // country → 州別の距離減衰eff（週次+dirtyで再計算）
     unitSupplyFactor: Map<number, number>; // unitId → 容量係数（0.5 or 1）

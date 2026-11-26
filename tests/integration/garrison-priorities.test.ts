@@ -31,7 +31,7 @@ describe('threat-aware garrison target priorities',()=>{
     const before=hashWorld(w);
     const priorities=rankGarrisonTargets(w,order);
     expect(priorities.map(x=>x.province)).toEqual([capital,coast]);
-    expect(priorities.map(x=>x.reason)).toEqual(['capital','coastal']);
+    expect(priorities.map(x=>x.reason)).toEqual(['capital','port']);
     expect(planGarrisonMoves(w,order)).toMatchObject([{unitId:unit.id,target:capital}]);
     expect(hashWorld(w)).toBe(before);
   });
@@ -61,8 +61,8 @@ describe('threat-aware garrison target priorities',()=>{
     order.provinces=[incheon,coast];
     const a=rankGarrisonTargets(w,order),b=rankGarrisonTargets(w,{owner:c,provinces:[coast,incheon]});
     expect(a).toEqual(b);
-    expect(a.map(p=>p.reason)).toEqual(['coastal','coastal']);
-    expect(a.map(p=>p.province)).toEqual([coast,incheon]); // Busan has higher population
+    expect(a.map(p=>p.reason)).toEqual(['port','port']);
+    expect(a.map(p=>p.province)).toEqual([coast,incheon]); // Busan has higher verified port capacity
     w.prov.controller[coast]=w.countries.id.indexOf('JPN');
     expect(rankGarrisonTargets(w,order).map(p=>p.province)).toEqual([incheon]);
   });
@@ -154,7 +154,7 @@ describe('threat-aware garrison target priorities',()=>{
     const diag=diagnoseGarrisonRoutes(w,1,c,0);
     expect(diag?.targets.map(t=>t.province)).toEqual([capital,coast]);
     expect(diag?.targets.map(t=>t.priorityRank)).toEqual([1,2]);
-    expect(diag?.targets.map(t=>t.priorityReason)).toEqual(['capital','coastal']);
+    expect(diag?.targets.map(t=>t.priorityReason)).toEqual(['capital','port']);
     expect(diag?.targets.map(t=>t.status)).toEqual(['notChecked','notChecked']);
     expect(hashWorld(w)).toBe(before);
     const restored=await createTestEngine(1,20261126,'KOR');

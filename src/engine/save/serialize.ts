@@ -15,6 +15,7 @@ import { hashWorld } from '../core/hash';
 import type { WorldState } from '../core/state';
 import { buildAdjacency } from '../map/adjacency';
 import { recomputeSupply } from '../systems/logistics';
+import {portCapacitiesFromPack} from '../naval/portDefense';
 import { packFingerprint } from '../scenario/loader';
 import type { Pack } from '../scenario/types';
 
@@ -469,6 +470,7 @@ function deserializeWorldInternal(buf: Uint8Array, pack: Pack): LoadResult {
     nextConstructionId: s.counters.nextConstructionId ?? 1,
     nextTreatyId: s.counters.nextTreatyId ?? 1,
     runtime: {
+      portCapacities:portCapacitiesFromPack(pack),
       supplyEff: new Array<number>(provCount).fill(0),
       graphEff: new Map<number, number[]>(),
       unitSupplyFactor: new Map<number, number>(),
