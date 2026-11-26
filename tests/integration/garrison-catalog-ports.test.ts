@@ -1,5 +1,5 @@
 import {describe,expect,it} from 'vitest';
-import {createTestEngine,loadTestPack} from '../helpers';
+import {createTestEngine} from '../helpers';
 import {portCapacitiesFromPack} from '../../src/engine/naval/portDefense';
 import {rankGarrisonTargets} from '../../src/engine/military/garrisonPriorities';
 import {planGarrisonMoves} from '../../src/engine/military/garrisons';
