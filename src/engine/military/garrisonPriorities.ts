@@ -1,15 +1,17 @@
 // Deterministic, read-only strategic ordering for currently controlled garrison targets.
-// Coastal terrain is NOT the maritime port catalog: only a coastal-exposure proxy.
+// Distinguish verified catalog ports from coastal terrain; capacity is a priority proxy.
 import {atWar,type WorldState} from '../core/state';
 import type {GarrisonOrder} from './garrisons';
 
-export type GarrisonPriorityReason='hostileForces'|'hostileBorder'|'capital'|'coastal'|'infrastructure';
+export type GarrisonPriorityReason='hostileForces'|'hostileBorder'|'capital'|'port'|'coastal'|'infrastructure';
 export interface GarrisonTargetPriority {
   province:number;
   hostileNeighbors:number;
   /** Living hostile divisions physically in directly adjacent hostile-controlled provinces. */
   hostileDivisions:number;
   capital:boolean;
+  /** Verified scenario port capacity; zero means no catalogued port. */
+  portCapacity:number;
   coastal:boolean;
   infrastructure:number;
   population:number;
@@ -46,11 +48,12 @@ export function rankGarrisonTargets(
       hostileDivisions+=hostileStack.get(adjacent)??0;
     }
     const capital=w.countries.capital[owner]===province;
+    const portCapacity=w.runtime.portCapacities?.[province]??0;
     const coastal=w.prov.coastal[province];
     const reason:GarrisonPriorityReason=hostileNeighbors>0?
       (hostileDivisions>0?'hostileForces':'hostileBorder'):
-      capital?'capital':coastal?'coastal':'infrastructure';
-    return {province,hostileNeighbors,hostileDivisions,capital,coastal,
+      capital?'capital':portCapacity>0?'port':coastal?'coastal':'infrastructure';
+    return {province,hostileNeighbors,hostileDivisions,capital,portCapacity,coastal,
       infrastructure:w.prov.infra[province],
       population:w.prov.population[province],reason};
   }).sort((a,b)=>
@@ -58,6 +61,7 @@ export function rankGarrisonTargets(
     b.hostileDivisions-a.hostileDivisions||
     b.hostileNeighbors-a.hostileNeighbors||
     Number(b.capital)-Number(a.capital)||
+    b.portCapacity-a.portCapacity||
     Number(b.coastal)-Number(a.coastal)||
     b.infrastructure-a.infrastructure||
     b.population-a.population||
