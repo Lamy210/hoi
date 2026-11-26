@@ -27,6 +27,21 @@ export function segmentDays(w: WorldState, from: number, to: number, unit?: Unit
 }
 
 /**
+ * Shared movement-entry predicate. Garrison preflight must use exactly the
+ * same rules as A*, including the at-war precedence over treaty access.
+ */
+export function canEnterProvince(
+  w:WorldState,p:number,country:number,allowHostile:boolean,
+):boolean {
+  const ctrl=w.prov.controller[p];
+  if(ctrl===country)return true;
+  if(atWar(w,country,ctrl))return allowHostile;
+  if(activeTreatyBetween(w,country,ctrl,'access'))return true;
+  if(isAllied(w,country,ctrl))return true;
+  return false;
+}
+
+/**
  * A*経路探索。敵国支配プロヴィンスは「目的地」以外通過不可（未開戦国は通過可）。
  * 戻り値: プロヴィンス列（from含む）またはnull（到達不可）。
  */
@@ -45,16 +60,7 @@ export function findPath(
   const open: number[] = [from];
   const inOpen = new Array<boolean>(n).fill(false);
   const closed = new Array<boolean>(n).fill(false);
-  const passable = (p: number): boolean => {
-    const ctrl = w.prov.controller[p];
-    if (ctrl === country) return true;
-    // 交戦国の領土は進攻により通過可。未開戦の他国領は通過不可（military-system仕様）
-    if (atWar(w, country, ctrl)) return allowHostile;
-    // 通行権（access条約・同盟）があれば他国領を通過可（D-044）
-    if (activeTreatyBetween(w, country, ctrl, 'access')) return true;
-    if (isAllied(w, country, ctrl)) return true;
-    return false;
-  };
+  const passable = (p: number): boolean => canEnterProvince(w,p,country,allowHostile);
   const h = (p: number): number => {
     return bakedDistanceKm(
       w.prov.cx[p], w.prov.cy[p], w.prov.cosLat[p],
