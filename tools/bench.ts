@@ -43,7 +43,8 @@ async function main():Promise<void>{
     console.log([r.workload,r.units+' divisions',r.targets+' targets',
       'p50='+r.p50Ms.toFixed(2)+'ms','p95='+r.p95Ms.toFixed(2)+'ms',
       'lookups='+r.routeRequests,'searches='+r.pathSearches,'hits='+r.cacheHits,
-      'unreachable='+r.unreachableSearches,'moves='+r.plannedMoves,
+      'unreachable='+r.unreachableSearches,'disconnected='+r.disconnectedSkips,
+      'moves='+r.plannedMoves,
       'heapDelta='+r.heapDeltaKiB.toFixed(0)+'KiB (GC-sensitive)'].join(' | '));
   }
 }

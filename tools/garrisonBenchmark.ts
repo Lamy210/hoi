@@ -31,6 +31,8 @@ export interface GarrisonBenchResult {
   pathSearches:number;
   cacheHits:number;
   unreachableSearches:number;
+  /** Distinct impossible routes rejected by connectivity, without A*. */
+  disconnectedSkips:number;
   plannedMoves:number;
   /** Not a deterministic allocation metric: process GC can affect this value. */
   heapDeltaKiB:number;
@@ -112,6 +114,7 @@ export async function runGarrisonBench(options:GarrisonBenchOptions):Promise<Gar
     minMs:times[0],maxMs:times[times.length-1],
     routeRequests:firstStats.requests,pathSearches:firstStats.searches,
     cacheHits:firstStats.hits,unreachableSearches:firstStats.unreachable,
+    disconnectedSkips:firstStats.disconnected,
     plannedMoves,heapDeltaKiB,
   };
 }

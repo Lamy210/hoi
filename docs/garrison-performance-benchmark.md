@@ -14,7 +14,7 @@ npm run bench -- --pattern distributed --units 48 --targets 16
 - `stacked`：全師団が同一出発州に集結し、同じ経路への問い合わせが多いケース
 - `distributed`：師団が異なる出発州に分散し、キャッシュによる重複排除が効きにくいケース
 - デフォルトでは両パターンでそれぞれ **256師団・64防衛地点** を測定。先行のウォームアップ2回を除く7回の所要時間からp50/p95を求める
-- 合法陸路の `routeRequests`、実際の `pathSearches`、`cacheHits`、`unreachableSearches` を計上。ヒット率は `cacheHits/routeRequests`
+- 合法陸路の `routeRequests`、A*の実際の `pathSearches`、`cacheHits`、`unreachableSearches`、および接続成分の事前判定でA*を省いた `disconnectedSkips` を計上。`routeRequests = pathSearches + cacheHits + disconnectedSkips` を満たす。ヒット率は `cacheHits/routeRequests`。到達不能件数は事前除外を含む。
 - 同じ世界状態を繰り返し計画し、計画内容が一致しない場合やWorldStateハッシュが変化した場合は失敗する。命令は発行しない
 - 出力の `heapDeltaKiB` はGCのタイミングで増減する参考値。確実なピークメモリ・確保量ではない
 

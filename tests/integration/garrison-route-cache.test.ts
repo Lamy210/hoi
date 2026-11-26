@@ -46,7 +46,7 @@ describe('per-planning-invocation garrison land-route cache',()=>{
     expect(findPath(w,busan,jeju,owner,false)).toBeNull();
     expect(lookup(busan,jeju)).toBeNull();
     expect(lookup(busan,jeju)).toBeNull();
-    expect(underlyingSearches).toBe(2);
+    expect(underlyingSearches).toBe(1);
     expect(hashWorld(w)).toBe(before);
 
     // A new planning invocation must re-evaluate the current world rather
@@ -56,7 +56,7 @@ describe('per-planning-invocation garrison land-route cache',()=>{
       return findPath(...args);
     });
     expect(next(busan,incheon)).toEqual(expected);
-    expect(underlyingSearches).toBe(3);
+    expect(underlyingSearches).toBe(2);
   });
 
   it('reports exact lookup, cache hit and unreachable metrics without changing plans',async()=>{
@@ -68,8 +68,51 @@ describe('per-planning-invocation garrison land-route cache',()=>{
     expect(route(busan,incheon)).not.toBeNull();
     expect(route(busan,jeju)).toBeNull();
     expect(route(busan,jeju)).toBeNull();
-    expect(stats).toEqual({requests:4,searches:2,hits:2,unreachable:1});
+    expect(stats).toEqual({requests:4,searches:1,hits:2,unreachable:1,disconnected:1});
     expect(hashWorld(w)).toBe(before);
+  });
+
+  it('preserves findPath reachability for a sample of routes with blocked provinces',async()=>{
+    const {w,owner,busan,incheon,jeju}=await fixture();
+    const before=hashWorld(w);
+    const lookup=createGarrisonRouteLookup(w,owner);
+    const sample=[busan,incheon,jeju, ...w.prov.id
+      .map((id,index)=>({id,index}))
+      .filter(p=>p.id.startsWith('KR-')||p.id.startsWith('KP-'))
+      .slice(0,14).map(p=>p.index)];
+    for(const from of sample){
+      for(const to of sample){
+        // Compare path validity, not path identity, because this preflight
+        // only rejects provably disconnected pairs before the original A*.
+        expect(lookup(from,to)===null,'route '+from+' -> '+to)
+          .toBe(findPath(w,from,to,owner,false)===null);
+      }
+    }
+    expect(hashWorld(w)).toBe(before);
+  });
+
+  it('rechecks control changes on the next invocation and does not reject a blocked origin',async()=>{
+    const {w,owner,busan,incheon}=await fixture();
+    const foreign=w.countries.id.indexOf('PRK');
+    expect(foreign).toBeGreaterThanOrEqual(0);
+    const originalController=w.prov.controller[incheon];
+    // A foreign target cannot be entered without a treaty or access.
+    w.prov.controller[incheon]=foreign;
+    expect(findPath(w,busan,incheon,owner,false)).toBeNull();
+    const stats=emptyGarrisonRouteCacheStats();
+    expect(createGarrisonRouteLookup(w,owner,undefined,stats)(busan,incheon)).toBeNull();
+    expect(stats.disconnected).toBe(1);
+    expect(stats.searches).toBe(0);
+    // After control is restored, the next planning invocation must search
+    // under current rights rather than preserving the prior rejection.
+    w.prov.controller[incheon]=originalController;
+    const restored=createGarrisonRouteLookup(w,owner);
+    expect(restored(busan,incheon)).toEqual(findPath(w,busan,incheon,owner,false));
+    // A blocked origin is intentionally allowed to exit in the original
+    // pathfinder, so the component prefilter must not create a false negative.
+    w.prov.controller[busan]=foreign;
+    const fromForeign=createGarrisonRouteLookup(w,owner);
+    expect(fromForeign(busan,incheon)).toEqual(findPath(w,busan,incheon,owner,false));
   });
 
   it('deduplicates stacked divisions across greedy selection and allocation without changing outcomes',async()=>{
