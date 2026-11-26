@@ -2,7 +2,6 @@
 // Never call from snapshot generation: pathfinding is intentionally explicit.
 import type {Unit,WorldState} from '../core/state';
 import {findPath} from '../systems/movement';
-import type {GarrisonOrder} from './garrisons';
 
 export const MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS=64;
 export type GarrisonRouteStatus=
