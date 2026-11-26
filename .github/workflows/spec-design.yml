@@ -47,6 +47,7 @@ jobs:
       - run: npx openspec validate designated-area-garrison-v21 --strict
       - run: npx openspec validate phase8-maritime-catalog-loader --strict
       - run: npx openspec validate phase8-port-map-visualization --strict
+      - run: npx openspec validate phase8-port-garrison-selection --strict
       - run: npx openspec validate phase8-starter-maritime-pack --strict
       - run: npx openspec validate phase8b-naval-models-capacity --strict
       - run: npx openspec validate phase8-maritime-map --strict
