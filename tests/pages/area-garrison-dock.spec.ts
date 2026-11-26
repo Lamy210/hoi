@@ -58,4 +58,12 @@ test('登録済みの自国港だけを一括で駐屯対象に追加して作�
   await expect(page.getByTestId('dock-garrison-order-1')).toContainText('釜山広域市');
   await expect(page.getByTestId('dock-garrison-order-1')).toContainText('仁川広域市');
   await expect(page.getByTestId('dock-garrison-order-1')).not.toContainText('東京都');
+  const coverage=page.getByTestId('dock-garrison-coverage-1');
+  await expect(coverage).toBeVisible();
+  await expect(coverage).toContainText('防衛中');
+  const targets=page.locator('[data-testid^="dock-garrison-target-1-"]');
+  await expect(targets).toHaveCount(2);
+  // With one assigned division and two ports at least one target must
+  // remain uncovered until additional divisions are assigned.
+  expect((await targets.allTextContents()).filter(s=>s.includes('未防衛')).length).toBeGreaterThanOrEqual(1);
 });

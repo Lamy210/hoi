@@ -6,6 +6,7 @@ import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 import {engineClient} from './engineClient';
 import {MAX_GARRISON_TARGETS,MAX_GARRISON_UNITS} from '../engine/military/garrisons';
 import {controlledPortTargets,appendGarrisonPortTargets} from './garrisonPortTargets';
+import {projectGarrisonCoverage} from './garrisonCoverage';
 
 type Props={
   snap:UiSnapshot;
@@ -228,21 +229,48 @@ export function ArmyCommandDock({
         <small className="muted">{label('地図で選択した州を優先して追加します。軍団・軍集団にフォーカス中はその所属師団、そうでなければ選択師団が対象です。戦線と駐屯の二重割当はできません。',
           'Map-selected province takes precedence. Uses focused formation or selected divisions. A division cannot serve a frontline and garrison simultaneously.')}</small>
       </div>
-      {ownGarrisons.map(g=><div key={g.id} className="army-dock-garrison-order"
-        data-testid={'dock-garrison-order-'+g.id}>
-        <span><strong>#{g.id}</strong> {g.provinces.map(p=>provinceNames[p]).join(' · ')}</span>
-        <span>{g.unitIds.length} {label('師団','divisions')} · {g.paused?label('停止中','Paused'):label('自動防衛中','Active')}</span>
-        <button data-testid={'dock-garrison-select-'+g.id}
-          onClick={()=>onSelect(g.unitIds)}>{label('師団選択','Select units')}</button>
-        <button data-testid={'dock-garrison-pause-'+g.id} disabled={busy}
-          onClick={()=>engineClient.command('setGarrisonPaused',{
-            orderId:g.id,expectedRevision:g.revision,paused:!g.paused,
-          })}>{g.paused?label('再開','Resume'):label('停止','Pause')}</button>
-        <button data-testid={'dock-garrison-delete-'+g.id} disabled={busy}
-          onClick={()=>engineClient.command('deleteGarrison',{
-            orderId:g.id,expectedRevision:g.revision,
-          })}>{label('解除','Remove')}</button>
-      </div>)}
+      {ownGarrisons.map(g=>{
+        const coverage=projectGarrisonCoverage(g,snap);
+        const guarded=coverage.filter(p=>p.status==='guarded').length;
+        const incoming=coverage.filter(p=>p.status==='incoming').length;
+        const lost=coverage.filter(p=>p.status==='lost').length;
+        return <div key={g.id} className="army-dock-garrison-order"
+          data-testid={'dock-garrison-order-'+g.id}>
+          <span><strong>#{g.id}</strong> {g.provinces.map(p=>provinceNames[p]).join(' · ')}</span>
+          <span>{g.unitIds.length} {label('師団','divisions')} · {g.paused?label('停止中','Paused'):label('自動防衛中','Active')}</span>
+          <button data-testid={'dock-garrison-select-'+g.id}
+            onClick={()=>onSelect(g.unitIds)}>{label('師団選択','Select units')}</button>
+          <button data-testid={'dock-garrison-pause-'+g.id} disabled={busy}
+            onClick={()=>engineClient.command('setGarrisonPaused',{
+              orderId:g.id,expectedRevision:g.revision,paused:!g.paused,
+            })}>{g.paused?label('再開','Resume'):label('停止','Pause')}</button>
+          <button data-testid={'dock-garrison-delete-'+g.id} disabled={busy}
+            onClick={()=>engineClient.command('deleteGarrison',{
+              orderId:g.id,expectedRevision:g.revision,
+            })}>{label('解除','Remove')}</button>
+          <div className="army-dock-garrison-coverage" data-testid={'dock-garrison-coverage-'+g.id}>
+            <small>{label('防衛中','Guarded')}: {guarded}/{coverage.length} ·
+              {label('移動中','Incoming')}: {incoming} · {label('支配喪失','Lost')}: {lost}</small>
+            {coverage.map(p=>{
+              const status=p.status==='guarded'?label('防衛中','Guarded'):
+                p.status==='incoming'?label('移動中','Incoming'):
+                p.status==='lost'?label('支配喪失','Lost'):label('未防衛','Uncovered');
+              const reason=p.gapReason==='paused'?label('作戦停止中','Order paused'):
+                p.gapReason==='noUnits'?label('配属師団なし','No assigned divisions'):
+                p.gapReason==='noAvailableUnits'?label('移動可能な師団なし','No available divisions'):
+                p.gapReason==='awaitingOrders'?label('作戦・経路確認待ち','Awaiting orders / path check'):'';
+              return <small key={p.province} data-testid={'dock-garrison-target-'+g.id+'-'+p.province}>
+                {provinceNames[p.province]??'#'+p.province}: {status}
+                {p.status==='guarded'?' ('+p.guardingUnitIds.length+')':''}
+                {p.status==='incoming'?' ('+p.incomingUnitIds.length+')':''}
+                {reason?' · '+reason:''}
+              </small>;
+            })}
+            <small className="muted">{label('現時点の師団位置と命令から判定。到達不能かどうかは未確認です。',
+              'Based on current positions and orders; route reachability is not determined.')}</small>
+          </div>
+        </div>;
+      })}
     </details>
   </section>;
 }
