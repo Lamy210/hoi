@@ -3,7 +3,7 @@ import {createTestEngine} from '../helpers';
 import {hashWorld} from '../../src/engine/core/hash';
 import {findPath} from '../../src/engine/systems/movement';
 import {planGarrisonMoves,GARRISON_COMMAND_BUDGET,type GarrisonMovePlan} from '../../src/engine/military/garrisons';
-import {estimateGarrisonTravelDays,optimizeGarrisonBatch} from '../../src/engine/military/garrisonBatchOptimization';
+import {estimateGarrisonTravelDays,optimizeGarrisonBatch,selectGarrisonReserveCandidates,MAX_GARRISON_EXTRA_RESERVES} from '../../src/engine/military/garrisonBatchOptimization';
 import type {Unit,WorldState} from '../../src/engine/core/state';
 
 async function fixture(){
@@ -78,6 +78,69 @@ describe('bounded garrison batch assignment optimization',()=>{
     expect(duration(w,result)).toBeCloseTo(best,8);
     expect(result.map(p=>p.target)).toEqual(targets);
     expect(new Set(result.map(p=>p.unitId))).toEqual(new Set(selected.map(u=>u.id)));
+    expect(hashWorld(w)).toBe(before);
+  });
+
+  it('uses an unselected nearby reserve when it improves the chosen two-port assignment',async()=>{
+    const {w,a,b,d,busan,incheon,province,g}=await fixture();
+    a.loc=province('KR-45');b.loc=province('KR-46');d.loc=province('KR-27');
+    g.unitIds=[a.id,b.id,d.id];
+    const original=[pathPlan(w,a,busan),pathPlan(w,b,incheon)];
+    const before=hashWorld(w);
+    const pool=selectGarrisonReserveCandidates(w,g,original);
+    expect(pool.map(u=>u.id)).toEqual([d.id]);
+    const baseline=optimizeGarrisonBatch(w,original);
+    const improved=optimizeGarrisonBatch(w,original,pool);
+    expect(improved.map(p=>p.target)).toEqual([busan,incheon]);
+    expect(improved).toHaveLength(2);
+    expect(new Set(improved.map(p=>p.unitId)).size).toBe(2);
+    expect(improved.some(p=>p.unitId===d.id)).toBe(true);
+    expect(duration(w,improved)).toBeLessThan(duration(w,baseline));
+    expect(original.map(p=>p.unitId)).toEqual([a.id,b.id]);
+    expect(hashWorld(w)).toBe(before);
+    // The normal planner may already have used that reserve in its greedy
+    // stage; optimization must never make the chosen pair slower.
+    const planned=planGarrisonMoves(w,g);
+    expect(planned.map(p=>p.target)).toEqual([busan,incheon]);
+    expect(duration(w,planned)).toBeLessThanOrEqual(duration(w,baseline));
+    expect(hashWorld(w)).toBe(before);
+  });
+
+  it('does not pull a guard or a manually held or moving reserve from a target',async()=>{
+    const {w,a,b,d,busan,incheon,province,g}=await fixture();
+    a.loc=province('KR-45');b.loc=province('KR-46');d.loc=incheon;
+    g.unitIds=[a.id,b.id,d.id];
+    const proposed=[pathPlan(w,a,busan),pathPlan(w,b,incheon)];
+    expect(selectGarrisonReserveCandidates(w,g,proposed)).toEqual([]);
+    d.loc=province('KR-27');d.manualHold=true;
+    expect(selectGarrisonReserveCandidates(w,g,proposed)).toEqual([]);
+    d.manualHold=false;d.path=[d.loc,busan];
+    expect(selectGarrisonReserveCandidates(w,g,proposed)).toEqual([]);
+    d.path=[];d.encircled=true;
+    expect(selectGarrisonReserveCandidates(w,g,proposed)).toEqual([]);
+    d.encircled=false;d.frontId=3;
+    expect(selectGarrisonReserveCandidates(w,g,proposed)).toEqual([]);
+    d.frontId=-1;
+    expect(selectGarrisonReserveCandidates(w,g,proposed).map(u=>u.id)).toEqual([d.id]);
+  });
+
+  it('caps extra reserve exploration at eight candidates with deterministic ties',async()=>{
+    const {w,a,b,d,busan,incheon,province,g}=await fixture();
+    a.loc=province('KR-45');b.loc=province('KR-46');
+    const origin=province('KR-27');
+    const proposed=[pathPlan(w,a,busan),pathPlan(w,b,incheon)];
+    const extras=Array.from({length:MAX_GARRISON_EXTRA_RESERVES+4},(_,i)=>({
+      ...d,id:200000+i,loc:origin,path:[],manualHold:false,encircled:false,frontId:-1,
+    }));
+    w.units.push(...extras);
+    g.unitIds=[a.id,b.id,...extras.map(u=>u.id)];
+    const before=hashWorld(w);
+    const reserves=selectGarrisonReserveCandidates(w,g,proposed);
+    expect(reserves.map(u=>u.id)).toEqual(extras.slice(0,MAX_GARRISON_EXTRA_RESERVES).map(u=>u.id));
+    const optimized=optimizeGarrisonBatch(w,proposed,reserves);
+    expect(optimized.length).toBe(2);
+    expect(optimized.map(x=>x.target)).toEqual([busan,incheon]);
+    expect(duration(w,optimized)).toBeLessThanOrEqual(duration(w,proposed));
     expect(hashWorld(w)).toBe(before);
   });
 
