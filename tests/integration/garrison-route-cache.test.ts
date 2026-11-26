@@ -2,7 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {createTestEngine} from '../helpers';
 import {hashWorld} from '../../src/engine/core/hash';
 import {findPath} from '../../src/engine/systems/movement';
-import {createGarrisonRouteLookup} from '../../src/engine/military/garrisonRouteCache';
+import {createGarrisonRouteLookup,emptyGarrisonRouteCacheStats} from '../../src/engine/military/garrisonRouteCache';
 import {optimizeGarrisonBatch} from '../../src/engine/military/garrisonBatchOptimization';
 import {planGarrisonMoves} from '../../src/engine/military/garrisons';
 
@@ -57,6 +57,19 @@ describe('per-planning-invocation garrison land-route cache',()=>{
     });
     expect(next(busan,incheon)).toEqual(expected);
     expect(underlyingSearches).toBe(3);
+  });
+
+  it('reports exact lookup, cache hit and unreachable metrics without changing plans',async()=>{
+    const {w,owner,busan,incheon,jeju}=await fixture();
+    const stats=emptyGarrisonRouteCacheStats();
+    const before=hashWorld(w);
+    const route=createGarrisonRouteLookup(w,owner,undefined,stats);
+    expect(route(busan,incheon)).not.toBeNull();
+    expect(route(busan,incheon)).not.toBeNull();
+    expect(route(busan,jeju)).toBeNull();
+    expect(route(busan,jeju)).toBeNull();
+    expect(stats).toEqual({requests:4,searches:2,hits:2,unreachable:1});
+    expect(hashWorld(w)).toBe(before);
   });
 
   it('deduplicates stacked divisions across greedy selection and allocation without changing outcomes',async()=>{
