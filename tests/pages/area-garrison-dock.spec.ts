@@ -50,6 +50,7 @@ test('登録済みの自国港だけを一括で駐屯対象に追加して作�
   await page.getByTestId('dock-garrison-add-ports').click();
   await expect(page.getByTestId('dock-garrison-targets')).toContainText('釜山広域市');
   await expect(page.getByTestId('dock-garrison-targets')).toContainText('仁川広域市');
+  await expect(page.getByTestId('dock-garrison-insufficient-units')).toContainText('全地点を同時に守れません');
   await expect(page.getByTestId('dock-garrison-add-ports')).toBeDisabled();
   await expect(page.getByTestId('dock-garrison-create')).toBeEnabled();
   await page.getByTestId('dock-garrison-create').click();
