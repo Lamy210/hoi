@@ -58,6 +58,7 @@ jobs:
       - run: npx openspec validate garrison-reserve-pool-assignment --strict
       - run: npx openspec validate garrison-command-last-guard-validation --strict
       - run: npx openspec validate garrison-physical-guard-coverage --strict
+      - run: npx openspec validate garrison-readonly-guard-consistency --strict
       - run: npx openspec validate phase8-starter-maritime-pack --strict
       - run: npx openspec validate phase8b-naval-models-capacity --strict
       - run: npx openspec validate phase8-maritime-map --strict
