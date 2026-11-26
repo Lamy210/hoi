@@ -84,6 +84,27 @@ export function validateGarrisons(w:WorldState):string[]{
 
 export interface GarrisonMovePlan {unitId:number;target:number;path:number[]}
 
+/**
+ * Return true when this unit is the last assigned coverage of an owned target.
+ * This defensive check is repeated when the queued AI movement is applied:
+ * between planning and execution, another guard may have moved or died.
+ * Incoming assigned guards count as coverage, matching planGarrisonMoves.
+ */
+export function isLastGarrisonGuard(
+  w:WorldState,g:GarrisonOrder,u:Unit,
+):boolean{
+  if(!g.provinces.includes(u.loc)||w.prov.controller[u.loc]!==g.owner)return false;
+  for(const otherId of g.unitIds){
+    if(otherId===u.id)continue;
+    const other=w.units.find(v=>v.id===otherId&&!v.destroyed&&v.owner===g.owner);
+    if(!other)continue;
+    const destination=other.path.length>1?other.path[other.path.length-1]:other.loc;
+    if(destination===u.loc)return false;
+  }
+  return true;
+}
+
+
 /** Stable one-tick planning: defend threatened and strategically important targets
  * first, never strip their last guard. Only legitimate land paths are considered. */
 export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan[]{
