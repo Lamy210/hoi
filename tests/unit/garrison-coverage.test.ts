@@ -56,6 +56,19 @@ describe('garrison coverage snapshot projection',()=>{
     expect(projectGarrisonCoverage(target,s)[0].gapReason).toBe('awaitingOrders');
   });
 
+  it('does not pull the last guard from an occupied objective when explaining gaps',()=>{
+    const target=order({provinces:[1,2],unitIds:[10,11]});
+    const single={
+      controller:controllers,
+      units:[unit(10,{loc:1}),unit(11,{loc:0,manualHold:true})],
+    };
+    expect(projectGarrisonCoverage(target,single)[1]).toMatchObject({
+      province:2,status:'uncovered',gapReason:'noAvailableUnits',
+    });
+    const reserve={...single,units:[unit(10,{loc:1}),unit(11,{loc:1})]};
+    expect(projectGarrisonCoverage(target,reserve)[1].gapReason).toBe('awaitingOrders');
+  });
+
   it('ignores foreign divisions, handles duplicate targets, and sorts IDs and provinces',()=>{
     const g=order({provinces:[3,1,3,2],unitIds:[11,10,12]});
     const snap={controller:controllers,units:[
