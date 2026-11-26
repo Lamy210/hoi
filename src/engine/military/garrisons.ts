@@ -3,7 +3,7 @@
 import type {Unit,WorldState} from '../core/state';
 import {findPath} from '../systems/movement';
 import {rankGarrisonTargets} from './garrisonPriorities';
-import {estimateGarrisonTravelDays,optimizeGarrisonBatch} from './garrisonBatchOptimization';
+import {estimateGarrisonTravelDays,optimizeGarrisonBatch,selectGarrisonReserveCandidates} from './garrisonBatchOptimization';
 
 export interface GarrisonOrder {
   id:number;
@@ -116,7 +116,8 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
     if(coverage.has(best.u.loc))coverage.set(best.u.loc,coverage.get(best.u.loc)!-1);
     coverage.set(target,coverage.get(target)!+1);
   }
-  // Only exchange destinations among the already selected units and targets.
-  // Source guard quotas and the priority-ordered set of covered targets stay fixed.
-  return optimizeGarrisonBatch(w,orders);
+  // Keep the chosen objectives and the existing guard withdrawals fixed, but
+  // consider nearby idle reserves outside every protected objective as well.
+  const reserves=selectGarrisonReserveCandidates(w,g,orders);
+  return optimizeGarrisonBatch(w,orders,reserves);
 }
