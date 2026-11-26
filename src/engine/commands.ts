@@ -15,7 +15,7 @@ import { AUTO_ATTACK_MIN_ORG, COUNTERATTACK_MIN_ORG, autoFrontProvinces, frontOf
 import { planFrontDeployment } from './military/frontDeployment';
 import {planGroupFrontAssignments} from './military/groupFrontAssignments';
 import {planGroupFrontDeployment} from './military/groupFrontDeployment';
-import {validateGarrisonCreation} from './military/garrisons';
+import {validateGarrisonCreation,isLastGarrisonGuard} from './military/garrisons';
 import { divisionTemplate, MAX_TRAINING, type DivisionTemplateId } from './military/templates';
 import { refundTraining, deployTrainingOrder } from './systems/training';
 import { MAX_ART_SHARE } from './systems/production';
@@ -784,6 +784,9 @@ export function registerAllCommands(): void {
       const target=p.target as number;
       if(!Number.isSafeInteger(target)||!g.provinces.includes(target)||
         w.prov.controller[target]!==g.owner||target===u.loc)return 'staleGarrisonOrder';
+      // Re-check after planning: another guard might have moved, been lost or
+      // received a different order before this queued AI command is applied.
+      if(isLastGarrisonGuard(w,g,u))return 'staleGarrisonOrder';
       const route=findPath(w,u.loc,target,g.owner,false);
       if(!route||route.length<2)return 'noPath';
       return null;
