@@ -5,6 +5,7 @@ import type { WorldState } from '../core/state';
 import { TERRAIN } from '../core/state';
 import { buildAdjacency } from '../map/adjacency';
 import { recomputeSupply } from '../systems/logistics';
+import {portCapacitiesFromPack} from '../naval/portDefense';
 import { UNIT_MAX_ART_EQUIPMENT, UNIT_MAX_INF_EQUIPMENT, UNIT_MAX_MANPOWER } from './unitCosts';
 import { generateCommanders } from '../military/commanders';
 import { legacyProductionLineState } from '../systems/productionLineState';
@@ -157,6 +158,7 @@ export function buildWorld(pack: Pack, opts: BuildOptions): WorldState {
     nextConstructionId: 1,
     nextTreatyId: 1,
     runtime: {
+      portCapacities:portCapacitiesFromPack(pack),
       supplyEff: new Array<number>(n).fill(0),
       graphEff: new Map<number, number[]>(),
       unitSupplyFactor: new Map<number, number>(),
