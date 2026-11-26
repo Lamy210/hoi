@@ -7,6 +7,7 @@ import {engineClient} from './engineClient';
 import {MAX_GARRISON_TARGETS,MAX_GARRISON_UNITS} from '../engine/military/garrisons';
 import {controlledPortTargets,appendGarrisonPortTargets} from './garrisonPortTargets';
 import {projectGarrisonCoverage} from './garrisonCoverage';
+import type {GarrisonRouteDiagnosis,GarrisonRouteTarget} from '../engine/military/garrisonRouteDiagnostics';
 
 type Props={
   snap:UiSnapshot;
@@ -41,6 +42,9 @@ export function ArmyCommandDock({
   const [deployMode,setDeployMode]=useState<FrontDeploymentMode>('even');
   const [garrisonTargets,setGarrisonTargets]=useState<number[]>([]);
   const [garrisonProvince,setGarrisonProvince]=useState('');
+  const [routeDiagnosis,setRouteDiagnosis]=useState<GarrisonRouteDiagnosis|null>(null);
+  const [diagnosingOrder,setDiagnosingOrder]=useState<number|null>(null);
+  const [diagnosisError,setDiagnosisError]=useState<string|null>(null);
   const fronts=snap.fronts.filter(f=>f.owner===country);
   const currentFront=fronts.find(f=>String(f.id)===deployFrontId)??fronts[0];
   const targetUnits=focus?formationUnits(snap,focus):selected;
@@ -231,6 +235,8 @@ export function ArmyCommandDock({
       </div>
       {ownGarrisons.map(g=>{
         const coverage=projectGarrisonCoverage(g,snap);
+        const diagnosis=routeDiagnosis?.orderId===g.id&&routeDiagnosis.revision===g.revision&&
+          routeDiagnosis.tick===snap.tick?routeDiagnosis:null;
         const guarded=coverage.filter(p=>p.status==='guarded').length;
         const incoming=coverage.filter(p=>p.status==='incoming').length;
         const lost=coverage.filter(p=>p.status==='lost').length;
@@ -248,6 +254,19 @@ export function ArmyCommandDock({
             onClick={()=>engineClient.command('deleteGarrison',{
               orderId:g.id,expectedRevision:g.revision,
             })}>{label('解除','Remove')}</button>
+          <button data-testid={'dock-garrison-diagnose-'+g.id}
+            disabled={busy||diagnosingOrder!==null}
+            onClick={()=>{
+              setDiagnosisError(null);
+              setRouteDiagnosis(null);
+              setDiagnosingOrder(g.id);
+              void engineClient.diagnoseGarrison(g.id)
+                .then(result=>setRouteDiagnosis(result))
+                .catch(error=>setDiagnosisError(String(error)))
+                .finally(()=>setDiagnosingOrder(null));
+            }}>
+            {diagnosingOrder===g.id?label('診断中','Checking'):label('陸路を診断','Check land routes')}
+          </button>
           <div className="army-dock-garrison-coverage" data-testid={'dock-garrison-coverage-'+g.id}>
             <small>{label('防衛中','Guarded')}: {guarded}/{coverage.length} ·
               {label('移動中','Incoming')}: {incoming} · {label('支配喪失','Lost')}: {lost}</small>
@@ -266,8 +285,36 @@ export function ArmyCommandDock({
                 {reason?' · '+reason:''}
               </small>;
             })}
-            <small className="muted">{label('現時点の師団位置と命令から判定。到達不能かどうかは未確認です。',
-              'Based on current positions and orders; route reachability is not determined.')}</small>
+            {diagnosis&&<div className="army-dock-garrison-diagnostics"
+              data-testid={'dock-garrison-diagnostics-'+g.id}>
+              <strong>{label('陸路診断結果','Land route diagnosis')} ·
+                {label('経路検査','Path checks')}: {diagnosis.pathChecks}</strong>
+              {diagnosis.targets.map((p:GarrisonRouteTarget)=>{
+                const status=p.status==='guarded'?label('防衛中','Guarded'):
+                  p.status==='incoming'?label('移動中','Incoming'):
+                  p.status==='lost'?label('支配喪失','Lost'):
+                  p.status==='paused'?label('作戦停止中','Order paused'):
+                  p.status==='noEligibleUnits'?label('移動可能な師団なし','No eligible division'):
+                  p.status==='routeAvailable'?label('陸路あり（同時配置は未確約）','Route exists (not a deployment guarantee)'):
+                  p.status==='noLandPath'?label('現在の条件では陸路なし','No land route under current conditions'):
+                  label('検査上限のため未確認','Not checked: diagnostic limit');
+                return <small key={p.province}
+                  data-testid={'dock-garrison-route-'+g.id+'-'+p.province}>
+                  {provinceNames[p.province]??'#'+p.province}: {status}
+                  {p.status==='routeAvailable'&&p.candidateUnitId!==undefined?
+                    ' · '+label('候補師団','Candidate division')+' #'+p.candidateUnitId:''}
+                </small>;
+              })}
+              {diagnosis.truncated&&<small>{label('診断上限に達したため、一部地点は未確認です。',
+                'Route check limit reached; some targets were not checked.')}</small>}
+              <small>{label('この診断は移動命令を出しません。実際の作戦時は経路・状態を再検証します。',
+                'Read-only check. Route legality and state are revalidated when issuing orders.')}</small>
+            </div>}
+            {diagnosisError&&<small data-testid="dock-garrison-diagnosis-error">
+              {label('診断失敗','Diagnosis failed')}: {diagnosisError}
+            </small>}
+            <small className="muted">{label('現時点の師団位置と命令から判定。到達不能かどうかは陸路診断で確認できます。',
+              'Coverage is based on current positions and orders. Use the land-route check for reachability.')}</small>
           </div>
         </div>;
       })}
