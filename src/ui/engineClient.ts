@@ -5,6 +5,7 @@ import { loadPack, defaultFetch, cryptoAvailable, loadVerifiedPackAsset } from '
 import type { Pack } from '../engine/scenario/types';
 import type { UiMeta, UiSnapshot } from '../engine/ui';
 import type { TemplateComposition, TemplatePreview } from '../engine/military/templateStats';
+import type {GarrisonRouteDiagnosis} from '../engine/military/garrisonRouteDiagnostics';
 import type { TraceRequest, TraceResult } from '../engine/engine';
 import { appStore } from './store';
 import { saveAutosave } from './idb';
@@ -278,6 +279,12 @@ export class EngineClient {
     } finally {
       this.loading = false;
     }
+  }
+
+  /** Read-only, on-demand route check for one owned garrison order. */
+  async diagnoseGarrison(orderId:number):Promise<GarrisonRouteDiagnosis> {
+    const m=await this.request({type:'diagnoseGarrison',orderId},'garrisonDiagnosis',8000);
+    return m.result as GarrisonRouteDiagnosis;
   }
 
   async previewTemplate(composition: TemplateComposition): Promise<TemplatePreview> {

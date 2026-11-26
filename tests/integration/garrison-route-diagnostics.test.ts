@@ -1,0 +1,90 @@
+import {describe,expect,it} from 'vitest';
+import {createTestEngine} from '../helpers';
+import {hashWorld} from '../../src/engine/core/hash';
+import {findPath} from '../../src/engine/systems/movement';
+import {diagnoseGarrisonRoutes,MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS} from '../../src/engine/military/garrisonRouteDiagnostics';
+
+async function fixture(){
+  const e=await createTestEngine(1,20261126,'KOR'),w=e.world,c=w.playerCountry;
+  const busan=w.prov.id.indexOf('KR-26');
+  const incheon=w.prov.id.indexOf('KR-28');
+  const jeju=w.prov.id.indexOf('KR-49');
+  expect(busan).toBeGreaterThanOrEqual(0);
+  expect(incheon).toBeGreaterThanOrEqual(0);
+  expect(jeju).toBeGreaterThanOrEqual(0);
+  const u=w.units.find(unit=>unit.owner===c&&!unit.destroyed)!;
+  expect(u).toBeDefined();
+  u.loc=busan;
+  u.path=[];u.segIdx=0;u.segProgress=0;u.segDays=0;
+  u.manualHold=false;u.encircled=false;u.frontId=-1;
+  w.garrisons.push({id:1,owner:c,provinces:[incheon,jeju],unitIds:[u.id],paused:false,revision:1});
+  w.nextGarrisonId=2;
+  return {e,w,c,u,busan,incheon,jeju};
+}
+
+describe('read-only on-demand garrison land-route diagnosis',()=>{
+  it('distinguishes a viable mainland route from an isolated owned island',async()=>{
+    const {w,c,u,incheon,jeju,busan}=await fixture();
+    expect(findPath(w,busan,incheon,c,false)).not.toBeNull();
+    expect(findPath(w,busan,jeju,c,false)).toBeNull();
+    const before=hashWorld(w);
+    const result=diagnoseGarrisonRoutes(w,1,c);
+    expect(result).not.toBeNull();
+    expect(result?.tick).toBe(w.tick);
+    expect(result?.revision).toBe(1);
+    expect(result?.pathChecks).toBeLessThanOrEqual(MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS);
+    expect(result?.targets.find(x=>x.province===incheon)).toMatchObject({
+      province:incheon,status:'routeAvailable',candidateUnitId:u.id,
+    });
+    expect(result?.targets.find(x=>x.province===jeju)).toMatchObject({
+      province:jeju,status:'noLandPath',
+    });
+    expect(hashWorld(w)).toBe(before);
+    expect(u.path).toEqual([]);
+  });
+
+  it('reports a bounded or unavailable check, never guessing a route',async()=>{
+    const {w,c,u,incheon,jeju}=await fixture();
+    expect(diagnoseGarrisonRoutes(w,1,c,0)?.targets.map(t=>t.status))
+      .toEqual(['notChecked','notChecked']);
+    expect(diagnoseGarrisonRoutes(w,1,c,0)?.truncated).toBe(true);
+    u.manualHold=true;
+    expect(diagnoseGarrisonRoutes(w,1,c)?.targets.map(t=>t.status))
+      .toEqual(['noEligibleUnits','noEligibleUnits']);
+    u.manualHold=false;
+    w.garrisons[0].paused=true;
+    expect(diagnoseGarrisonRoutes(w,1,c)?.targets.map(t=>t.status))
+      .toEqual(['paused','paused']);
+    w.garrisons[0].paused=false;
+    w.garrisons[0].unitIds=[];
+    expect(diagnoseGarrisonRoutes(w,1,c)?.targets.map(t=>t.status))
+      .toEqual(['noEligibleUnits','noEligibleUnits']);
+    expect(incheon).not.toBe(jeju);
+  });
+
+  it('shows guard, incoming route and lost province without path search',async()=>{
+    const {w,c,u,busan,incheon,jeju}=await fixture();
+    w.garrisons[0].provinces=[jeju,busan,incheon];
+    u.path=[busan,incheon];
+    expect(diagnoseGarrisonRoutes(w,1,c)?.targets.find(t=>t.province===incheon)?.status).toBe('incoming');
+    expect(diagnoseGarrisonRoutes(w,1,c)?.targets.find(t=>t.province===busan)?.status).toBe('noEligibleUnits');
+    u.path=[];
+    expect(diagnoseGarrisonRoutes(w,1,c)?.targets.find(t=>t.province===busan)?.status).toBe('guarded');
+    const enemy=w.countries.id.indexOf('JPN');
+    expect(enemy).toBeGreaterThanOrEqual(0);
+    w.prov.controller[jeju]=enemy;
+    expect(diagnoseGarrisonRoutes(w,1,c)?.targets.find(t=>t.province===jeju)?.status).toBe('lost');
+  });
+
+  it('denies foreign and malformed requests and keeps existing orders untouched',async()=>{
+    const {w,c}=await fixture();
+    expect(diagnoseGarrisonRoutes(w,1,c+1)).toBeNull();
+    expect(diagnoseGarrisonRoutes(w,999999,c)).toBeNull();
+    expect(diagnoseGarrisonRoutes(w,0,c)).toBeNull();
+    expect(diagnoseGarrisonRoutes(w,Number.NaN,c)).toBeNull();
+    const before=hashWorld(w);
+    const result=diagnoseGarrisonRoutes(w,1,c,Number.MAX_SAFE_INTEGER);
+    expect(result?.pathChecks).toBeLessThanOrEqual(MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS);
+    expect(hashWorld(w)).toBe(before);
+  });
+});

@@ -66,4 +66,12 @@ test('登録済みの自国港だけを一括で駐屯対象に追加して作�
   // With one assigned division and two ports at least one target must
   // remain uncovered until additional divisions are assigned.
   expect((await targets.allTextContents()).filter(s=>s.includes('未防衛')).length).toBeGreaterThanOrEqual(1);
+  await expect(page.getByTestId('dock-garrison-diagnose-1')).toBeEnabled();
+  await page.getByTestId('dock-garrison-diagnose-1').click();
+  const diagnosis=page.getByTestId('dock-garrison-diagnostics-1');
+  await expect(diagnosis).toBeVisible();
+  await expect(diagnosis).toContainText('陸路診断結果');
+  await expect(page.locator('[data-testid^="dock-garrison-route-1-"]')).toHaveCount(2);
+  // Diagnosis is read-only; it must not queue any game command.
+  await expect(page.getByTestId('dock-garrison-order-1')).toContainText('自動防衛中');
 });
