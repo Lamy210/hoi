@@ -1,7 +1,7 @@
 // Persistent defensive area orders. Never silently move divisions assigned to
 // frontline operations or under explicit manual control.
 import type {Unit,WorldState} from '../core/state';
-import {findPath} from '../systems/movement';
+import {createGarrisonRouteLookup} from './garrisonRouteCache';
 import {rankGarrisonTargets} from './garrisonPriorities';
 import {estimateGarrisonTravelDays,optimizeGarrisonBatch,selectGarrisonReserveCandidates} from './garrisonBatchOptimization';
 
@@ -109,6 +109,8 @@ export function isLastGarrisonGuard(
 export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan[]{
   if(g.paused||!w.countries.alive[g.owner])return [];
   const targets=rankGarrisonTargets(w,g).map(t=>t.province);
+  // A fresh lookup per plan prevents stale paths across world-state changes.
+  const routeLookup=createGarrisonRouteLookup(w,g.owner);
   const units=g.unitIds.map(id=>w.units.find(u=>u.id===id))
     .filter((u):u is Unit=>!!u&&!u.destroyed&&u.owner===g.owner);
   // Planned arrivals cover future assignments, but cannot hold the province
@@ -129,7 +131,7 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
       !u.encircled&&!u.path.length&&!w.runtime.activeBattles.has(u.loc)&&
       w.prov.controller[u.loc]===g.owner&&u.frontId<0&&u.loc!==target&&
       (!stationed.has(u.loc)||stationed.get(u.loc)!>1))
-      .map(u=>({u,path:findPath(w,u.loc,target,g.owner,false)}))
+      .map(u=>({u,path:routeLookup(u.loc,target)}))
       .filter((v):v is {u:Unit;path:number[]}=>!!v.path&&v.path.length>1)
       .map(v=>({...v,days:estimateGarrisonTravelDays(w,v.u,v.path)}))
       .filter(v=>Number.isFinite(v.days))
@@ -145,5 +147,5 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
   // Keep the chosen objectives and the existing guard withdrawals fixed, but
   // consider nearby idle reserves outside every protected objective as well.
   const reserves=selectGarrisonReserveCandidates(w,g,orders);
-  return optimizeGarrisonBatch(w,orders,reserves);
+  return optimizeGarrisonBatch(w,orders,reserves,routeLookup);
 }
