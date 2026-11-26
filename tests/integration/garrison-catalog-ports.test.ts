@@ -74,10 +74,6 @@ describe('catalogued port defenses without changing save schemas',()=>{
     expect(restored.world.runtime.portCapacities?.[incheon]).toBe(80);
     expect(rankGarrisonTargets(restored.world,restored.world.garrisons[0])).toEqual(initial);
     expect(diagnoseGarrisonRoutes(restored.world,1,c,0)?.targets.map(t=>t.portCapacity)).toEqual([110,80]);
-    for(let tick=0;tick<10;tick++){
-      e.loadFrom(saved); // reset runtime cache to verified pack before deterministic steps
-      break;
-    }
     expect(e.loadFrom(saved).ok).toBe(true);
     for(let tick=0;tick<14;tick++){
       e.stepTick();restored.stepTick();
