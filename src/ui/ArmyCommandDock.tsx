@@ -298,7 +298,8 @@ export function ArmyCommandDock({
                   p.status==='routeAvailable'?label('陸路あり（同時配置は未確約）','Route exists (not a deployment guarantee)'):
                   p.status==='noLandPath'?label('現在の条件では陸路なし','No land route under current conditions'):
                   label('検査上限のため未確認','Not checked: diagnostic limit');
-                const priority=p.priorityReason==='hostileBorder'?label('敵と接する州','Hostile border'):
+                const priority=p.priorityReason==='hostileForces'?label('隣接敵師団の集結','Concentrated hostile divisions'):
+                  p.priorityReason==='hostileBorder'?label('敵と接する州','Hostile border'):
                   p.priorityReason==='capital'?label('首都','Capital'):
                   p.priorityReason==='coastal'?label('沿岸','Coastal'):
                   label('インフラ・人口','Infrastructure / population');
@@ -307,14 +308,16 @@ export function ArmyCommandDock({
                   {provinceNames[p.province]??'#'+p.province}: {status}
                   {p.priorityRank!==undefined?
                     ' · '+label('防衛優先','Defense priority')+' #'+p.priorityRank+' ('+priority+')':''}
+                  {p.hostileDivisions!==undefined&&p.hostileDivisions>0?
+                    ' · '+label('隣接敵師団','Adjacent hostile divisions')+': '+p.hostileDivisions:''}
                   {p.status==='routeAvailable'&&p.candidateUnitId!==undefined?
                     ' · '+label('候補師団','Candidate division')+' #'+p.candidateUnitId:''}
                 </small>;
               })}
               {diagnosis.truncated&&<small>{label('診断上限に達したため、一部地点は未確認です。',
                 'Route check limit reached; some targets were not checked.')}</small>}
-              <small>{label('防衛優先度は敵接触・首都・沿岸・インフラ・人口の順です。沿岸は港とは限りません。',
-                'Priority uses hostile contact, capital, coast, infrastructure and population; coastal does not necessarily mean a port.')}</small>
+              <small>{label('防衛優先度は敵隣接の有無・隣接敵師団数・敵接触数・首都・沿岸・インフラ・人口の順です。敵師団数は戦闘力推定ではありません。沿岸は港とは限りません。',
+                'Priority uses hostile contact, adjacent hostile divisions, hostile borders, capital, coast, infrastructure and population. Division count is not combat power. Coastal is not necessarily a port.')}</small>
               <small>{label('この診断は移動命令を出しません。実際の作戦時は経路・状態を再検証します。',
                 'Read-only check. Route legality and state are revalidated when issuing orders.')}</small>
             </div>}
