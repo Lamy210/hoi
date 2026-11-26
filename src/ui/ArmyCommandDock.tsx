@@ -5,6 +5,7 @@ import {formationUnits,canDeployFormation,type FormationScope} from '../engine/m
 import type {FrontDeploymentMode} from '../engine/military/frontDeployment';
 import {engineClient} from './engineClient';
 import {MAX_GARRISON_TARGETS,MAX_GARRISON_UNITS} from '../engine/military/garrisons';
+import {controlledPortTargets,appendGarrisonPortTargets} from './garrisonPortTargets';
 
 type Props={
   snap:UiSnapshot;
@@ -12,6 +13,7 @@ type Props={
   selectedIds:readonly number[];
   selectedProvince:number|null;
   provinceNames:readonly string[];
+  portProvinces:readonly number[];
   pending:number;
   focus:FormationScope|null;
   onFocus:(value:FormationScope|null)=>void;
@@ -25,7 +27,7 @@ type Props={
  * Unit assignment and the new formation are atomic in the same command.
  */
 export function ArmyCommandDock({
-  snap,lang,selectedIds,selectedProvince,provinceNames,pending,focus,onFocus,onSelect,onDrawFront,onDrawObjective,
+  snap,lang,selectedIds,selectedProvince,provinceNames,portProvinces,pending,focus,onFocus,onSelect,onDrawFront,onDrawObjective,
 }:Props){
   const ja=lang==='ja',label=(j:string,e:string)=>ja?j:e,country=snap.playerCountry;
   const armies=snap.armies.filter(a=>a.owner===country).sort((a,b)=>a.id-b.id);
@@ -46,7 +48,11 @@ export function ArmyCommandDock({
   const ownGarrisons=snap.garrisons.filter(g=>g.owner===country);
   const garrisonAssigned=new Set(ownGarrisons.flatMap(g=>g.unitIds));
   const candidateGuardUnits=targetUnits.filter(u=>u.frontId<0&&!garrisonAssigned.has(u.id));
-  const canCreateGarrison=!busy&&garrisonTargets.length>0&&garrisonTargets.length<=MAX_GARRISON_TARGETS&&
+  const ownPorts=controlledPortTargets(portProvinces,snap.controller,country);
+  const mergedPortTargets=appendGarrisonPortTargets(garrisonTargets,ownPorts);
+  const newPortTargets=ownPorts.filter(p=>!garrisonTargets.includes(p));
+  const staleGarrisonTargets=garrisonTargets.some(p=>snap.controller[p]!==country);
+  const canCreateGarrison=!busy&&!staleGarrisonTargets&&garrisonTargets.length>0&&garrisonTargets.length<=MAX_GARRISON_TARGETS&&
     targetUnits.length>0&&targetUnits.length<=MAX_GARRISON_UNITS&&candidateGuardUnits.length===targetUnits.length;
   const selectedTarget=selectedProvince!==null&&snap.controller[selectedProvince]===country?selectedProvince:null;
   const dropdownTarget=garrisonProvince!==''?Number(garrisonProvince):null;
@@ -194,7 +200,17 @@ export function ArmyCommandDock({
         <button data-testid="dock-garrison-add-province" disabled={busy||possibleTarget===null||
           snap.controller[possibleTarget]!==country||garrisonTargets.includes(possibleTarget)}
           onClick={addGarrisonTarget}>{label('防衛地点に追加','Add target')}</button>
+        <button data-testid="dock-garrison-add-ports" disabled={busy||!newPortTargets.length||mergedPortTargets===null}
+          onClick={()=>{if(!busy&&mergedPortTargets!==null)setGarrisonTargets(mergedPortTargets);}}>
+          {label('自国港を一括追加','Add controlled ports')} ({newPortTargets.length})
+        </button>
         <span data-testid="dock-garrison-targets">{garrisonTargets.map(p=>provinceNames[p]).join(' · ')||label('地点未指定','No targets')}</span>
+        {staleGarrisonTargets&&<small data-testid="dock-garrison-stale-targets">
+          {label('防衛予定地の支配権が変化しました。地点をクリアして再指定してください。',
+            'Some draft targets are no longer controlled. Clear the draft and select controlled provinces again.')}
+        </small>}
+        <small data-testid="dock-garrison-port-hint">{label('実際に登録された港湾のみを追加します（自国支配港 '+ownPorts.length+'件）。港がない場合や64地点上限を超える場合は追加できません。',
+          'Only catalogued ports controlled by you are included ('+ownPorts.length+'). No coastal substitutes; a draft exceeding 64 targets is rejected.')}</small>
         <button data-testid="dock-garrison-clear-targets" disabled={busy||!garrisonTargets.length}
           onClick={()=>setGarrisonTargets([])}>{label('地点クリア','Clear')}</button>
         <button data-testid="dock-garrison-create" disabled={!canCreateGarrison}
