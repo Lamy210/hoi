@@ -51,6 +51,7 @@ jobs:
       - run: npx openspec validate garrison-coverage-visibility --strict
       - run: npx openspec validate on-demand-garrison-route-diagnostics --strict
       - run: npx openspec validate threat-aware-garrison-priorities --strict
+      - run: npx openspec validate garrison-hostile-division-pressure --strict
       - run: npx openspec validate phase8-starter-maritime-pack --strict
       - run: npx openspec validate phase8b-naval-models-capacity --strict
       - run: npx openspec validate phase8-maritime-map --strict
