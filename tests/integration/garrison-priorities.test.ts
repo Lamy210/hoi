@@ -66,6 +66,74 @@ describe('threat-aware garrison target priorities',()=>{
     expect(rankGarrisonTargets(w,order).map(p=>p.province)).toEqual([incheon]);
   });
 
+  it('uses observed enemy concentrations to prioritize an equally exposed frontier',async()=>{
+    const {w,c,order,unit,capital}=await fixture();
+    const west=w.prov.id.indexOf('KR-41'),east=w.prov.id.indexOf('KR-42');
+    const enemyProvince=w.prov.id.indexOf('KR-47');
+    const enemy=w.countries.id.indexOf('PRK');
+    expect(west).toBeGreaterThanOrEqual(0);
+    expect(east).toBeGreaterThanOrEqual(0);
+    expect(enemyProvince).toBeGreaterThanOrEqual(0);
+    expect(enemy).toBeGreaterThanOrEqual(0);
+    unit.loc=capital;
+    order.provinces=[east,west];
+    w.wars.push({id:1001,aggressor:enemy,defender:c,startTick:w.tick,cb:false,
+      status:'active',offeredBy:-1,offerType:-1,offerDemands:[],endTick:-1,contrib:{}});
+    // Enemy occupation creates two hostile borders for each objective:
+    // west: KP-06/KP-07, east: KP-07/KR-47.
+    w.prov.controller[enemyProvince]=enemy;
+    const enemyUnits=w.units.filter(u=>u.owner===enemy&&!u.destroyed);
+    expect(enemyUnits.length).toBeGreaterThanOrEqual(3);
+    const far=w.prov.id.indexOf('KP-01');
+    for(const u of enemyUnits)u.loc=far;
+    const baseline=rankGarrisonTargets(w,order);
+    expect(baseline.map(x=>x.hostileNeighbors)).toEqual([2,2]);
+    const previous=baseline[0].province;
+    // Test the new pressure signal independently of the prior border count:
+    // concentrate forces beside whichever objective was previously second.
+    const target=baseline[1].province;
+    const localEnemyProvince=target===east?enemyProvince:w.prov.id.indexOf('KP-06');
+    for(const u of enemyUnits.slice(0,3))u.loc=localEnemyProvince;
+    const before=hashWorld(w);
+    const ranked=rankGarrisonTargets(w,order);
+    expect(ranked[0]).toMatchObject({
+      province:target,hostileNeighbors:2,hostileDivisions:3,reason:'hostileForces',
+    });
+    expect(ranked[1]).toMatchObject({province:previous,hostileNeighbors:2,hostileDivisions:0});
+    expect(planGarrisonMoves(w,order)[0]?.target).toBe(target);
+    expect(diagnoseGarrisonRoutes(w,1,c,0)?.targets[0]).toMatchObject({
+      province:target,priorityRank:1,priorityReason:'hostileForces',hostileDivisions:3,
+    });
+    expect(hashWorld(w)).toBe(before);
+    // Destroyed enemy divisions must not inflate threat.
+    enemyUnits[0].destroyed=true;
+    expect(rankGarrisonTargets(w,order)[0].hostileDivisions).toBe(2);
+    // A peace agreement removes the threat signal even if the units remain nearby.
+    w.wars[w.wars.length-1].status='ended';
+    expect(rankGarrisonTargets(w,order).every(p=>p.hostileDivisions===0)).toBe(true);
+    expect(rankGarrisonTargets(w,order).every(p=>p.hostileNeighbors===0)).toBe(true);
+  });
+
+  it('ignores neutral and destroyed foreign divisions even beside a hostile border',async()=>{
+    const {w,c,order,border}=await fixture();
+    order.provinces=[border];
+    const enemy=w.countries.id.indexOf('PRK');
+    const japan=w.countries.id.indexOf('JPN');
+    w.wars.push({id:1002,aggressor:enemy,defender:c,startTick:w.tick,cb:false,
+      status:'active',offeredBy:-1,offerType:-1,offerDemands:[],endTick:-1,contrib:{}});
+    const kp07=w.prov.id.indexOf('KP-07');
+    const hostile=w.units.find(u=>u.owner===enemy&&!u.destroyed)!;
+    const neutral=w.units.find(u=>u.owner===japan&&!u.destroyed)!;
+    for(const u of w.units.filter(u=>u.owner===enemy))u.loc=w.prov.id.indexOf('KP-01');
+    hostile.loc=kp07;
+    neutral.loc=kp07;
+    const before=hashWorld(w);
+    expect(rankGarrisonTargets(w,order)[0].hostileDivisions).toBe(1);
+    hostile.destroyed=true;
+    expect(rankGarrisonTargets(w,order)[0].hostileDivisions).toBe(0);
+    expect(hashWorld(w)).not.toBe(before);
+  });
+
   it('keeps the existing last-guard and manual-hold protections',async()=>{
     const {w,order,unit,capital,coast}=await fixture();
     unit.loc=capital;
