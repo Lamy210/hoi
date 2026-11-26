@@ -2,6 +2,7 @@ import {describe,expect,it} from 'vitest';
 import {createTestEngine} from '../helpers';
 import {hashWorld} from '../../src/engine/core/hash';
 import {findPath} from '../../src/engine/systems/movement';
+import {estimateGarrisonTravelDays} from '../../src/engine/military/garrisonBatchOptimization';
 import {diagnoseGarrisonRoutes,MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS} from '../../src/engine/military/garrisonRouteDiagnostics';
 
 async function fixture(){
@@ -39,6 +40,12 @@ describe('read-only on-demand garrison land-route diagnosis',()=>{
     expect(result?.targets.find(x=>x.province===jeju)).toMatchObject({
       province:jeju,status:'noLandPath',
     });
+    const route=findPath(w,busan,incheon,c,false)!;
+    const estimatedDays=estimateGarrisonTravelDays(w,u,route);
+    expect(result?.targets.find(x=>x.province===incheon)?.estimatedDays)
+      .toBeCloseTo(estimatedDays,8);
+    expect(result?.targets.find(x=>x.province===jeju)?.estimatedDays).toBeUndefined();
+    expect(result?.targets.find(x=>x.province===incheon)?.hops).toBe(route.length-1);
     expect(hashWorld(w)).toBe(before);
     expect(u.path).toEqual([]);
   });
@@ -48,6 +55,7 @@ describe('read-only on-demand garrison land-route diagnosis',()=>{
     expect(diagnoseGarrisonRoutes(w,1,c,0)?.targets.map(t=>t.status))
       .toEqual(['notChecked','notChecked']);
     expect(diagnoseGarrisonRoutes(w,1,c,0)?.truncated).toBe(true);
+    expect(diagnoseGarrisonRoutes(w,1,c,0)?.targets.every(t=>t.estimatedDays===undefined)).toBe(true);
     u.manualHold=true;
     expect(diagnoseGarrisonRoutes(w,1,c)?.targets.map(t=>t.status))
       .toEqual(['noEligibleUnits','noEligibleUnits']);
