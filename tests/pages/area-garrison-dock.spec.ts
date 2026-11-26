@@ -33,3 +33,29 @@ test('下部軍団指揮バーから地点指定防衛を作成し停止・再�
   await page.getByTestId('apply-pending').click();
   await expect(page.getByTestId('dock-garrison-order-1')).toHaveCount(0);
 });
+
+test('登録済みの自国港だけを一括で駐屯対象に追加して作戦を作成する',async({page})=>{
+  await page.goto('/hoi/');
+  await page.getByTestId('btn-new-game').click();
+  await page.getByTestId('btn-to-country').click();
+  await page.getByTestId('country-KOR').click();
+  await page.getByTestId('btn-start').click();
+  await page.getByTestId('roster-mode-list').click();
+  const id=await page.locator('[data-unit-id]').first().getAttribute('data-unit-id');
+  expect(id).toBeTruthy();
+  await page.getByTestId('unit-roster-'+id).click();
+  await page.getByTestId('dock-garrison-toggle').click();
+  await expect(page.getByTestId('dock-garrison-add-ports')).toBeEnabled();
+  await expect(page.getByTestId('dock-garrison-add-ports')).toContainText('(2)');
+  await page.getByTestId('dock-garrison-add-ports').click();
+  await expect(page.getByTestId('dock-garrison-targets')).toContainText('釜山広域市');
+  await expect(page.getByTestId('dock-garrison-targets')).toContainText('仁川広域市');
+  await expect(page.getByTestId('dock-garrison-insufficient-units')).toContainText('全地点を同時に守れません');
+  await expect(page.getByTestId('dock-garrison-add-ports')).toBeDisabled();
+  await expect(page.getByTestId('dock-garrison-create')).toBeEnabled();
+  await page.getByTestId('dock-garrison-create').click();
+  await page.getByTestId('apply-pending').click();
+  await expect(page.getByTestId('dock-garrison-order-1')).toContainText('釜山広域市');
+  await expect(page.getByTestId('dock-garrison-order-1')).toContainText('仁川広域市');
+  await expect(page.getByTestId('dock-garrison-order-1')).not.toContainText('東京都');
+});
