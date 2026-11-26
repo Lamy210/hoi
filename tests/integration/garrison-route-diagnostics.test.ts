@@ -3,6 +3,7 @@ import {createTestEngine} from '../helpers';
 import {hashWorld} from '../../src/engine/core/hash';
 import {findPath} from '../../src/engine/systems/movement';
 import {estimateGarrisonTravelDays} from '../../src/engine/military/garrisonBatchOptimization';
+import {planGarrisonMoves} from '../../src/engine/military/garrisons';
 import {diagnoseGarrisonRoutes,MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS} from '../../src/engine/military/garrisonRouteDiagnostics';
 
 async function fixture(){
@@ -106,7 +107,6 @@ describe('read-only on-demand garrison land-route diagnosis',()=>{
     expect(pending?.pathChecks).toBe(0);
     expect(hashWorld(w)).toBe(before);
     // The existing weekly planner also protects the last physical defender.
-    const {planGarrisonMoves}=await import('../../src/engine/military/garrisons');
     expect(planGarrisonMoves(w,w.garrisons[0])).toEqual([]);
 
     // A relief becomes a real guard only after its movement has completed.
