@@ -76,7 +76,7 @@ describe('designated province garrison and deterministic movement',()=>{
   });
 
   it('revalidates the guard count between two queued AI movements',async()=>{
-    const {w,unit,own,target,cmd}=await fixture();
+    const {unit,own,target,cmd}=await fixture();
     const source=unit.loc,other=own.find(u=>u.id!==unit.id)!;
     other.loc=source;other.path=[];other.frontId=-1;other.manualHold=false;
     expect(cmd('createGarrison',{
