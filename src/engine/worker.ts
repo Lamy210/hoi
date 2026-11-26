@@ -3,6 +3,7 @@
 import { createEngine, type Engine, type TraceRequest } from './engine';
 import { civilFromDays } from './clock/date';
 import { previewTemplate } from './military/templateStats';
+import {diagnoseGarrisonRoutes} from './military/garrisonRouteDiagnostics';
 import type { Pack } from './scenario/types';
 
 let engine: Engine | null = null;
@@ -83,6 +84,13 @@ self.onmessage = async (ev: MessageEvent) => {
         } else {
           reply({ type: 'loaded', ok: false, violations: r.violations });
         }
+        break;
+      }
+      case 'diagnoseGarrison': {
+        if (!engine) throw new Error('Engine not initialized');
+        const result=diagnoseGarrisonRoutes(engine.world,msg.orderId as number,engine.world.playerCountry);
+        if(!result)throw new Error('Garrison order not found or not owned by player');
+        reply({type:'garrisonDiagnosis',result});
         break;
       }
       case 'previewTemplate': {
