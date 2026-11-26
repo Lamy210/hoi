@@ -69,6 +69,29 @@ describe('garrison coverage snapshot projection',()=>{
     expect(projectGarrisonCoverage(target,reserve)[1].gapReason).toBe('awaitingOrders');
   });
 
+  it('does not count an incoming relief as a second guard when explaining uncovered targets',()=>{
+    const g=order({provinces:[1,2],unitIds:[10,11]});
+    const enRoute={controller:controllers,units:[
+      unit(10,{loc:1}),unit(11,{loc:0,moving:true,target:1}),
+    ]};
+    const before=structuredClone(enRoute);
+    const pending=projectGarrisonCoverage(g,enRoute);
+    expect(pending[0]).toMatchObject({
+      province:1,status:'guarded',guardingUnitIds:[10],incomingUnitIds:[11],
+    });
+    expect(pending[1]).toMatchObject({
+      province:2,status:'uncovered',gapReason:'noAvailableUnits',
+    });
+    expect(enRoute).toEqual(before);
+    // Only a physically arrived, stationary guard may release another guard.
+    const arrived=projectGarrisonCoverage(g,{
+      controller:controllers,units:[unit(10,{loc:1}),unit(11,{loc:1})],
+    });
+    expect(arrived[1]).toMatchObject({
+      province:2,status:'uncovered',gapReason:'awaitingOrders',
+    });
+  });
+
   it('ignores foreign divisions, handles duplicate targets, and sorts IDs and provinces',()=>{
     const g=order({provinces:[3,1,3,2],unitIds:[11,10,12]});
     const snap={controller:controllers,units:[
