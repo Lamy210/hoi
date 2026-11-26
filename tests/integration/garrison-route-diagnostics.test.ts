@@ -84,6 +84,41 @@ describe('read-only on-demand garrison land-route diagnosis',()=>{
     expect(diagnoseGarrisonRoutes(w,1,c)?.targets.find(t=>t.province===jeju)?.status).toBe('lost');
   });
 
+  it('does not report the last stationed defender as movable while its relief is still incoming',async()=>{
+    const {w,c,u,busan,incheon}=await fixture();
+    const relief=w.units.find(unit=>unit.owner===c&&!unit.destroyed&&unit.id!==u.id)!;
+    expect(relief).toBeDefined();
+    const seoul=w.prov.id.indexOf('KR-11');
+    expect(seoul).toBeGreaterThanOrEqual(0);
+    relief.loc=seoul;
+    relief.path=[seoul,busan];
+    relief.manualHold=false;relief.encircled=false;relief.frontId=-1;
+    w.garrisons[0].provinces=[busan,incheon];
+    w.garrisons[0].unitIds=[u.id,relief.id];
+
+    const before=hashWorld(w);
+    const pending=diagnoseGarrisonRoutes(w,1,c);
+    expect(pending?.targets.find(t=>t.province===busan)?.status).toBe('guarded');
+    expect(pending?.targets.find(t=>t.province===incheon)).toMatchObject({
+      province:incheon,status:'noEligibleUnits',
+    });
+    expect(pending?.targets.find(t=>t.province===incheon)?.candidateUnitId).toBeUndefined();
+    expect(pending?.pathChecks).toBe(0);
+    expect(hashWorld(w)).toBe(before);
+    // The existing weekly planner also protects the last physical defender.
+    const {planGarrisonMoves}=await import('../../src/engine/military/garrisons');
+    expect(planGarrisonMoves(w,w.garrisons[0])).toEqual([]);
+
+    // A relief becomes a real guard only after its movement has completed.
+    relief.loc=busan;
+    relief.path=[];
+    const afterArrival=hashWorld(w);
+    const arrived=diagnoseGarrisonRoutes(w,1,c);
+    expect(arrived?.targets.find(t=>t.province===incheon)?.status).toBe('routeAvailable');
+    expect(planGarrisonMoves(w,w.garrisons[0])).toHaveLength(1);
+    expect(hashWorld(w)).toBe(afterArrival);
+  });
+
   it('denies foreign and malformed requests and keeps existing orders untouched',async()=>{
     const {w,c}=await fixture();
     expect(diagnoseGarrisonRoutes(w,1,c+1)).toBeNull();
