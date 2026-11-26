@@ -2,6 +2,7 @@
 // Never call from snapshot generation: pathfinding is intentionally explicit.
 import type {Unit,WorldState} from '../core/state';
 import {findPath} from '../systems/movement';
+import {estimateGarrisonTravelDays} from './garrisonBatchOptimization';
 import {rankGarrisonTargets,type GarrisonPriorityReason} from './garrisonPriorities';
 
 export const MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS=64;
@@ -14,6 +15,8 @@ export interface GarrisonRouteTarget{
   /** Only returned for an observed, currently valid route; not a movement order. */
   candidateUnitId?:number;
   hops?:number;
+  /** Estimated days for the shown candidate route, not a deployment promise. */
+  estimatedDays?:number;
   /** Current priority among controlled objectives, not a guaranteed deployment. */
   priorityRank?:number;
   priorityReason?:GarrisonPriorityReason;
@@ -93,7 +96,12 @@ export function diagnoseGarrisonRoutes(
       pathChecks++;
       const route=findPath(w,u.loc,province,country,false);
       if(route&&route.length>1){
-        found={province,status:'routeAvailable',candidateUnitId:u.id,hops:route.length-1};
+        const estimatedDays=estimateGarrisonTravelDays(w,u,route);
+        if(!Number.isFinite(estimatedDays))continue;
+        // Diagnostics report the first reachable candidate in ID order,
+        // not the optimized assignment made by the weekly planner.
+        found={province,status:'routeAvailable',candidateUnitId:u.id,
+          hops:route.length-1,estimatedDays};
         break;
       }
     }
