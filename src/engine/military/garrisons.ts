@@ -3,6 +3,7 @@
 import type {Unit,WorldState} from '../core/state';
 import {findPath} from '../systems/movement';
 import {rankGarrisonTargets} from './garrisonPriorities';
+import {estimateGarrisonTravelDays,optimizeGarrisonBatch} from './garrisonBatchOptimization';
 
 export interface GarrisonOrder {
   id:number;
@@ -105,7 +106,9 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
       (!coverage.has(u.loc)||coverage.get(u.loc)!>1))
       .map(u=>({u,path:findPath(w,u.loc,target,g.owner,false)}))
       .filter((v):v is {u:Unit;path:number[]}=>!!v.path&&v.path.length>1)
-      .sort((a,b)=>a.path.length-b.path.length||a.u.id-b.u.id);
+      .map(v=>({...v,days:estimateGarrisonTravelDays(w,v.u,v.path)}))
+      .filter(v=>Number.isFinite(v.days))
+      .sort((a,b)=>a.days-b.days||a.path.length-b.path.length||a.u.id-b.u.id);
     const best=candidates[0];
     if(!best)continue;
     orders.push({unitId:best.u.id,target,path:best.path});
@@ -113,5 +116,7 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
     if(coverage.has(best.u.loc))coverage.set(best.u.loc,coverage.get(best.u.loc)!-1);
     coverage.set(target,coverage.get(target)!+1);
   }
-  return orders;
+  // Only exchange destinations among the already selected units and targets.
+  // Source guard quotas and the priority-ordered set of covered targets stay fixed.
+  return optimizeGarrisonBatch(w,orders);
 }
