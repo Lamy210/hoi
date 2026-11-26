@@ -3,7 +3,8 @@
 // Reassigning destinations among the same divisions preserves guard withdrawals,
 // manual control, command budget, target coverage and save compatibility.
 import type {Unit,WorldState} from '../core/state';
-import {findPath,segmentDays} from '../systems/movement';
+import {segmentDays} from '../systems/movement';
+import {createGarrisonRouteLookup,type GarrisonRouteLookup} from './garrisonRouteCache';
 import type {GarrisonMovePlan,GarrisonOrder} from './garrisons';
 
 const MAX_ASSIGNMENTS=4;
@@ -77,11 +78,13 @@ export function selectGarrisonReserveCandidates(
 export function optimizeGarrisonBatch(
   w:WorldState,orders:readonly GarrisonMovePlan[],
   extraUnits:readonly Unit[]=[],
+  sharedRouteLookup?:GarrisonRouteLookup,
 ):GarrisonMovePlan[]{
   if(orders.length<=1||orders.length>MAX_ASSIGNMENTS)return orders.map(o=>({...o,path:[...o.path]}));
   const units=orders.map(o=>w.units.find(u=>u.id===o.unitId&&!u.destroyed));
   if(units.some(u=>!u))return orders.map(o=>({...o,path:[...o.path]}));
   const selected=units as Unit[];
+  const routeLookup=sharedRouteLookup??createGarrisonRouteLookup(w,selected[0].owner);
   const selectedIds=new Set(selected.map(u=>u.id));
   const candidates=[...selected];
   for(const unit of extraUnits){
@@ -100,7 +103,7 @@ export function optimizeGarrisonBatch(
     for(let unitIndex=0;unitIndex<candidates.length;unitIndex++){
       const unit=candidates[unitIndex];
       const path=targetIndex===unitIndex?orders[targetIndex].path:
-        findPath(w,unit.loc,target,unit.owner,false);
+        routeLookup(unit.loc,target);
       const days=path?estimateGarrisonTravelDays(w,unit,path):Infinity;
       row.push(path&&Number.isFinite(days)?{unitId:unit.id,path,days}:null);
     }
