@@ -17,6 +17,8 @@ export interface GarrisonRouteTarget{
   /** Current priority among controlled objectives, not a guaranteed deployment. */
   priorityRank?:number;
   priorityReason?:GarrisonPriorityReason;
+  /** Nearby currently hostile divisions; a count, not an estimated combat strength. */
+  hostileDivisions?:number;
 }
 export interface GarrisonRouteDiagnosis{
   orderId:number;
@@ -42,7 +44,7 @@ export function diagnoseGarrisonRoutes(
   const units=g.unitIds.map(id=>w.units.find(u=>u.id===id))
     .filter((u):u is Unit=>!!u&&!u.destroyed&&u.owner===country);
   const ranked=rankGarrisonTargets(w,g);
-  const rankMap=new Map(ranked.map((p,i)=>[p.province,{rank:i+1,reason:p.reason}]));
+  const rankMap=new Map(ranked.map((p,i)=>[p.province,{rank:i+1,reason:p.reason,hostileDivisions:p.hostileDivisions}]));
   // The same priority order used by the weekly planner also controls which
   // targets receive a route check first when the diagnostic budget is tight.
   const lost=g.provinces.filter(p=>Number.isSafeInteger(p)&&p>=0&&p<w.prov.count&&
@@ -99,6 +101,7 @@ export function diagnoseGarrisonRoutes(
   return {orderId:g.id,revision:g.revision,tick:w.tick,pathChecks,truncated,
     targets:results.map(t=>{
       const rank=rankMap.get(t.province);
-      return rank?{...t,priorityRank:rank.rank,priorityReason:rank.reason}:t;
+      return rank?{...t,priorityRank:rank.rank,priorityReason:rank.reason,
+        hostileDivisions:rank.hostileDivisions}:t;
     })};
 }
