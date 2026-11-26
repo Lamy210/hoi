@@ -98,6 +98,39 @@ describe('designated province garrison and deterministic movement',()=>{
     expect(unit.path[unit.path.length-1]).toBe(target);
   });
 
+  it('does not withdraw the only physical guard before an incoming reinforcement arrives',async()=>{
+    const {w,c,unit,own,target,cmd}=await fixture();
+    const source=unit.loc,reinforcement=own.find(u=>u.id!==unit.id)!;
+    const route=findPath(w,target,source,c,false);
+    expect(route?.length).toBeGreaterThan(1);
+    reinforcement.loc=target;reinforcement.path=route!;
+    reinforcement.frontId=-1;reinforcement.manualHold=false;reinforcement.encircled=false;
+    expect(cmd('createGarrison',{
+      provinces:[source,target],unitIds:[unit.id,reinforcement.id],
+    }).ok).toBe(true);
+    // The replacement is assigned to source, but is physically elsewhere.
+    expect(planGarrisonMoves(w,w.garrisons[0])).toEqual([]);
+    const beforePath=[...unit.path];
+    const rejected=cmd('garrisonMove',{
+      orderId:1,revision:1,unitId:unit.id,target,
+    },'frontai');
+    expect(rejected).toMatchObject({ok:false,reason:'staleGarrisonOrder'});
+    expect(unit.loc).toBe(source);
+    expect(unit.path).toEqual(beforePath);
+    // Once the incoming division actually arrives, one of the two
+    // stationed guards may legally redeploy without leaving source empty.
+    reinforcement.loc=source;reinforcement.path=[];
+    const planned=planGarrisonMoves(w,w.garrisons[0]);
+    expect(planned).toHaveLength(1);
+    expect(planned[0].target).toBe(target);
+    const allowed=cmd('garrisonMove',{
+      orderId:1,revision:1,unitId:unit.id,target,
+    },'frontai');
+    expect(allowed.ok).toBe(true);
+    expect(unit.path[unit.path.length-1]).toBe(target);
+    expect(reinforcement.loc).toBe(source);
+  });
+
   it('rejects foreign divisions, duplicate targets and double assignment without mutation',async()=>{
     const {w,c,unit,target,cmd}=await fixture();
     const foreign=w.units.find(u=>u.owner!==c&&!u.destroyed)!;
