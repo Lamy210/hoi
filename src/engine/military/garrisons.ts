@@ -2,6 +2,7 @@
 // frontline operations or under explicit manual control.
 import type {Unit,WorldState} from '../core/state';
 import {findPath} from '../systems/movement';
+import {rankGarrisonTargets} from './garrisonPriorities';
 
 export interface GarrisonOrder {
   id:number;
@@ -82,11 +83,11 @@ export function validateGarrisons(w:WorldState):string[]{
 
 export interface GarrisonMovePlan {unitId:number;target:number;path:number[]}
 
-/** Stable one-tick planning: fill uncovered valid targets, never strip their
- * last assigned guard. Only legitimate land paths are considered. */
+/** Stable one-tick planning: defend threatened and strategically important targets
+ * first, never strip their last guard. Only legitimate land paths are considered. */
 export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan[]{
   if(g.paused||!w.countries.alive[g.owner])return [];
-  const targets=g.provinces.filter(p=>w.prov.controller[p]===g.owner).sort((a,b)=>a-b);
+  const targets=rankGarrisonTargets(w,g).map(t=>t.province);
   const units=g.unitIds.map(id=>w.units.find(u=>u.id===id))
     .filter((u):u is Unit=>!!u&&!u.destroyed&&u.owner===g.owner);
   const coverage=new Map(targets.map(p=>[p,0]));
