@@ -205,6 +205,10 @@ export function ArmyCommandDock({
           {label('自国港を一括追加','Add controlled ports')} ({newPortTargets.length})
         </button>
         <span data-testid="dock-garrison-targets">{garrisonTargets.map(p=>provinceNames[p]).join(' · ')||label('地点未指定','No targets')}</span>
+        {garrisonTargets.length>targetUnits.length&&<small data-testid="dock-garrison-insufficient-units">
+          {label('防衛地点が師団数を上回っています。現在の駐屯AIでは全地点を同時に守れません。追加の師団が必要です。',
+            'More targets than divisions: the current garrison AI cannot defend every location simultaneously. Add divisions for full coverage.')}
+        </small>}
         {staleGarrisonTargets&&<small data-testid="dock-garrison-stale-targets">
           {label('防衛予定地の支配権が変化しました。地点をクリアして再指定してください。',
             'Some draft targets are no longer controlled. Clear the draft and select controlled provinces again.')}
