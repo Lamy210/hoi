@@ -30,6 +30,8 @@ jobs:
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
+      # Synthetic max-sized garrison workload; a smoke run, not an SLO benchmark.
+      - run: npm run bench -- --iterations 2 --warmup 1 --format json
       - run: npx playwright install --with-deps chromium
       - run: npm run test:pages
       - run: npx openspec validate release-github-pages --strict
