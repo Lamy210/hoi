@@ -88,7 +88,7 @@ export interface GarrisonMovePlan {unitId:number;target:number;path:number[]}
  * Return true when this unit is the last assigned coverage of an owned target.
  * This defensive check is repeated when the queued AI movement is applied:
  * between planning and execution, another guard may have moved or died.
- * Incoming assigned guards count as coverage, matching planGarrisonMoves.
+ * En-route reinforcements do not count as physically present defenders.
  */
 export function isLastGarrisonGuard(
   w:WorldState,g:GarrisonOrder,u:Unit,
@@ -98,8 +98,7 @@ export function isLastGarrisonGuard(
     if(otherId===u.id)continue;
     const other=w.units.find(v=>v.id===otherId&&!v.destroyed&&v.owner===g.owner);
     if(!other)continue;
-    const destination=other.path.length>1?other.path[other.path.length-1]:other.loc;
-    if(destination===u.loc)return false;
+    if(other.path.length===0&&other.loc===u.loc)return false;
   }
   return true;
 }
@@ -112,10 +111,15 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
   const targets=rankGarrisonTargets(w,g).map(t=>t.province);
   const units=g.unitIds.map(id=>w.units.find(u=>u.id===id))
     .filter((u):u is Unit=>!!u&&!u.destroyed&&u.owner===g.owner);
+  // Planned arrivals cover future assignments, but cannot hold the province
+  // before arriving. Keep a separate count of physically stationed guards.
   const coverage=new Map(targets.map(p=>[p,0]));
+  const stationed=new Map(targets.map(p=>[p,0]));
   for(const u of units){
     const dest=u.path.length>1?u.path[u.path.length-1]:u.loc;
     if(coverage.has(dest))coverage.set(dest,coverage.get(dest)!+1);
+    if(u.path.length===0&&stationed.has(u.loc))
+      stationed.set(u.loc,stationed.get(u.loc)!+1);
   }
   const busyUnits=new Set<number>();
   const orders:GarrisonMovePlan[]=[];
@@ -124,7 +128,7 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
     const candidates=units.filter(u=>!busyUnits.has(u.id)&&!u.manualHold&&
       !u.encircled&&!u.path.length&&!w.runtime.activeBattles.has(u.loc)&&
       w.prov.controller[u.loc]===g.owner&&u.frontId<0&&u.loc!==target&&
-      (!coverage.has(u.loc)||coverage.get(u.loc)!>1))
+      (!stationed.has(u.loc)||stationed.get(u.loc)!>1))
       .map(u=>({u,path:findPath(w,u.loc,target,g.owner,false)}))
       .filter((v):v is {u:Unit;path:number[]}=>!!v.path&&v.path.length>1)
       .map(v=>({...v,days:estimateGarrisonTravelDays(w,v.u,v.path)}))
@@ -135,6 +139,7 @@ export function planGarrisonMoves(w:WorldState,g:GarrisonOrder):GarrisonMovePlan
     orders.push({unitId:best.u.id,target,path:best.path});
     busyUnits.add(best.u.id);
     if(coverage.has(best.u.loc))coverage.set(best.u.loc,coverage.get(best.u.loc)!-1);
+    if(stationed.has(best.u.loc))stationed.set(best.u.loc,stationed.get(best.u.loc)!-1);
     coverage.set(target,coverage.get(target)!+1);
   }
   // Keep the chosen objectives and the existing guard withdrawals fixed, but
