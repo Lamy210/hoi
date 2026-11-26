@@ -2,6 +2,7 @@
 // Never call from snapshot generation: pathfinding is intentionally explicit.
 import type {Unit,WorldState} from '../core/state';
 import {findPath} from '../systems/movement';
+import {rankGarrisonTargets,type GarrisonPriorityReason} from './garrisonPriorities';
 
 export const MAX_GARRISON_DIAGNOSTIC_PATH_CHECKS=64;
 export type GarrisonRouteStatus=
@@ -13,6 +14,9 @@ export interface GarrisonRouteTarget{
   /** Only returned for an observed, currently valid route; not a movement order. */
   candidateUnitId?:number;
   hops?:number;
+  /** Current priority among controlled objectives, not a guaranteed deployment. */
+  priorityRank?:number;
+  priorityReason?:GarrisonPriorityReason;
 }
 export interface GarrisonRouteDiagnosis{
   orderId:number;
@@ -37,9 +41,14 @@ export function diagnoseGarrisonRoutes(
   if(!g)return null;
   const units=g.unitIds.map(id=>w.units.find(u=>u.id===id))
     .filter((u):u is Unit=>!!u&&!u.destroyed&&u.owner===country);
-  const targets=g.provinces.filter(p=>Number.isSafeInteger(p)&&p>=0&&p<w.prov.count)
-    .slice().sort((a,b)=>a-b);
-  const activeTargets=new Set(targets.filter(p=>w.prov.controller[p]===country));
+  const ranked=rankGarrisonTargets(w,g);
+  const rankMap=new Map(ranked.map((p,i)=>[p.province,{rank:i+1,reason:p.reason}]));
+  // The same priority order used by the weekly planner also controls which
+  // targets receive a route check first when the diagnostic budget is tight.
+  const lost=g.provinces.filter(p=>Number.isSafeInteger(p)&&p>=0&&p<w.prov.count&&
+    w.prov.controller[p]!==country).sort((a,b)=>a-b);
+  const targets=[...ranked.map(p=>p.province),...lost];
+  const activeTargets=new Set(ranked.map(p=>p.province));
   const coverage=new Map([...activeTargets].map(p=>[p,0]));
   const guards=new Set<number>(),incoming=new Set<number>();
   for(const u of units){
@@ -87,5 +96,9 @@ export function diagnoseGarrisonRoutes(
     }
     results.push(found??{province,status:exhausted?'notChecked':'noLandPath'});
   }
-  return {orderId:g.id,revision:g.revision,tick:w.tick,pathChecks,truncated,targets:results};
+  return {orderId:g.id,revision:g.revision,tick:w.tick,pathChecks,truncated,
+    targets:results.map(t=>{
+      const rank=rankMap.get(t.province);
+      return rank?{...t,priorityRank:rank.rank,priorityReason:rank.reason}:t;
+    })};
 }
