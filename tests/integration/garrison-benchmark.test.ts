@@ -21,7 +21,7 @@ describe('garrison stress-workload measurement',()=>{
     const stats=emptyGarrisonRouteCacheStats();
     const planned=planGarrisonMoves(world,order,stats);
     expect(planned.length).toBeLessThanOrEqual(GARRISON_COMMAND_BUDGET);
-    expect(stats.requests).toBe(stats.searches+stats.hits);
+    expect(stats.requests).toBe(stats.searches+stats.hits+stats.disconnected);
     expect(stats.requests).toBeGreaterThan(0);
     expect(stats.searches).toBeGreaterThan(0);
     expect(stats.searches).toBeLessThan(stats.requests);
@@ -36,7 +36,7 @@ describe('garrison stress-workload measurement',()=>{
       });
       expect(result.provinceCount).toBeGreaterThan(8);
       expect(result.plannedMoves).toBeLessThanOrEqual(GARRISON_COMMAND_BUDGET);
-      expect(result.routeRequests).toBe(result.pathSearches+result.cacheHits);
+      expect(result.routeRequests).toBe(result.pathSearches+result.cacheHits+result.disconnectedSkips);
       expect(result.pathSearches).toBeGreaterThan(0);
       for(const timing of [result.minMs,result.p50Ms,result.p95Ms,result.maxMs]){
         expect(Number.isFinite(timing)).toBe(true);
