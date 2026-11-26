@@ -36,12 +36,12 @@ export function projectGarrisonCoverage(
   }
   for(const index of [guards,arrivals])
     for(const list of index.values())list.sort((a,b)=>a-b);
-  // Match the planner's last-guard constraint: a stationed division is only
-  // available as a reinforcement when its defended province has another guard.
+  // Match the planner's last-guard constraint: an incoming reinforcement
+  // cannot relieve the last physically stationed defender before arrival.
   const targets=new Set(order.provinces.filter(p=>snapshot.controller[p]===order.owner));
   const available=units.some(u=>!u.moving&&!u.manualHold&&!u.inBattle&&!u.encircled&&
     snapshot.controller[u.loc]===order.owner&&
-    (!targets.has(u.loc)||((guards.get(u.loc)?.length??0)+(arrivals.get(u.loc)?.length??0)>1)));
+    (!targets.has(u.loc)||(guards.get(u.loc)?.length??0)>1));
   const reason:CoverageGapReason=order.paused?'paused':
     !units.length?'noUnits':!available?'noAvailableUnits':'awaitingOrders';
   return [...new Set(order.provinces)].sort((a,b)=>a-b).map(province=>{
