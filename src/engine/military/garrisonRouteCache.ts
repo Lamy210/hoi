@@ -19,23 +19,17 @@ export function emptyGarrisonRouteCacheStats():GarrisonRouteCacheStats {
 type LandPathSearch=(world:WorldState,from:number,to:number,owner:number,allowHostile:boolean)=>number[]|null;
 
 /**
- * Reuse legal land paths for identical origins and objectives within one
- * garrison planning invocation. Cache failed searches as well.
+ * Return a conservative connectivity preflight for peaceful land travel.
+ * False means definitely unreachable; true only means that the original A*
+ * may find a route. A foreign-controlled origin is allowed to depart because
+ * findPath only applies entry permissions to neighbors, not its starting node.
  *
- * No module-level cache: diplomacy, wars and province control may change on
- * the next tick. Return a copy so consumers cannot mutate a cached path.
- * Division-specific ETA must still be calculated separately with segmentDays.
+ * The passable graph is undirected in the current scenario format. Build it
+ * anew per planning/diagnosis invocation; no cached access rights cross ticks.
  */
-export function createGarrisonRouteLookup(
+export function createGarrisonConnectivity(
   w:WorldState,owner:number,
-  search:LandPathSearch=findPath,
-  stats?:GarrisonRouteCacheStats,
-):GarrisonRouteLookup {
-  // The movement graph is undirected. Within one planning invocation, each
-  // passable province belongs to one component. This provides a *necessary*
-  // connectivity check without changing the A* route or its tie-breaking.
-  // A blocked origin is deliberately not rejected here: findPath permits
-  // starting on a foreign-controlled node and leaving for a passable neighbor.
+):(from:number,to:number)=>boolean {
   const n=w.prov.count;
   const passable=Array.from({length:n},(_,p)=>canEnterProvince(w,p,owner,false));
   const component=new Array<number>(n).fill(-1);
@@ -57,6 +51,29 @@ export function createGarrisonRouteLookup(
     queue.length=0;
     componentId++;
   }
+  return (from,to)=>{
+    if(from===to)return true;
+    if(!Number.isSafeInteger(from)||from<0||from>=n||
+       !Number.isSafeInteger(to)||to<0||to>=n)return false;
+    return component[to]!==-1&&
+      (component[from]===-1||component[from]===component[to]);
+  };
+}
+
+/**
+ * Reuse legal land paths for identical origins and objectives within one
+ * garrison planning invocation. Cache failed searches as well.
+ *
+ * No module-level cache: diplomacy, wars and province control may change on
+ * the next tick. Return a copy so consumers cannot mutate a cached path.
+ * Division-specific ETA must still be calculated separately with segmentDays.
+ */
+export function createGarrisonRouteLookup(
+  w:WorldState,owner:number,
+  search:LandPathSearch=findPath,
+  stats?:GarrisonRouteCacheStats,
+):GarrisonRouteLookup {
+  const couldReach=createGarrisonConnectivity(w,owner);
   const byOrigin=new Map<number,Map<number,number[]|null>>();
   return (from,to)=>{
     if(stats)stats.requests++;
@@ -69,9 +86,7 @@ export function createGarrisonRouteLookup(
       // A* admits from===to even on a blocked node. Otherwise, the target
       // must be passable; two passable nodes in different components cannot
       // be connected. A blocked origin falls back to the original A* check.
-      const disconnected=from!==to&&(
-        component[to]===-1||
-        (component[from]!==-1&&component[from]!==component[to]));
+      const disconnected=!couldReach(from,to);
       if(disconnected){
         destinations.set(to,null);
         if(stats){stats.disconnected++;stats.unreachable++;}
