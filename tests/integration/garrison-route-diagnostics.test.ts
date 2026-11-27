@@ -51,6 +51,43 @@ describe('read-only on-demand garrison land-route diagnosis',()=>{
     expect(u.path).toEqual([]);
   });
 
+  it('reports an unreachable island without spending the remaining A* budget',async()=>{
+    const {w,c,incheon,jeju}=await fixture();
+    const before=hashWorld(w);
+    // The mainland target uses the only permitted A* call. The island has
+    // no land connection and can be rejected without claiming an extra check.
+    const diagnosis=diagnoseGarrisonRoutes(w,1,c,1);
+    expect(diagnosis?.pathChecks).toBe(1);
+    expect(diagnosis?.truncated).toBe(false);
+    expect(diagnosis?.targets.find(t=>t.province===incheon)?.status).toBe('routeAvailable');
+    expect(diagnosis?.targets.find(t=>t.province===jeju)?.status).toBe('noLandPath');
+    expect(diagnosis?.targets.find(t=>t.province===jeju)?.estimatedDays).toBeUndefined();
+    expect(hashWorld(w)).toBe(before);
+    // Explicit zero-budget requests preserve the previous "not checked"
+    // semantics; a connectivity preflight alone is not a user-requested scan.
+    const zero=diagnoseGarrisonRoutes(w,1,c,0);
+    expect(zero?.pathChecks).toBe(0);
+    expect(zero?.truncated).toBe(true);
+    expect(zero?.targets.map(t=>t.status)).toEqual(['notChecked','notChecked']);
+  });
+
+  it('rejects co-located isolated candidates without unnecessary A* calls',async()=>{
+    const {w,c,u,incheon,jeju}=await fixture();
+    const another=w.units.find(v=>v.owner===c&&!v.destroyed&&v.id!==u.id)!;
+    expect(another).toBeDefined();
+    for(const unit of [u,another]){
+      unit.loc=jeju;unit.path=[];unit.manualHold=false;unit.encircled=false;unit.frontId=-1;
+    }
+    w.garrisons[0].provinces=[incheon];
+    w.garrisons[0].unitIds=[u.id,another.id];
+    const before=hashWorld(w);
+    const diagnosis=diagnoseGarrisonRoutes(w,1,c,1);
+    expect(diagnosis?.pathChecks).toBe(0);
+    expect(diagnosis?.truncated).toBe(false);
+    expect(diagnosis?.targets).toMatchObject([{province:incheon,status:'noLandPath'}]);
+    expect(hashWorld(w)).toBe(before);
+  });
+
   it('reports a bounded or unavailable check, never guessing a route',async()=>{
     const {w,c,u,incheon,jeju}=await fixture();
     expect(diagnoseGarrisonRoutes(w,1,c,0)?.targets.map(t=>t.status))

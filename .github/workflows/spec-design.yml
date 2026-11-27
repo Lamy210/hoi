@@ -62,6 +62,7 @@ jobs:
       - run: npx openspec validate garrison-plan-local-route-cache --strict
       - run: npx openspec validate garrison-stress-benchmark --strict
       - run: npx openspec validate garrison-connectivity-prefilter --strict
+      - run: npx openspec validate garrison-diagnostic-connectivity-budget --strict
       - run: npx openspec validate phase8-starter-maritime-pack --strict
       - run: npx openspec validate phase8b-naval-models-capacity --strict
       - run: npx openspec validate phase8-maritime-map --strict
