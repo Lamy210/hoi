@@ -2,6 +2,7 @@
 // Never call from snapshot generation: pathfinding is intentionally explicit.
 import type {Unit,WorldState} from '../core/state';
 import {findPath} from '../systems/movement';
+import {createGarrisonConnectivity} from './garrisonRouteCache';
 import {estimateGarrisonTravelDays} from './garrisonBatchOptimization';
 import {rankGarrisonTargets,type GarrisonPriorityReason} from './garrisonPriorities';
 
@@ -68,6 +69,10 @@ export function diagnoseGarrisonRoutes(
         stationed.set(u.loc,stationed.get(u.loc)!+1);
     }
   }
+  // A single read-only invocation uses the same access/connectivity rules
+  // as the weekly planner. Unreachable land pairs need no A* budget.
+  const couldReach=createGarrisonConnectivity(w,country);
+  const checkedPaths=new Map<number,Map<number,number[]|null>>();
   let pathChecks=0;
   let truncated=false;
   const results:GarrisonRouteTarget[]=[];
@@ -94,12 +99,32 @@ export function diagnoseGarrisonRoutes(
     if(!candidates.length){
       results.push({province,status:'noEligibleUnits'});continue;
     }
+    // An explicitly zero diagnostic budget must remain "not checked",
+    // even for a province that the connectivity preflight could rule out.
+    if(budget===0){
+      truncated=true;
+      results.push({province,status:'notChecked'});
+      continue;
+    }
     let found:GarrisonRouteTarget|null=null;
     let exhausted=false;
     for(const u of candidates){
-      if(pathChecks>=budget){exhausted=true;truncated=true;break;}
-      pathChecks++;
-      const route=findPath(w,u.loc,province,country,false);
+      if(!couldReach(u.loc,province))continue;
+      let origins=checkedPaths.get(u.loc);
+      let route:number[]|null;
+      if(origins?.has(province)){
+        // A failed search is memoized too. It does not consume a second slot.
+        route=origins.get(province)??null;
+      }else{
+        if(pathChecks>=budget){exhausted=true;truncated=true;break;}
+        pathChecks++;
+        route=findPath(w,u.loc,province,country,false);
+        if(!origins){
+          origins=new Map();
+          checkedPaths.set(u.loc,origins);
+        }
+        origins.set(province,route);
+      }
       if(route&&route.length>1){
         const estimatedDays=estimateGarrisonTravelDays(w,u,route);
         if(!Number.isFinite(estimatedDays))continue;
