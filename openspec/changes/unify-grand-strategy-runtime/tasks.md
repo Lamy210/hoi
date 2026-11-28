@@ -1,0 +1,28 @@
+# Tasks
+- [x] 1.1 現行mainの二重エンジンと既存OpenSpecを照合し、CR-01〜30をproposal/designへ記載。
+- [x] 1.2 strategy/model.ts と rules.ts の入力検証・決済丸めを修正、strategy-runtime-invariants.test.ts に回帰を追加（実行は未確認）。
+- [ ] 1.3 strict OpenSpec・typecheck・Vitest・build・既存E2E・365日テスト実行、結果をPRに記録。
+- [ ] 2.1 core/state.ts・scenario/build.ts に排他正本/IDの契約を定義、初期化・二重計上テスト。
+- [ ] 2.2 core/scheduler.ts をフェーズ化、日次/週次/月次と同時戦闘の順序テスト。
+- [ ] 2.3 save/serialize.ts・worker.ts 新形式の原子保存/旧形式拒否/再開hash一致テスト。
+- [ ] 3.1 economy の採掘/在庫/日次需給/整数通貨台帳、資源・資金保存テスト。
+- [ ] 3.2 貿易・海上輸送・禁輸・escrow、重複予約と輸送ロス回帰。
+- [ ] 3.3 財政・税・賃金・国債・債務再編、債権債務一致テスト。
+- [ ] 3.4 population の地域POP・動員/復員/教育、回復と人口保存テスト。
+- [ ] 4.1 politics の政体/政党/議席/連立・選挙、議席保存と支持率テスト。
+- [ ] 4.2 閣僚・利益集団・政治危機・国号/旗、ID保持・危機再発防止テスト。
+- [ ] 4.3 focus/spirits のDAG・排他・modifier、冪等性テスト。
+- [ ] 5.1 construction の民需容量・修理・資材予約、二重支出回帰。
+- [ ] 5.2 production の工場・WIP・効率・資源台帳、型番切替保存則。
+- [ ] 5.3 strategy/designer と research の本番接続、装備凍結/研究RP/MIOテスト。
+- [ ] 6.1 logistics の地域索引・燃料・容量配賦、容量超過/dirtyテスト。
+- [ ] 6.2 fronts/garrisons のコマンド橋渡し、手動優先・上限・経路失効テスト。
+- [ ] 6.3 combat の同時解決・幅・装甲・損耗、順序独立テスト。
+- [ ] 6.4 air の任務・防空・爆撃、出撃/燃料/損害保存テスト。
+- [ ] 6.5 occupation の操業権・駐屯人員・抵抗、重複徴収禁止テスト。
+- [ ] 7.1 UI政治/市場/POP画面と命令・不足診断、Playwright操作確認。
+- [ ] 7.2 UI工業/兵器/研究画面、設計→生産→実配備E2E。
+- [ ] 7.3 UI補給/航空/占領/国策画面、命令→戦闘→占領E2E。
+- [ ] 8.1 1/5/10年の平和・戦争・禁輸・総動員・空襲・破産シナリオ回帰。
+- [ ] 8.2 実シナリオ性能計測、p95/CPU/メモリ/命令予算を報告。
+- [ ] 8.3 既存OpenSpec差分の重複整理・旧正本廃止・リリース判定。未完了のままアーカイブしない。
