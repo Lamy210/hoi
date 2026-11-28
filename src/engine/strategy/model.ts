@@ -170,7 +170,7 @@ export function assertStrategyState(w:StrategyState):void{
         throw new RangeError('province belongs to multiple regions');
       assignedProvinces.add(p);
     }
-    nonnegative(r.population);
+    if(!Number.isSafeInteger(r.population)||r.population<0)throw new RangeError('regional population integer');
     for(const qty of Object.values(r.resources))nonnegative(qty);
   }
   if(assignedProvinces.size!==w.provinces.length)throw new RangeError('unassigned province');
@@ -269,6 +269,7 @@ export function assertStrategyState(w:StrategyState):void{
       throw new RangeError('invalid division combat width');
     for(const v of [u.soldiers,u.organization,u.hp,u.supply,u.hardness,u.softAttack,u.hardAttack,u.defense,u.breakthrough])
       nonnegative(v);
+    if(!Number.isSafeInteger(u.soldiers))throw new RangeError('division soldiers integer');
     if(u.hardness>1||u.supply>1)throw new RangeError('division ratio');
   }
   // Airbase hangars count both ready aircraft and aircraft in the repair queue.
@@ -321,7 +322,8 @@ export function assertStrategyState(w:StrategyState):void{
     if(occupationKeys.has(key))throw new RangeError('duplicate occupation');
     occupationKeys.add(key);
     if(!regions.has(o.regionId)||!countries.has(o.occupier))throw new RangeError('occupation references');
-    if(o.share<0||o.share>1||o.resistance<0||o.resistance>100||
+    if([o.share,o.resistance,o.compliance,o.garrisonSupply].some(v=>!Number.isFinite(v))||
+      o.share<0||o.share>1||o.resistance<0||o.resistance>100||
       o.compliance<0||o.compliance>100||o.garrisonSupply<0||o.garrisonSupply>1)
       throw new RangeError('occupation ratio');
   }

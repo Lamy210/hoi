@@ -50,8 +50,12 @@ export interface TradeResult {quantity:number;paid:number;buyerCash:number;selle
 export function settleTrade(qty:number,price:number,buyerCash:number,sellerCash:number,buyerStock:number,sellerStock:number):TradeResult{
   for(const v of [qty,price,buyerCash,sellerCash,buyerStock,sellerStock])nonnegative(v);
   if(price<=0)throw new RangeError('trade price');
-  const quantity=Math.max(0,Math.min(Math.floor(qty),Math.floor(sellerStock),Math.floor(buyerCash/price+1e-9)));
+  // Never round an unaffordable order up. Check the actual multiplication as well.
+  let quantity=Math.max(0,Math.min(Math.floor(qty),Math.floor(sellerStock),Math.floor(buyerCash/price)));
+  if(!Number.isSafeInteger(quantity))throw new RangeError('trade quantity outside safe integer range');
+  if(quantity*price>buyerCash)quantity=Math.max(0,quantity-1);
   const paid=quantity*price;
+  if(paid>buyerCash||!Number.isFinite(sellerCash+paid)||!Number.isFinite(buyerStock+quantity))throw new RangeError('trade settlement overflow');
   return {quantity,paid,buyerCash:buyerCash-paid,sellerCash:sellerCash+paid,buyerStock:buyerStock+quantity,sellerStock:sellerStock-quantity};
 }
 export interface ConstructionResult {progressIC:number;paid:number;materialsSpent:number;nextDamage?:number;}
